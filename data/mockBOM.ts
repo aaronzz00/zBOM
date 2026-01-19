@@ -29,6 +29,9 @@ export const complexBOM: BOMNode = {
   targetCost: 135.00,
   variants: ['Common'],
   weightG: 0, // Calculated roll-up
+  attachments: [
+    { id: 'att-1', name: 'Assembly_Guide_RevA.pdf', type: 'drawing', url: '#', size: '2.4 MB', uploadDate: '2024-05-10' }
+  ],
   history: [
     {
       revision: 'A.02',
@@ -55,6 +58,10 @@ export const complexBOM: BOMNode = {
       leadTimeWeeks: 4,
       variants: ['Common'],
       weightG: 120,
+      customAttributes: {
+        'material': 'Cardboard',
+        'finish': 'Matte'
+      },
       children: [
         {
           id: 'n1-1',
@@ -72,7 +79,11 @@ export const complexBOM: BOMNode = {
           variants: ['Common'],
           weightG: 85,
           moq: 1000,
-          spq: 50
+          spq: 50,
+          customAttributes: {
+            'material': 'Greyboard',
+            'finish': 'Soft Touch'
+          }
         },
         {
           id: 'n1-2',
@@ -145,6 +156,10 @@ export const complexBOM: BOMNode = {
           ],
           avl: [
             { id: 'a1', manufacturer: 'Samsung Display', mpn: 'AMS667YK01', status: 'Preferred' }
+          ],
+          attachments: [
+            { id: 'att-ds', name: 'AMS667YK01_Datasheet.pdf', type: 'datasheet', url: '#', size: '1.2 MB', uploadDate: '2024-01-15' },
+            { id: 'att-cad', name: 'OLED_Model.step', type: 'cad', url: '#', size: '15 MB', uploadDate: '2024-02-20' }
           ]
         },
         {
@@ -162,7 +177,10 @@ export const complexBOM: BOMNode = {
           manufacturer: 'ATL',
           leadTimeWeeks: 8,
           variants: ['Common'],
-          weightG: 68.5
+          weightG: 68.5,
+          customAttributes: {
+             'compliance': 'UN38.3'
+          }
         },
         {
           id: 'n2-3',
@@ -246,7 +264,11 @@ export const complexBOM: BOMNode = {
           variants: ['Common'],
           weightG: 0.05,
           moq: 5000,
-          spq: 1000
+          spq: 1000,
+          customAttributes: {
+            'material': 'Stainless Steel',
+            'torque': '0.15 Nm'
+          }
         }
       ]
     }

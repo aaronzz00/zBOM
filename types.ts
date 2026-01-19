@@ -44,6 +44,7 @@ export enum Permission {
   MANAGE_AVL = 'MANAGE_AVL', // Add/Remove suppliers
   APPROVE_CHANGE = 'APPROVE_CHANGE', // Approve ECOs
   CREATE_ECO = 'CREATE_ECO',
+  MANAGE_ATTRIBUTES = 'MANAGE_ATTRIBUTES', // Create/Delete custom columns
 }
 
 export interface PricingTier {
@@ -64,6 +65,25 @@ export interface AVLEntry {
   manufacturer: string;
   mpn: string;
   status: 'Preferred' | 'Alternate' | 'DoNotUse' | 'Pending';
+}
+
+// --- P1: Data Flexibility Types ---
+
+export interface AttributeDefinition {
+  id: string;
+  name: string; // Display Name (e.g. "Material")
+  key: string;  // Internal Key (e.g. "material")
+  type: 'text' | 'number' | 'select' | 'date';
+  options?: string[]; // For select type
+}
+
+export interface Attachment {
+  id: string;
+  name: string;
+  type: 'datasheet' | 'cad' | 'drawing' | 'other';
+  url: string;
+  size?: string;
+  uploadDate: string;
 }
 
 export interface BOMNode {
@@ -103,6 +123,10 @@ export interface BOMNode {
 
   // Supply Chain - P2 AVL Feature
   avl?: AVLEntry[];
+
+  // P1: Data Flexibility
+  customAttributes?: Record<string, any>; // Key matches AttributeDefinition.key
+  attachments?: Attachment[];
 
   children?: BOMNode[];
   isExpanded?: boolean; // UI state
@@ -186,6 +210,10 @@ export interface LibraryPart {
 
   // Physical
   weightG?: number;
+
+  // P1: Data Flexibility
+  customAttributes?: Record<string, any>;
+  attachments?: Attachment[];
 
   datasheet?: string;
 }

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { BOMNode, LifecycleState, ComponentType, Permission } from '../types';
 import { ChevronRight, ChevronDown, FileText, Component, Package, Cpu, Database, AlertTriangle, TrendingDown, Target, Lock, Scale, Image } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useAppStore } from '../context/AppContext';
 
 interface BOMTableProps {
   data: BOMNode;
@@ -68,6 +69,7 @@ const analyzeRefDesDuplicates = (rootNode: BOMNode) => {
 
 export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId, isMBOMView }) => {
   const { hasPermission } = useAuth();
+  const { attributeDefs } = useAppStore();
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set(['root', 'n1', 'n2', 'n2-3']));
 
   const canViewCost = hasPermission(Permission.VIEW_COST);
@@ -140,17 +142,24 @@ export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId, 
             </div>
         </div>
       <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm text-left">
+        <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10 font-semibold shadow-sm">
             <tr>
-              <th className="px-4 py-3 w-[260px] border-b border-r border-slate-200">Part Number</th>
+              <th className="px-4 py-3 w-[260px] border-b border-r border-slate-200 min-w-[200px]">Part Number</th>
               <th className="px-4 py-3 w-16 border-b border-r border-slate-200 text-center">Img</th>
-              <th className="px-4 py-3 border-b border-r border-slate-200">Description</th>
+              <th className="px-4 py-3 border-b border-r border-slate-200 min-w-[150px]">Description</th>
               <th className="px-4 py-3 w-[120px] border-b border-r border-slate-200 bg-indigo-50/30">RefDes</th>
               <th className="px-4 py-3 w-24 border-b border-r border-slate-200">State</th>
               <th className="px-4 py-3 w-16 text-right border-b border-r border-slate-200">Qty</th>
-              {/* Feature: Weight */}
               <th className="px-4 py-3 w-20 text-right border-b border-r border-slate-200">Wgt(g)</th>
+              
+              {/* Dynamic Columns */}
+              {attributeDefs.map(def => (
+                  <th key={def.id} className="px-4 py-3 border-b border-r border-slate-200 bg-slate-100/30 min-w-[100px] text-slate-600">
+                      {def.name}
+                  </th>
+              ))}
+
               <th className="px-4 py-3 w-28 text-right border-b border-r border-slate-200 bg-slate-100/30">Target</th>
               <th className="px-4 py-3 w-28 text-right border-b border-slate-200 bg-slate-100/30">Actual</th>
             </tr>
@@ -224,10 +233,16 @@ export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId, 
                     </td>
                     <td className="px-4 py-2 text-right border-r border-slate-100 font-mono text-slate-700">{row.quantity} {row.unit}</td>
                     
-                    {/* Weight Column */}
                     <td className="px-4 py-2 text-right border-r border-slate-100 font-mono text-slate-600 text-xs">
                         {row.weightG ? `${(row.weightG * row.quantity).toFixed(1)}` : '-'}
                     </td>
+
+                    {/* Dynamic Cells */}
+                    {attributeDefs.map(def => (
+                        <td key={def.id} className="px-4 py-2 border-r border-slate-100 text-slate-600 text-sm truncate max-w-[150px]">
+                            {row.customAttributes?.[def.key] || '-'}
+                        </td>
+                    ))}
 
                     <td className="px-4 py-2 text-right border-r border-slate-100 font-mono text-slate-500 bg-slate-50/30">
                         <CostCell value={row.targetCost} />
