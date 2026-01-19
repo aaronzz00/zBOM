@@ -15,8 +15,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ENG_LEAD: [
     Permission.VIEW_DASHBOARD, 
     Permission.VIEW_BOM, 
+    Permission.VIEW_ECO,
     Permission.EDIT_BOM_STRUCTURE, 
     Permission.EDIT_BOM_METADATA,
+    Permission.CREATE_ECO,
     // Engineer CANNOT view cost or manage AVL commercially
   ],
   SOURCING: [
@@ -27,11 +29,12 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.VIEW_SUPPLIER_RISK,
     Permission.EDIT_COST,
     Permission.MANAGE_AVL,
-    // Sourcing CANNOT edit structure (add/remove parts)
+    // Sourcing CANNOT edit structure (add/remove parts) or Approve technical ECOs
   ],
   VIEWER: [
     Permission.VIEW_DASHBOARD,
-    Permission.VIEW_BOM
+    Permission.VIEW_BOM,
+    Permission.VIEW_ECO
     // Read only, no cost visibility
   ]
 };

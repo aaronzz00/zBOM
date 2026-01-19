@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Bell, User, ChevronDown } from 'lucide-react';
+import { Search, Bell, User, ChevronDown, Scale } from 'lucide-react';
 import { Project } from '../types';
 
 interface HeaderProps {
@@ -30,6 +30,14 @@ export const Header: React.FC<HeaderProps> = ({ project }) => {
             <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-medium border border-slate-200">
                 {project.sku}
             </span>
+        </div>
+        
+        {/* Weight Rollup Display */}
+        <div className="hidden md:flex items-center gap-2 ml-4 px-3 py-1 bg-slate-50 border border-slate-200 rounded-full">
+             <Scale className="w-4 h-4 text-slate-400" />
+             <span className="text-xs font-semibold text-slate-600">
+                {project.totalWeight ? `${project.totalWeight.toFixed(1)} g` : '--'}
+             </span>
         </div>
       </div>
 

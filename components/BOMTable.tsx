@@ -1,34 +1,43 @@
 import React, { useMemo } from 'react';
 import { BOMNode, LifecycleState, ComponentType, Permission } from '../types';
-import { ChevronRight, ChevronDown, FileText, Component, Package, Cpu, Database, AlertTriangle, TrendingDown, Target, Lock } from 'lucide-react';
+import { ChevronRight, ChevronDown, FileText, Component, Package, Cpu, Database, AlertTriangle, TrendingDown, Target, Lock, Scale, Image } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface BOMTableProps {
   data: BOMNode;
   onSelect: (node: BOMNode) => void;
   selectedId: string | null;
+  isMBOMView: boolean; // Control visibility of Auxiliary items
 }
 
 // Flatten the recursive structure for the table view, tracking depth
-const flattenBOM = (node: BOMNode, depth = 0, expandedIds: Set<string>): Array<BOMNode & { depth: number; hasChildren: boolean }> => {
+const flattenBOM = (node: BOMNode, depth = 0, expandedIds: Set<string>, isMBOMView: boolean): Array<BOMNode & { depth: number; hasChildren: boolean }> => {
   const result: Array<BOMNode & { depth: number; hasChildren: boolean }> = [];
   
-  result.push({ ...node, depth, hasChildren: !!(node.children && node.children.length > 0) });
+  // EBOM Filter: Skip if node is auxiliary and we are NOT in MBOM view
+  if (node.isAuxiliary && !isMBOMView) {
+      return result; 
+  }
 
-  if (expandedIds.has(node.id) && node.children) {
-    node.children.forEach(child => {
-      result.push(...flattenBOM(child, depth + 1, expandedIds));
+  // Determine if children exist (considering the filter)
+  const visibleChildren = node.children ? node.children.filter(c => isMBOMView || !c.isAuxiliary) : [];
+  const hasVisibleChildren = visibleChildren.length > 0;
+
+  result.push({ ...node, depth, hasChildren: hasVisibleChildren });
+
+  if (expandedIds.has(node.id) && hasVisibleChildren) {
+    visibleChildren.forEach(child => {
+      result.push(...flattenBOM(child, depth + 1, expandedIds, isMBOMView));
     });
   }
   
   return result;
 };
 
-// P0 Feature: Analyze RefDes Uniqueness
-// Returns a Set of RefDes strings that are duplicates, and a Map of NodeID -> DuplicatedRefDesString[]
+// ... (RefDes Logic kept the same)
 const analyzeRefDesDuplicates = (rootNode: BOMNode) => {
-    const refDesMap = new Map<string, string[]>(); // RefDes -> [NodeIDs]
-    const duplicates = new Map<string, string[]>(); // NodeID -> [ConflictingRefDes]
+    const refDesMap = new Map<string, string[]>(); 
+    const duplicates = new Map<string, string[]>(); 
 
     const traverse = (node: BOMNode) => {
         if (node.refDes) {
@@ -46,8 +55,6 @@ const analyzeRefDesDuplicates = (rootNode: BOMNode) => {
     };
 
     traverse(rootNode);
-
-    // Identify duplicates
     refDesMap.forEach((nodeIds, des) => {
         if (nodeIds.length > 1) {
             nodeIds.forEach(id => {
@@ -56,13 +63,12 @@ const analyzeRefDesDuplicates = (rootNode: BOMNode) => {
             });
         }
     });
-
     return duplicates;
 };
 
-export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId }) => {
+export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId, isMBOMView }) => {
   const { hasPermission } = useAuth();
-  const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set(['root', 'n2', 'n2-3']));
+  const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set(['root', 'n1', 'n2', 'n2-3']));
 
   const canViewCost = hasPermission(Permission.VIEW_COST);
 
@@ -77,9 +83,7 @@ export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId }
     setExpandedIds(newSet);
   };
 
-  const rows = useMemo(() => flattenBOM(data, 0, expandedIds), [data, expandedIds]);
-  
-  // Calculate duplicates map
+  const rows = useMemo(() => flattenBOM(data, 0, expandedIds, isMBOMView), [data, expandedIds, isMBOMView]);
   const duplicateMap = useMemo(() => analyzeRefDesDuplicates(data), [data]);
 
   const getLifecycleColor = (state: LifecycleState) => {
@@ -103,26 +107,10 @@ export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId }
     }
   };
 
-  const getVariantBadge = (variants?: string[]) => {
-      if (!variants || variants.length === 0 || (variants.length === 1 && variants[0] === 'Common')) {
-          return null; 
-      }
-      return (
-          <div className="flex gap-1 flex-wrap">
-              {variants.map(v => (
-                  <span key={v} className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100 font-medium">
-                      {v}
-                  </span>
-              ))}
-          </div>
-      );
-  };
-
-  // Helper component for Masked Cost
   const CostCell = ({ value, prefix = '$', showTrend = false, variance = 0, isOver = false }: any) => {
       if (!canViewCost) {
           return (
-            <div className="flex items-center justify-end gap-1 opacity-20 select-none" title="Hidden due to permission settings">
+            <div className="flex items-center justify-end gap-1 opacity-20 select-none">
                  <Lock className="w-3 h-3" />
                  <span>***</span>
             </div>
@@ -143,10 +131,12 @@ export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId }
   return (
     <div className="flex-1 bg-white overflow-hidden flex flex-col h-full border rounded-lg border-slate-200 shadow-sm">
         <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex items-center justify-between flex-shrink-0">
-            <h3 className="text-sm font-semibold text-slate-700">Indent Level View</h3>
+            <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-slate-700">Indent Level View</h3>
+                {isMBOMView && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-200">MBOM Mode</span>}
+            </div>
             <div className="flex gap-2 text-xs">
                  <button onClick={() => setExpandedIds(new Set(['root']))} className="px-2 py-1 text-slate-600 hover:bg-slate-200 rounded">Collapse All</button>
-                 <button onClick={() => setExpandedIds(new Set(['root', 'n1', 'n2', 'n2-3']))} className="px-2 py-1 text-slate-600 hover:bg-slate-200 rounded">Expand Level 2</button>
             </div>
         </div>
       <div className="flex-1 overflow-auto">
@@ -154,16 +144,15 @@ export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId }
           <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10 font-semibold shadow-sm">
             <tr>
               <th className="px-4 py-3 w-[260px] border-b border-r border-slate-200">Part Number</th>
+              <th className="px-4 py-3 w-16 border-b border-r border-slate-200 text-center">Img</th>
               <th className="px-4 py-3 border-b border-r border-slate-200">Description</th>
-              {/* P0 Feature Header */}
               <th className="px-4 py-3 w-[120px] border-b border-r border-slate-200 bg-indigo-50/30">RefDes</th>
-              <th className="px-4 py-3 w-16 border-b border-r border-slate-200">Rev</th>
               <th className="px-4 py-3 w-24 border-b border-r border-slate-200">State</th>
               <th className="px-4 py-3 w-16 text-right border-b border-r border-slate-200">Qty</th>
-              {/* P1 Feature Header: Target Cost */}
+              {/* Feature: Weight */}
+              <th className="px-4 py-3 w-20 text-right border-b border-r border-slate-200">Wgt(g)</th>
               <th className="px-4 py-3 w-28 text-right border-b border-r border-slate-200 bg-slate-100/30">Target</th>
-              <th className="px-4 py-3 w-28 text-right border-b border-r border-slate-200 bg-slate-100/30">Actual</th>
-              <th className="px-4 py-3 w-24 border-b border-slate-200">Variants</th>
+              <th className="px-4 py-3 w-28 text-right border-b border-slate-200 bg-slate-100/30">Actual</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -172,12 +161,12 @@ export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId }
                 const hasTarget = row.targetCost !== undefined;
                 const variance = hasTarget ? row.cost - (row.targetCost || 0) : 0;
                 const isOverBudget = variance > 0;
-
+                
                 return (
                 <tr 
                     key={row.id} 
                     onClick={() => onSelect(row)}
-                    className={`group cursor-pointer transition-colors ${selectedId === row.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                    className={`group cursor-pointer transition-colors ${selectedId === row.id ? 'bg-blue-50' : 'hover:bg-slate-50'} ${row.isAuxiliary ? 'bg-amber-50/30' : ''}`}
                 >
                     <td className="px-2 py-2 border-r border-slate-100 font-mono text-slate-700 flex items-center gap-2">
                     <div style={{ paddingLeft: `${row.depth * 20}px` }} className="flex items-center min-w-0">
@@ -195,49 +184,56 @@ export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId }
                         <span className="w-5 mr-1 inline-block flex-shrink-0"></span>
                         )}
                         <span className="opacity-70 mr-2 flex-shrink-0" title={row.type}>{getTypeIcon(row.type)}</span>
-                        <span className="font-medium truncate">{row.partNumber}</span>
+                        <span className="font-medium truncate">
+                            {row.partNumber}
+                            {row.isAuxiliary && <span className="ml-2 text-[9px] bg-amber-200 text-amber-800 px-1 rounded font-bold">AUX</span>}
+                        </span>
                     </div>
                     </td>
+                    
+                    {/* Thumbnail Column */}
+                    <td className="px-2 py-2 border-r border-slate-100 text-center">
+                        {row.imageUrl ? (
+                            <img src={row.imageUrl} alt="" className="w-8 h-8 rounded border border-slate-200 object-cover mx-auto bg-white" />
+                        ) : (
+                            <div className="w-8 h-8 rounded border border-slate-200 bg-slate-50 flex items-center justify-center mx-auto text-slate-300">
+                                <Image className="w-4 h-4" />
+                            </div>
+                        )}
+                    </td>
+
                     <td className="px-4 py-2 border-r border-slate-100 text-slate-800">
                         <div className="truncate" title={row.name}>{row.name}</div>
                     </td>
                     
-                    {/* RefDes with Duplicate Warning */}
                     <td className={`px-4 py-2 border-r border-slate-100 font-mono text-xs ${conflicts ? 'bg-red-50' : 'bg-indigo-50/10'}`}>
                         <div className="flex items-center justify-between">
                             <div className={`truncate max-w-[80px] ${conflicts ? 'text-red-600 font-bold' : 'text-slate-600'}`} title={row.refDes || ''}>
                                 {row.refDes || '-'}
                             </div>
                             {conflicts && (
-                                <div className="group/warn relative">
-                                    <AlertTriangle className="w-3.5 h-3.5 text-red-500 animate-pulse" />
-                                    <div className="absolute left-full top-0 ml-2 w-48 p-2 bg-red-800 text-white text-[10px] rounded shadow-lg z-50 hidden group-hover/warn:block">
-                                        Duplicate Designator found: <span className="font-mono font-bold">{conflicts.join(', ')}</span>.
-                                        This will cause SMT failure.
-                                    </div>
-                                </div>
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
                             )}
                         </div>
                     </td>
 
-                    <td className="px-4 py-2 border-r border-slate-100 text-slate-600">{row.revision}</td>
                     <td className="px-4 py-2 border-r border-slate-100">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getLifecycleColor(row.state)}`}>
-                        {row.state}
-                    </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getLifecycleColor(row.state)}`}>
+                            {row.state}
+                        </span>
                     </td>
-                    <td className="px-4 py-2 text-right border-r border-slate-100 font-mono text-slate-700">{row.quantity}</td>
+                    <td className="px-4 py-2 text-right border-r border-slate-100 font-mono text-slate-700">{row.quantity} {row.unit}</td>
                     
-                    {/* Target Costing Feature with FLS */}
+                    {/* Weight Column */}
+                    <td className="px-4 py-2 text-right border-r border-slate-100 font-mono text-slate-600 text-xs">
+                        {row.weightG ? `${(row.weightG * row.quantity).toFixed(1)}` : '-'}
+                    </td>
+
                     <td className="px-4 py-2 text-right border-r border-slate-100 font-mono text-slate-500 bg-slate-50/30">
                         <CostCell value={row.targetCost} />
                     </td>
-                    <td className="px-4 py-2 text-right border-r border-slate-100 bg-slate-50/30">
+                    <td className="px-4 py-2 text-right border-slate-100 bg-slate-50/30">
                         <CostCell value={row.cost} showTrend={hasTarget} variance={variance} isOver={isOverBudget} />
-                    </td>
-
-                    <td className="px-4 py-2 border-r border-slate-100">
-                        {getVariantBadge(row.variants)}
                     </td>
                 </tr>
             )})}

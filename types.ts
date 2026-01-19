@@ -9,7 +9,7 @@ export enum LifecycleState {
 export enum ComponentType {
   Assembly = 'Assembly',
   Part = 'Part',
-  Material = 'Material',
+  Material = 'Material', // For MBOM aux items like Glue/Solder
   Software = 'Software'
 }
 
@@ -31,6 +31,7 @@ export enum Permission {
   VIEW_DASHBOARD = 'VIEW_DASHBOARD',
   VIEW_BOM = 'VIEW_BOM',
   VIEW_SUPPLY_CHAIN = 'VIEW_SUPPLY_CHAIN',
+  VIEW_ECO = 'VIEW_ECO',
   
   // Data Visibility (Field Level)
   VIEW_COST = 'VIEW_COST', // Can see price data
@@ -41,10 +42,14 @@ export enum Permission {
   EDIT_BOM_METADATA = 'EDIT_BOM_METADATA', // Edit description, refdes
   EDIT_COST = 'EDIT_COST', // Edit target cost or unit cost
   MANAGE_AVL = 'MANAGE_AVL', // Add/Remove suppliers
-  APPROVE_CHANGE = 'APPROVE_CHANGE',
+  APPROVE_CHANGE = 'APPROVE_CHANGE', // Approve ECOs
+  CREATE_ECO = 'CREATE_ECO',
 }
 
-// Existing Types...
+export interface PricingTier {
+  minQty: number;
+  price: number;
+}
 
 export interface RevisionLog {
   revision: string;
@@ -66,6 +71,7 @@ export interface BOMNode {
   partNumber: string;
   name: string;
   description?: string;
+  imageUrl?: string; // Visual BOM support
   revision: string;
   state: LifecycleState;
   type: ComponentType;
@@ -77,19 +83,30 @@ export interface BOMNode {
   mpn?: string; // Manufacturer Part Number
   leadTimeWeeks?: number;
   
-  // New Fields for Consumer Electronics Support
-  refDes?: string; // Reference Designators (e.g., "R1, R2, R5")
-  variants?: string[]; // SKU applicability (e.g., ["Common"] or ["US-Only"])
+  // Consumer Electronics Support
+  refDes?: string; 
+  variants?: string[]; 
   
   // P1 - Target Costing
-  targetCost?: number; // The budget allocated for this subsystem/part
+  targetCost?: number; 
+
+  // Feature: Procurement Intelligence
+  moq?: number; // Minimum Order Quantity
+  spq?: number; // Standard Pack Quantity
+  pricingTiers?: PricingTier[]; // Volume pricing
+
+  // Feature: Physical Attributes
+  weightG?: number; // Weight in grams
+
+  // Feature: MBOM Support
+  isAuxiliary?: boolean; // If true, only visible in MBOM view (e.g. glue, tape)
 
   // Supply Chain - P2 AVL Feature
   avl?: AVLEntry[];
 
   children?: BOMNode[];
   isExpanded?: boolean; // UI state
-  history?: RevisionLog[]; // New history log
+  history?: RevisionLog[]; 
 }
 
 export interface BOMSnapshot {
@@ -97,6 +114,29 @@ export interface BOMSnapshot {
   name: string;
   timestamp: string;
   data: BOMNode;
+}
+
+// --- ECO / Change Management Types ---
+export interface ECOImpact {
+  partNumber: string;
+  name: string;
+  changeType: 'RevUp' | 'New' | 'Obsolete' | 'QtyChange';
+  from?: string;
+  to?: string;
+}
+
+export interface ECO {
+  id: string;
+  ecoNumber: string;
+  title: string;
+  description: string;
+  status: 'Draft' | 'Pending Approval' | 'Approved' | 'Rejected' | 'Implemented';
+  initiator: string;
+  createdDate: string;
+  approvedBy?: string;
+  approvalDate?: string;
+  impacts: ECOImpact[];
+  priority: 'Low' | 'Medium' | 'High' | 'Emergency';
 }
 
 export interface Project {
@@ -107,6 +147,7 @@ export interface Project {
   phase: 'EVT' | 'DVT' | 'PVT' | 'MP';
   lastModified: string;
   totalCost: number;
+  totalWeight?: number; 
 }
 
 export interface Supplier {
@@ -119,7 +160,6 @@ export interface Supplier {
   category: string;
   leadTimeAvg: number; // weeks
   lastAudit: string;
-  // partsCount is now derived from relation, removed from base interface or kept optional for UI cache
 }
 
 export interface LibraryPart {
@@ -128,17 +168,26 @@ export interface LibraryPart {
   mpn: string;
   manufacturer: string;
   description: string;
+  imageUrl?: string;
   category: string;
+  state: LifecycleState;
+  location: string;
+  type?: ComponentType; 
+  
+  // Commercial & Procurement
   cost: number;
   stock: number;
   minStock: number;
-  state: LifecycleState;
-  datasheet?: string;
-  location: string;
-  type?: ComponentType; 
-  // Linkage fields
   supplierId?: string;
   leadTimeWeeks?: number;
+  moq?: number;
+  spq?: number;
+  pricingTiers?: PricingTier[];
+
+  // Physical
+  weightG?: number;
+
+  datasheet?: string;
 }
 
 export interface AIAnalysisResult {

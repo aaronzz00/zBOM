@@ -6,6 +6,7 @@ import { BOMEditor } from './pages/BOMEditor';
 import { BOMCompare } from './pages/BOMCompare';
 import { PartLibrary } from './pages/PartLibrary';
 import { SupplyChain } from './pages/SupplyChain';
+import { ECOManager } from './pages/ECOManager';
 import { mockProject } from './data/mockBOM';
 
 function App() {
@@ -17,6 +18,8 @@ function App() {
         return <Dashboard />;
       case 'bom':
         return <BOMEditor />;
+      case 'eco':
+        return <ECOManager />;
       case 'compare':
         return <BOMCompare />;
       case 'parts':

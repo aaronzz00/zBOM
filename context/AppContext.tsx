@@ -29,17 +29,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [libraryParts, setLibraryParts] = useState<LibraryPart[]>(mockLibraryData);
   const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
   
-  // Initialize with the mock 'previous' version as a snapshot so comparison works out of the box
   const [snapshots, setSnapshots] = useState<BOMSnapshot[]>([
     {
       id: 'snap-001',
       name: 'Baseline (Rev A.01)',
-      timestamp: new Date(Date.now() - 86400000 * 7).toISOString(), // 7 days ago
+      timestamp: new Date(Date.now() - 86400000 * 7).toISOString(), 
       data: previousBOM
     }
   ]);
 
-  // Helper to recursively update a node
   const updateNodeRecursive = (node: BOMNode, id: string, updates: Partial<BOMNode>): BOMNode => {
     if (node.id === id) {
       return { ...node, ...updates };
@@ -53,7 +51,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return node;
   };
 
-  // Helper to recursively add a node
   const addNodeRecursive = (node: BOMNode, parentId: string, newNode: BOMNode): BOMNode => {
     if (node.id === parentId) {
       return {
@@ -70,25 +67,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return node;
   };
 
-  // Recalculate Project Total Cost when BOM changes
+  // Recalculate Project Total Cost AND Total Weight when BOM changes
   useEffect(() => {
-    const calculateTotalCost = (node: BOMNode): number => {
+    // Return [Cost, Weight]
+    const calculateTotals = (node: BOMNode): [number, number] => {
+      // Base values
       const selfCost = node.type !== ComponentType.Assembly ? (node.cost * node.quantity) : 0;
-      const childrenCost = node.children ? node.children.reduce((acc, child) => acc + calculateTotalCost(child), 0) : 0;
+      const selfWeight = (node.weightG || 0) * node.quantity;
+
+      // Children values
+      let childrenCost = 0;
+      let childrenWeight = 0;
+
+      if (node.children) {
+          node.children.forEach(child => {
+              const [cCost, cWeight] = calculateTotals(child);
+              childrenCost += cCost;
+              childrenWeight += cWeight;
+          });
+      }
+
+      // If assembly, its cost/weight is sum of children + its own (if any, e.g. aux)
+      // Note: Logic depends if cost/weightG on Assembly node means "Assembly Process Cost/Weight" or "Total".
+      // Usually Total = Children + Self.
       
-      if (node.type === ComponentType.Assembly) return childrenCost;
-      return selfCost;
+      const totalCost = (node.type === ComponentType.Assembly ? childrenCost : selfCost); 
+      // Weight roll-up: Sum of children weights
+      const totalWeight = node.type === ComponentType.Assembly ? childrenWeight + selfWeight : selfWeight;
+
+      return [totalCost, totalWeight];
     };
 
-    const calcRecursive = (n: BOMNode): number => {
-        if (!n.children || n.children.length === 0) return n.cost * n.quantity;
-        const childrenSum = n.children.reduce((sum, child) => sum + calcRecursive(child), 0);
-        return childrenSum * n.quantity; 
-    };
-
-    const rootCost = bomData.children ? bomData.children.reduce((sum, child) => sum + calcRecursive(child), 0) : 0;
+    // Calculate recursively for the root's CHILDREN (as root qty is usually 1 project)
+    // Or just run on root and assume root quantity is 1 unit of product
     
-    setProject(prev => ({ ...prev, totalCost: rootCost }));
+    // We want the cost/weight of ONE unit of the root product
+    let pCost = 0;
+    let pWeight = 0;
+
+    if (bomData.children) {
+        bomData.children.forEach(child => {
+             const [c, w] = calculateTotals(child);
+             pCost += c;
+             pWeight += w;
+        });
+    }
+    
+    setProject(prev => ({ ...prev, totalCost: pCost, totalWeight: pWeight }));
 
   }, [bomData]);
 
@@ -113,7 +138,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id: `snap-${Date.now()}`,
         name: name,
         timestamp: new Date().toISOString(),
-        // Deep copy the current BOM Data
         data: JSON.parse(JSON.stringify(bomData))
     };
     setSnapshots(prev => [newSnapshot, ...prev]);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Layers, Box, Settings, Share2, Database, Cpu, GitCompare, Shield } from 'lucide-react';
+import { LayoutDashboard, Layers, Box, Settings, Share2, Database, Cpu, GitCompare, Shield, FileSignature } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, Permission } from '../types';
 
@@ -15,6 +15,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
   const navItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', requiredPerm: Permission.VIEW_DASHBOARD },
     { id: 'bom', icon: Layers, label: 'BOM Editor', requiredPerm: Permission.VIEW_BOM },
+    { id: 'eco', icon: FileSignature, label: 'Change Orders', requiredPerm: Permission.VIEW_ECO },
     { id: 'compare', icon: GitCompare, label: 'Compare Revisions', requiredPerm: Permission.VIEW_BOM },
     { id: 'parts', icon: Box, label: 'Part Library', requiredPerm: Permission.VIEW_BOM },
     { id: 'suppliers', icon: Share2, label: 'Supply Chain', requiredPerm: Permission.VIEW_SUPPLY_CHAIN },
@@ -78,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
           Settings
         </button>
         <div className="mt-4 px-4 text-xs text-slate-600">
-          v2.4.0 (Build 9921)<br/>
+          v2.5.0 (Build 9924)<br/>
           Logged in as: <span className="text-slate-400 font-bold">{currentUser.name}</span>
         </div>
       </div>

@@ -1,18 +1,79 @@
 import React, { useMemo } from 'react';
 import { BOMNode } from '../types';
 import { flattenBOMForProcurement } from '../utils/bomFlatener';
-import { DollarSign, ShoppingCart, Layers, CircuitBoard } from 'lucide-react';
+import { DollarSign, ShoppingCart, Layers, CircuitBoard, PackageCheck } from 'lucide-react';
 
 interface BOMFlatViewProps {
   data: BOMNode;
 }
 
-export const BOMFlatView: React.FC<BOMFlatViewProps> = ({ data }) => {
-  const flatItems = useMemo(() => flattenBOMForProcurement(data), [data]);
+// Logic to calculate tiered price
+const getUnitPrice = (qty: number, node?: BOMNode) => {
+    if (!node || !node.pricingTiers || node.pricingTiers.length === 0) return node ? node.cost : 0;
+    
+    // Sort tiers descending by qty
+    const sortedTiers = [...node.pricingTiers].sort((a, b) => b.minQty - a.minQty);
+    const matchedTier = sortedTiers.find(t => qty >= t.minQty);
+    
+    return matchedTier ? matchedTier.price : node.cost;
+};
 
-  const totalParts = flatItems.reduce((acc, item) => acc + item.totalQuantity, 0);
-  const totalUnique = flatItems.length;
-  const totalCost = flatItems.reduce((acc, item) => acc + item.totalCost, 0);
+export const BOMFlatView: React.FC<BOMFlatViewProps> = ({ data }) => {
+  // We need access to the raw node data for MOQ/SPQ logic, 
+  // currently flattenBOMForProcurement aggregates data.
+  // We will enhance the flattening logic or do a post-process lookup if we had a map.
+  // For this demo, let's assume we map back to the BOMNode to find MOQ/SPQ using partNumber.
+  
+  // Flatten tree
+  const flatItems = useMemo(() => flattenBOMForProcurement(data), [data]);
+  
+  // Create a map for quick lookup of MOQ/SPQ/Tiers from the original data tree
+  // In a real app, the flattener should include these fields.
+  const lookupMap = useMemo(() => {
+      const map = new Map<string, BOMNode>();
+      const traverse = (n: BOMNode) => {
+          map.set(n.partNumber, n);
+          if (n.children) n.children.forEach(traverse);
+      }
+      traverse(data);
+      return map;
+  }, [data]);
+
+  const procurementData = flatItems.map(item => {
+      const originalNode = lookupMap.get(item.partNumber);
+      const moq = originalNode?.moq || 1;
+      const spq = originalNode?.spq || 1;
+      
+      const requiredQty = item.totalQuantity;
+      
+      // Calculate Buy Qty
+      // 1. Must satisfy MOQ
+      let buyQty = Math.max(requiredQty, moq);
+      
+      // 2. Must be multiple of SPQ (if SPQ > 1)
+      if (spq > 1) {
+          buyQty = Math.ceil(buyQty / spq) * spq;
+      }
+      
+      const unitPrice = getUnitPrice(buyQty, originalNode);
+      const procurementCost = buyQty * unitPrice;
+      const excessQty = buyQty - requiredQty;
+      const excessCost = excessQty * unitPrice;
+
+      return {
+          ...item,
+          moq,
+          spq,
+          buyQty,
+          unitPrice, // Tier adjusted price
+          procurementCost,
+          excessCost
+      };
+  });
+
+  const totalBOMCost = flatItems.reduce((acc, item) => acc + item.totalCost, 0);
+  const totalProcurementSpend = procurementData.reduce((acc, item) => acc + item.procurementCost, 0);
+  const totalExcess = procurementData.reduce((acc, item) => acc + item.excessCost, 0);
 
   return (
     <div className="flex-1 bg-white overflow-hidden flex flex-col h-full border rounded-lg border-slate-200 shadow-sm animate-in fade-in duration-300">
@@ -23,26 +84,28 @@ export const BOMFlatView: React.FC<BOMFlatViewProps> = ({ data }) => {
                   <ShoppingCart className="w-4 h-4" />
               </div>
               <div>
-                  <p className="text-xs text-slate-500 uppercase font-bold">Total Spend</p>
-                  <p className="text-lg font-mono font-bold text-slate-800">${totalCost.toFixed(2)}</p>
+                  <p className="text-xs text-slate-500 uppercase font-bold">Standard Cost</p>
+                  <p className="text-lg font-mono font-bold text-slate-800">${totalBOMCost.toFixed(2)}</p>
               </div>
           </div>
-          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded border border-slate-200 shadow-sm">
-              <div className="p-2 bg-purple-100 text-purple-600 rounded-full">
-                  <Layers className="w-4 h-4" />
-              </div>
-              <div>
-                  <p className="text-xs text-slate-500 uppercase font-bold">Unique Parts</p>
-                  <p className="text-lg font-mono font-bold text-slate-800">{totalUnique}</p>
-              </div>
-          </div>
+          
           <div className="flex items-center gap-3 bg-white px-4 py-2 rounded border border-slate-200 shadow-sm">
               <div className="p-2 bg-emerald-100 text-emerald-600 rounded-full">
-                  <CircuitBoard className="w-4 h-4" />
+                  <DollarSign className="w-4 h-4" />
               </div>
               <div>
-                  <p className="text-xs text-slate-500 uppercase font-bold">Total Component Count</p>
-                  <p className="text-lg font-mono font-bold text-slate-800">{totalParts}</p>
+                  <p className="text-xs text-slate-500 uppercase font-bold">Procurement Spend (w/ MOQ)</p>
+                  <p className="text-lg font-mono font-bold text-emerald-700">${totalProcurementSpend.toFixed(2)}</p>
+              </div>
+          </div>
+
+          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded border border-slate-200 shadow-sm">
+              <div className="p-2 bg-rose-100 text-rose-600 rounded-full">
+                  <PackageCheck className="w-4 h-4" />
+              </div>
+              <div>
+                  <p className="text-xs text-slate-500 uppercase font-bold">Excess Inventory</p>
+                  <p className="text-lg font-mono font-bold text-rose-600">${totalExcess.toFixed(2)}</p>
               </div>
           </div>
       </div>
@@ -52,49 +115,30 @@ export const BOMFlatView: React.FC<BOMFlatViewProps> = ({ data }) => {
           <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10 font-semibold shadow-sm">
             <tr>
               <th className="px-4 py-3 border-b border-slate-200 w-48">Part Number</th>
-              <th className="px-4 py-3 border-b border-slate-200">Description</th>
-              <th className="px-4 py-3 border-b border-slate-200 w-40">Manufacturer</th>
-              <th className="px-4 py-3 border-b border-slate-200 w-40">MPN</th>
-              <th className="px-4 py-3 border-b border-slate-200 text-right w-32">Total Qty</th>
-              <th className="px-4 py-3 border-b border-slate-200 text-right w-32">Unit Cost</th>
-              <th className="px-4 py-3 border-b border-slate-200 text-right w-32 bg-slate-100/50">Total Cost</th>
-              <th className="px-4 py-3 border-b border-slate-200 w-24 text-center">Refs</th>
+              <th className="px-4 py-3 border-b border-slate-200 w-20 text-center">MOQ/SPQ</th>
+              <th className="px-4 py-3 border-b border-slate-200 text-right w-24">Required</th>
+              <th className="px-4 py-3 border-b border-slate-200 text-right w-24 font-bold text-slate-700 bg-slate-50">Buy Qty</th>
+              <th className="px-4 py-3 border-b border-slate-200 text-right w-24">Unit Price</th>
+              <th className="px-4 py-3 border-b border-slate-200 text-right w-32 bg-slate-100/50">Spend</th>
+              <th className="px-4 py-3 border-b border-slate-200 text-right w-24 text-rose-600">Excess $</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {flatItems.map((item) => (
+            {procurementData.map((item) => (
               <tr key={item.partNumber} className="hover:bg-slate-50 group">
-                <td className="px-4 py-3 font-mono font-medium text-blue-600">{item.partNumber}</td>
-                <td className="px-4 py-3 text-slate-700">
-                    <div className="font-medium">{item.name}</div>
-                    <div className="text-xs text-slate-500 truncate max-w-[300px]">{item.description}</div>
+                <td className="px-4 py-3">
+                    <div className="font-mono font-medium text-blue-600">{item.partNumber}</div>
+                    <div className="text-xs text-slate-500 truncate w-40">{item.name}</div>
                 </td>
-                <td className="px-4 py-3 text-slate-600">{item.manufacturer}</td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-500">{item.mpn}</td>
-                <td className="px-4 py-3 text-right font-bold text-slate-800">{item.totalQuantity}</td>
-                <td className="px-4 py-3 text-right font-mono text-slate-600">${item.unitCost.toFixed(3)}</td>
-                <td className="px-4 py-3 text-right font-mono font-bold text-slate-800 bg-slate-50/50">${item.totalCost.toFixed(2)}</td>
-                <td className="px-4 py-3 text-center">
-                    <div className="relative group/tooltip">
-                        <span className="bg-slate-200 text-slate-600 text-[10px] px-1.5 py-0.5 rounded font-bold cursor-help">
-                            {item.occurrences}
-                        </span>
-                        {/* Simple CSS Tooltip for RefDes */}
-                        <div className="absolute right-full top-0 mr-2 w-64 p-2 bg-slate-800 text-white text-xs rounded opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 shadow-lg pointer-events-none">
-                            <div className="font-bold mb-1 border-b border-slate-600 pb-1">Usage Locations:</div>
-                            <ul className="list-disc pl-3 space-y-0.5 text-[10px] text-slate-300 max-h-32 overflow-y-auto">
-                                {item.locations.map((loc, i) => <li key={i} className="truncate">{loc}</li>)}
-                            </ul>
-                            {item.refDes.length > 0 && (
-                                <div className="mt-2 pt-1 border-t border-slate-600">
-                                    <span className="font-bold text-[10px]">RefDes: </span>
-                                    <span className="font-mono text-[9px] text-slate-300 break-words">
-                                        {item.refDes.join(', ')}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                <td className="px-4 py-3 text-center text-xs font-mono text-slate-500">
+                    {item.moq}/{item.spq}
+                </td>
+                <td className="px-4 py-3 text-right font-mono text-slate-600">{item.totalQuantity}</td>
+                <td className="px-4 py-3 text-right font-bold font-mono text-slate-800 bg-slate-50/30">{item.buyQty}</td>
+                <td className="px-4 py-3 text-right font-mono text-slate-600">${item.unitPrice.toFixed(3)}</td>
+                <td className="px-4 py-3 text-right font-mono font-bold text-slate-800 bg-slate-50/50">${item.procurementCost.toFixed(2)}</td>
+                <td className="px-4 py-3 text-right font-mono text-rose-500 font-medium">
+                    {item.excessCost > 0 ? `$${item.excessCost.toFixed(2)}` : '-'}
                 </td>
               </tr>
             ))}
