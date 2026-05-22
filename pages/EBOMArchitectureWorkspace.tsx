@@ -50,10 +50,11 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                 </p>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-300">
+                <label htmlFor="ebom-base-select" className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-300">
                   EBOM Base
                 </label>
                 <select
+                  id="ebom-base-select"
                   value={selectedBaseId}
                   onChange={(event) => setSelectedBaseId(event.target.value)}
                   className="w-full rounded-lg border border-white/20 bg-slate-950 px-3 py-2 text-sm font-semibold text-white focus:border-cyan-300 focus:outline-none"

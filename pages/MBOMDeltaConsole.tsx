@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Boxes, FileStack, Layers, PackageSearch } from 'lucide-react';
 import type { MBOMDeltaType } from '../domain/mbomTypes';
 import { useMBOMDeltaStore } from '../stores/useMBOMDeltaStore';
@@ -23,11 +23,20 @@ const statusStyles = {
 export const MBOMDeltaConsole: React.FC = () => {
   const { projects, structures, variationAxes, skus, activeProjectId } = useProductConfigStore();
   const { getDeltaPacksBySKU, groupDeltaItemsByType } = useMBOMDeltaStore();
-  const projectSKUs = skus.filter((sku) => sku.projectId === activeProjectId);
+  const projectSKUs = useMemo(
+    () => skus.filter((sku) => sku.projectId === activeProjectId),
+    [activeProjectId, skus],
+  );
   const defaultSKUId = projectSKUs.find((sku) => getDeltaPacksBySKU(sku.id).length > 0)?.id
     ?? projectSKUs[0]?.id
     ?? '';
   const [selectedSKUId, setSelectedSKUId] = useState(defaultSKUId);
+
+  useEffect(() => {
+    if (!projectSKUs.some((sku) => sku.id === selectedSKUId)) {
+      setSelectedSKUId(projectSKUs[0]?.id ?? '');
+    }
+  }, [projectSKUs, selectedSKUId]);
 
   const selectedSKU = projectSKUs.find((sku) => sku.id === selectedSKUId);
   const selectedProject = projects.find((project) => project.id === selectedSKU?.projectId);
@@ -56,10 +65,11 @@ export const MBOMDeltaConsole: React.FC = () => {
                 </p>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-300">
+                <label htmlFor="mbom-sku-select" className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-300">
                   SKU
                 </label>
                 <select
+                  id="mbom-sku-select"
                   value={selectedSKUId}
                   onChange={(event) => setSelectedSKUId(event.target.value)}
                   className="w-full rounded-lg border border-white/20 bg-slate-950 px-3 py-2 text-sm font-semibold text-white focus:border-indigo-300 focus:outline-none"
