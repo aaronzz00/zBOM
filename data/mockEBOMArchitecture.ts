@@ -153,7 +153,7 @@ export const mockEBOMItems: EBOMItem[] = [
     parentItemId: 'item-std-root',
     partNumber: 'ZP26-3200',
     name: 'Battery Pack, 4500mAh',
-    quantity: 1,
+    quantity: 2,
     unit: 'EA',
     revision: 'A',
     designMasterPartId: 'dmp-battery-4500mah',
