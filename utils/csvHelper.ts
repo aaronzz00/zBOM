@@ -1,4 +1,5 @@
 import { BOMNode, ComponentType, LifecycleState } from '../types';
+import { BOMNodeSchema } from '../schemas';
 
 // Helper to sanitize string for CSV (handle commas, quotes)
 const escapeCSV = (str: string | undefined) => {
@@ -46,23 +47,23 @@ export const parseCSVToBOM = (csvText: string): BOMNode | null => {
   // Basic CSV parser (ignoring complex quoted commas for this prototype, assume standard format)
   // For production, use a library like PapaParse
   const parseLine = (line: string) => {
-      // Simple split by comma, handling basic quotes
-      const res = [];
-      let inQuote = false;
-      let current = '';
-      for(let i=0; i<line.length; i++) {
-          const char = line[i];
-          if(char === '"') { inQuote = !inQuote; continue; }
-          if(char === ',' && !inQuote) { res.push(current); current = ''; continue; }
-          current += char;
-      }
-      res.push(current);
-      return res;
+    // Simple split by comma, handling basic quotes
+    const res = [];
+    let inQuote = false;
+    let current = '';
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') { inQuote = !inQuote; continue; }
+      if (char === ',' && !inQuote) { res.push(current); current = ''; continue; }
+      current += char;
+    }
+    res.push(current);
+    return res;
   };
 
   // Skip header
   const dataRows = lines.slice(1).map(parseLine);
-  
+
   // Logic to reconstruct tree based on 'Level' column (index 0)
   const rootStack: BOMNode[] = [];
   let rootNode: BOMNode | null = null;
@@ -104,6 +105,16 @@ export const parseCSVToBOM = (csvText: string): BOMNode | null => {
       }
     }
   });
+
+  // Validate with Zod
+  if (rootNode) {
+    try {
+      BOMNodeSchema.parse(rootNode);
+    } catch (e) {
+      console.error("Validation Failed", e);
+      return null;
+    }
+  }
 
   return rootNode;
 };

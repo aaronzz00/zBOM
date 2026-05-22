@@ -1,7 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { BOMNode } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = process.env.API_KEY;
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Helper to flatten BOM for context window efficiency if needed, 
 // but for now we send the structured subtree.
@@ -14,7 +15,7 @@ const formatBOMForPrompt = (node: BOMNode): string => {
 };
 
 export const analyzeBOMNode = async (node: BOMNode, task: 'optimize' | 'risks' | 'alternatives'): Promise<string> => {
-  const model = "gemini-3-flash-preview"; 
+  const model = "gemini-3-flash-preview";
   const bomContext = formatBOMForPrompt(node);
 
   let systemInstruction = "You are an expert Senior Supply Chain Engineer and Electronics Manufacturing specialist.";
@@ -29,7 +30,7 @@ export const analyzeBOMNode = async (node: BOMNode, task: 'optimize' | 'risks' |
       BOM Data:
       ${bomContext}`;
       break;
-    
+
     case 'risks':
       systemInstruction += " Your goal is to identify supply chain risks (single source, obsolescence, lead times).";
       prompt = `Analyze the following BOM for "${node.name}". 
@@ -50,6 +51,10 @@ export const analyzeBOMNode = async (node: BOMNode, task: 'optimize' | 'risks' |
       break;
   }
 
+  if (!ai) {
+    return "AI Configuration Error: API Key is missing. Please set GEMINI_API_KEY in your environment.";
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: model,
@@ -67,27 +72,30 @@ export const analyzeBOMNode = async (node: BOMNode, task: 'optimize' | 'risks' |
   }
 };
 
-export const chatWithBOM = async (history: {role: 'user' | 'model', text: string}[], currentContextNode: BOMNode | null, message: string) => {
-    try {
-        const chat = ai.chats.create({
-            model: "gemini-3-flash-preview",
-            config: {
-                systemInstruction: `You are zBOM Assistant, a helpful AI for managing electronic Bills of Materials. 
+export const chatWithBOM = async (history: { role: 'user' | 'model', text: string }[], currentContextNode: BOMNode | null, message: string) => {
+  if (!ai) {
+    return "I can't chat right now because the AI service is not configured (missing API Key).";
+  }
+  try {
+    const chat = ai.chats.create({
+      model: "gemini-3-flash-preview",
+      config: {
+        systemInstruction: `You are zBOM Assistant, a helpful AI for managing electronic Bills of Materials. 
                 Context: The user is currently viewing the BOM node: ${currentContextNode ? `${currentContextNode.partNumber} - ${currentContextNode.name}` : 'Root Project'}.
                 If technical details are asked, answer with precision suitable for an engineer.`
-            },
-            history: history.map(h => ({ role: h.role, parts: [{ text: h.text }] }))
-        });
+      },
+      history: history.map(h => ({ role: h.role, parts: [{ text: h.text }] }))
+    });
 
-        // Add context to the message if it's the first relevant interaction about this node
-        const fullMessage = currentContextNode 
-            ? `[Context: Active Node JSON: ${formatBOMForPrompt(currentContextNode)}] \n\n User Question: ${message}` 
-            : message;
+    // Add context to the message if it's the first relevant interaction about this node
+    const fullMessage = currentContextNode
+      ? `[Context: Active Node JSON: ${formatBOMForPrompt(currentContextNode)}] \n\n User Question: ${message}`
+      : message;
 
-        const result = await chat.sendMessage({ message: fullMessage });
-        return result.text;
-    } catch (e) {
-        console.error(e);
-        return "I'm having trouble processing that request right now.";
-    }
+    const result = await chat.sendMessage({ message: fullMessage });
+    return result.text;
+  } catch (e) {
+    console.error(e);
+    return "I'm having trouble processing that request right now.";
+  }
 }
