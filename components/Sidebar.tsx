@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Layers, Box, Settings, Share2, Database, Cpu, GitCompare, Shield, FileSignature, Grid3X3 } from 'lucide-react';
+import { LayoutDashboard, Layers, Box, Settings, Share2, Database, Cpu, GitCompare, Shield, FileSignature, Grid3X3, GitBranch, PackageSearch, Hammer } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, Permission } from '../types';
 
@@ -16,6 +16,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', requiredPerm: Permission.VIEW_DASHBOARD },
     { id: 'bom', icon: Layers, label: 'BOM Editor', requiredPerm: Permission.VIEW_BOM },
     { id: 'product-matrix', icon: Grid3X3, label: 'Product Matrix', requiredPerm: Permission.VIEW_BOM },
+    { id: 'ebom-architecture', icon: GitBranch, label: 'EBOM Architecture', requiredPerm: Permission.VIEW_BOM },
+    { id: 'mbom-delta', icon: PackageSearch, label: 'MBOM Delta', requiredPerm: Permission.VIEW_BOM },
+    { id: 'tooling', icon: Hammer, label: 'Tooling Hub', requiredPerm: Permission.VIEW_BOM },
     { id: 'eco', icon: FileSignature, label: 'Change Orders', requiredPerm: Permission.VIEW_ECO },
     { id: 'compare', icon: GitCompare, label: 'Compare Revisions', requiredPerm: Permission.VIEW_BOM },
     { id: 'parts', icon: Box, label: 'Part Library', requiredPerm: Permission.VIEW_BOM },

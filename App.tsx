@@ -8,6 +8,9 @@ import { PartLibrary } from './pages/PartLibrary';
 import { SupplyChain } from './pages/SupplyChain';
 import { ECOManager } from './pages/ECOManager';
 import { ProductMatrixCenter } from './pages/ProductMatrixCenter';
+import { EBOMArchitectureWorkspace } from './pages/EBOMArchitectureWorkspace';
+import { MBOMDeltaConsole } from './pages/MBOMDeltaConsole';
+import { ToolingHub } from './pages/ToolingHub';
 import { mockProject } from './data/mockBOM';
 
 // Simple Error Boundary Component
@@ -53,6 +56,12 @@ function App() {
         return <BOMEditor />;
       case 'product-matrix':
         return <ProductMatrixCenter />;
+      case 'ebom-architecture':
+        return <EBOMArchitectureWorkspace />;
+      case 'mbom-delta':
+        return <MBOMDeltaConsole />;
+      case 'tooling':
+        return <ToolingHub />;
       case 'eco':
         return <ECOManager />;
       case 'compare':
