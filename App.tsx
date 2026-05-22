@@ -7,6 +7,7 @@ import { BOMCompare } from './pages/BOMCompare';
 import { PartLibrary } from './pages/PartLibrary';
 import { SupplyChain } from './pages/SupplyChain';
 import { ECOManager } from './pages/ECOManager';
+import { ProductMatrixCenter } from './pages/ProductMatrixCenter';
 import { mockProject } from './data/mockBOM';
 
 // Simple Error Boundary Component
@@ -50,6 +51,8 @@ function App() {
         return <Dashboard />;
       case 'bom':
         return <BOMEditor />;
+      case 'product-matrix':
+        return <ProductMatrixCenter />;
       case 'eco':
         return <ECOManager />;
       case 'compare':
