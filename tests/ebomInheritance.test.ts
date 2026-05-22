@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { EBOMBase } from '../domain/ebomArchitectureTypes';
+import type { EBOMBase, EBOMItem } from '../domain/ebomArchitectureTypes';
 import { mockEBOMBases, mockEBOMItems } from '../data/mockEBOMArchitecture';
 import {
   getInheritanceChain,
@@ -81,6 +81,73 @@ describe('ebomInheritance', () => {
     });
   });
 
+  it('removes unlocked optional local-only fields when merging locked items', () => {
+    const bases: EBOMBase[] = [
+      {
+        id: 'base-parent',
+        projectId: 'project',
+        scope: 'platform',
+        rootItemId: 'item-parent-root',
+        revision: 'A',
+        status: 'released',
+      },
+      {
+        id: 'base-child',
+        projectId: 'project',
+        scope: 'structure',
+        parentBaseId: 'base-parent',
+        rootItemId: 'item-child-root',
+        revision: 'A',
+        status: 'draft',
+      },
+    ];
+    const items: EBOMItem[] = [
+      {
+        id: 'item-parent-part',
+        baseId: 'base-parent',
+        partNumber: 'SRC-100',
+        name: 'Source Part',
+        quantity: 1,
+        unit: 'EA',
+        revision: 'A',
+        inheritanceState: 'local',
+      },
+      {
+        id: 'item-child-part',
+        baseId: 'base-child',
+        partNumber: 'LOCAL-STALE',
+        name: 'Stale Local Name',
+        quantity: 5,
+        unit: 'EA',
+        revision: 'LOCAL',
+        designMasterPartId: 'stale-local-only-dmp',
+        sourceItemId: 'item-parent-part',
+        sourceBaseId: 'base-parent',
+        inheritanceState: 'locked',
+        lockedFields: ['quantity'],
+      },
+    ];
+
+    const resolved = resolveEBOMBase('base-child', bases, items);
+
+    expect(resolved).toEqual([
+      {
+        id: 'item-child-part',
+        baseId: 'base-child',
+        partNumber: 'SRC-100',
+        name: 'Source Part',
+        quantity: 5,
+        unit: 'EA',
+        revision: 'A',
+        sourceItemId: 'item-parent-part',
+        sourceBaseId: 'base-parent',
+        inheritanceState: 'locked',
+        lockedFields: ['quantity'],
+      },
+    ]);
+    expect(resolved[0].designMasterPartId).toBeUndefined();
+  });
+
   it('does not mutate bases or items during resolution', () => {
     const basesBefore = structuredClone(mockEBOMBases);
     const itemsBefore = structuredClone(mockEBOMItems);
@@ -103,6 +170,24 @@ describe('ebomInheritance', () => {
   it('throws a clear error for a missing base', () => {
     expect(() => getInheritanceChain('missing-base', mockEBOMBases)).toThrow(
       /EBOM base not found: missing-base/,
+    );
+  });
+
+  it('throws a clear error for a missing parent base', () => {
+    const bases: EBOMBase[] = [
+      {
+        id: 'base-child',
+        projectId: 'project',
+        scope: 'structure',
+        parentBaseId: 'missing-parent',
+        rootItemId: 'item-child-root',
+        revision: 'A',
+        status: 'draft',
+      },
+    ];
+
+    expect(() => getInheritanceChain('base-child', bases)).toThrow(
+      /EBOM parent base not found: missing-parent for base base-child/,
     );
   });
 

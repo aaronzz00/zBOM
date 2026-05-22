@@ -108,15 +108,23 @@ function findSourceItemIndex(resolved: EBOMItem[], sourceItemId: string): number
 }
 
 function mergeLockedItem(sourceItem: EBOMItem, localItem: EBOMItem): EBOMItem {
-  const merged = cloneItem(localItem);
-  const lockedFields = new Set(localItem.lockedFields ?? []);
+  const merged = {
+    ...cloneItem(sourceItem),
+    id: localItem.id,
+    baseId: localItem.baseId,
+    parentItemId: localItem.parentItemId,
+    sourceItemId: localItem.sourceItemId,
+    sourceBaseId: localItem.sourceBaseId,
+    inheritanceState: localItem.inheritanceState,
+    lockedFields: localItem.lockedFields ? [...localItem.lockedFields] : undefined,
+  };
 
-  for (const key of Object.keys(sourceItem) as Array<keyof EBOMItem>) {
-    if (lockedFields.has(key) || LOCAL_IDENTITY_FIELDS.has(key)) {
+  for (const key of localItem.lockedFields ?? []) {
+    if (LOCAL_IDENTITY_FIELDS.has(key)) {
       continue;
     }
 
-    merged[key] = sourceItem[key] as never;
+    merged[key] = localItem[key] as never;
   }
 
   return merged;
