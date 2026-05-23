@@ -107,7 +107,7 @@ export interface EBOMChangeRecord {
   id: string;
   baseId: string;
   revision: string;
-  status: 'published';
+  state: 'recorded';
   summary: string;
   operationIds: string[];
   publishedAt: string;
@@ -119,6 +119,7 @@ The implementation can refine names and field shapes, but the design intent is c
 - draft operations are audit-friendly intent records
 - current item state is updated for immediate UI feedback
 - publish converts the current draft operation list into a durable change record shape
+- `EBOMChangeRecord.state` describes the package record, not `EBOMBase.status`
 
 ### 4.3 Store boundary
 
@@ -217,6 +218,8 @@ Publish should call the repository port. On success:
 - clear dirty state for that base
 - update local base status according to the prototype policy
 
+`publishChangePackage` should be treated as the atomic repository operation that records the package and clears persisted draft operations for the base. The store should not call `saveDraftOperations(baseId, [])` as a separate success cleanup step.
+
 Prototype publish policy:
 
 - released bases are read-only and cannot publish draft changes in this phase
@@ -288,6 +291,7 @@ Required store tests:
 - locks a field and records a `lock-field` operation
 - unlocks a field and records an `unlock-field` operation
 - adds a local child item and records an `add-local-item` operation
+- reverts item draft state, records a `revert-item` operation, and preserves other item operations
 - resets draft changes for a base
 - publishes a change package and clears dirty state on success
 - preserves dirty state and operations on publish failure
