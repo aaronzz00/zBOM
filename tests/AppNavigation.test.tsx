@@ -22,7 +22,7 @@ describe('App phase 1 navigation', () => {
     expect(screen.getByText('MBOM Delta Console')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Tooling Hub/i }));
-    expect(screen.getByRole('combobox', { name: 'Design Master Part' })).toBeInTheDocument();
+    expect(screen.getByText('Design Master Part Tooling View')).toBeInTheDocument();
   });
 
   it('keeps phase 1 BOM-facing modules visible to viewer role', () => {
