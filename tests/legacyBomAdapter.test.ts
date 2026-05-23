@@ -106,13 +106,14 @@ describe('legacyBomAdapter', () => {
 
   it('throws a clear error for item parent cycles reachable from the selected root', () => {
     const resolvedItems: EBOMItem[] = [
-      item({ id: 'root' }),
+      item({ id: 'root', parentItemId: 'child-b' }),
       item({ id: 'child-a', parentItemId: 'root' }),
       item({ id: 'child-b', parentItemId: 'child-a' }),
-      item({ id: 'child-a', parentItemId: 'child-b' }),
     ];
 
-    expect(() => toLegacyBOMNode(resolvedItems, 'root')).toThrow(/EBOM item parent cycle detected/);
+    expect(() => toLegacyBOMNode(resolvedItems, 'root')).toThrow(
+      /EBOM item parent cycle detected: root -> child-a -> child-b -> root/,
+    );
   });
 
   it('does not mutate input items', () => {
