@@ -4,9 +4,12 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { EBOMArchitectureWorkspace } from '../pages/EBOMArchitectureWorkspace';
 import { MBOMDeltaConsole } from '../pages/MBOMDeltaConsole';
 import { ToolingHub } from '../pages/ToolingHub';
+import { createInMemoryEBOMArchitectureRepository } from '../repositories/ebomArchitectureRepository';
+import { useEBOMArchitectureStore } from '../stores/useEBOMArchitectureStore';
 import { useMBOMDeltaStore } from '../stores/useMBOMDeltaStore';
 import { useProductConfigStore } from '../stores/useProductConfigStore';
 import { useToolingStore } from '../stores/useToolingStore';
+import type { EBOMBase, EBOMItem } from '../domain/ebomArchitectureTypes';
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: vi.fn(({ count }) => ({
@@ -26,15 +29,20 @@ describe('Phase 1 workflow pages', () => {
     useProductConfigStore.getState().reset();
     useMBOMDeltaStore.getState().reset();
     useToolingStore.getState().reset();
+    useEBOMArchitectureStore.getState().reset();
+    useEBOMArchitectureStore.getState().setRepository(createInMemoryEBOMArchitectureRepository());
   });
 
-  it('renders EBOM architecture inheritance chain and resolved item states', () => {
+  it('renders EBOM architecture inheritance chain and resolved item states', async () => {
     render(<EBOMArchitectureWorkspace />);
+
+    expect(screen.getByText(/Loading EBOM architecture/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument());
+    expect(screen.getByText(/Draft Status/i)).toBeInTheDocument();
 
     const baseSelect = screen.getByRole('combobox', { name: 'EBOM Base' }) as HTMLSelectElement;
     const preview = screen.getByTestId('legacy-bom-preview');
 
-    expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument();
     expect(screen.getAllByText('ebom-platform-zp26').length).toBeGreaterThan(0);
     expect(screen.getAllByText('ebom-series-zp-a').length).toBeGreaterThan(0);
     expect(screen.getAllByText('ebom-structure-zp-a-std').length).toBeGreaterThan(0);
@@ -53,6 +61,126 @@ describe('Phase 1 workflow pages', () => {
     expect(baseSelect.value).toBe('ebom-structure-zp-a-pro');
     expect(screen.getAllByText('Display Module, ProMotion OLED').length).toBeGreaterThan(0);
     expect(within(screen.getByTestId('legacy-bom-preview')).getAllByText('Camera Module, Triple Lens Pro').length).toBeGreaterThan(0);
+  });
+
+  it('shows a recoverable EBOM load error', async () => {
+    const repository = createInMemoryEBOMArchitectureRepository();
+    repository.loadSnapshot = async () => {
+      throw new Error('load failed');
+    };
+    useEBOMArchitectureStore.getState().setRepository(repository);
+
+    render(<EBOMArchitectureWorkspace />);
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('load failed'));
+    expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument();
+  });
+
+  it('shows a resolver error without crashing the page', async () => {
+    const cyclicBases: EBOMBase[] = [
+      {
+        id: 'base-a',
+        projectId: 'project',
+        scope: 'platform',
+        parentBaseId: 'base-c',
+        rootItemId: 'item-a',
+        revision: 'A',
+        status: 'draft',
+      },
+      {
+        id: 'base-b',
+        projectId: 'project',
+        scope: 'series',
+        parentBaseId: 'base-a',
+        rootItemId: 'item-b',
+        revision: 'A',
+        status: 'draft',
+      },
+      {
+        id: 'base-c',
+        projectId: 'project',
+        scope: 'structure',
+        parentBaseId: 'base-b',
+        rootItemId: 'item-c',
+        revision: 'A',
+        status: 'draft',
+      },
+    ];
+    const items: EBOMItem[] = [
+      {
+        id: 'item-a',
+        baseId: 'base-a',
+        partNumber: 'A-ROOT',
+        name: 'A Root',
+        quantity: 1,
+        unit: 'EA',
+        revision: 'A',
+        inheritanceState: 'local',
+      },
+    ];
+    useEBOMArchitectureStore.getState().setRepository(
+      createInMemoryEBOMArchitectureRepository({ bases: cyclicBases, items }),
+    );
+
+    render(<EBOMArchitectureWorkspace />);
+
+    await waitFor(() => expect(screen.getByText(/Unable to resolve EBOM items/i)).toBeInTheDocument());
+  });
+
+  it('keeps resolved rows visible when legacy preview cannot be built', async () => {
+    const bases: EBOMBase[] = [
+      {
+        id: 'ebom-structure-zp-a-std',
+        projectId: 'project',
+        scope: 'structure',
+        rootItemId: 'root',
+        revision: 'A',
+        status: 'draft',
+      },
+    ];
+    const items: EBOMItem[] = [
+      {
+        id: 'root',
+        baseId: 'ebom-structure-zp-a-std',
+        parentItemId: 'child-b',
+        partNumber: 'ROOT',
+        name: 'Root',
+        quantity: 1,
+        unit: 'EA',
+        revision: 'A',
+        inheritanceState: 'local',
+      },
+      {
+        id: 'child-a',
+        baseId: 'ebom-structure-zp-a-std',
+        parentItemId: 'root',
+        partNumber: 'CHILD-A',
+        name: 'Child A',
+        quantity: 1,
+        unit: 'EA',
+        revision: 'A',
+        inheritanceState: 'local',
+      },
+      {
+        id: 'child-b',
+        baseId: 'ebom-structure-zp-a-std',
+        parentItemId: 'child-a',
+        partNumber: 'CHILD-B',
+        name: 'Child B',
+        quantity: 1,
+        unit: 'EA',
+        revision: 'A',
+        inheritanceState: 'local',
+      },
+    ];
+    useEBOMArchitectureStore.getState().setRepository(
+      createInMemoryEBOMArchitectureRepository({ bases, items }),
+    );
+
+    render(<EBOMArchitectureWorkspace />);
+
+    await waitFor(() => expect(screen.getByText('ROOT')).toBeInTheDocument());
+    expect(screen.getByText(/Unable to build legacy BOM preview/i)).toBeInTheDocument();
   });
 
   it('renders SKU-first MBOM deltas grouped by delta type and reconciles stale selections', async () => {

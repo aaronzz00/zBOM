@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { GitBranch, Layers3, Lock, ShieldCheck } from 'lucide-react';
 import { BOMTable } from '../components/BOMTable';
-import { mockEBOMBases, mockEBOMItems } from '../data/mockEBOMArchitecture';
 import type { EBOMBase, InheritanceState } from '../domain/ebomArchitectureTypes';
+import { useEBOMArchitectureStore } from '../stores/useEBOMArchitectureStore';
 import type { BOMNode } from '../types';
 import { getInheritanceChain, resolveEBOMBase } from '../utils/ebomInheritance';
 import { toLegacyBOMNode } from '../utils/legacyBomAdapter';
@@ -21,33 +21,103 @@ const statusStyles: Record<EBOMBase['status'], string> = {
 };
 
 export const EBOMArchitectureWorkspace: React.FC = () => {
-  const defaultBaseId = mockEBOMBases.find((base) => base.id === 'ebom-structure-zp-a-std')?.id
-    ?? mockEBOMBases[0]?.id
-    ?? '';
-  const [selectedBaseId, setSelectedBaseId] = useState(defaultBaseId);
+  const {
+    bases,
+    items,
+    selectedBaseId,
+    status,
+    error,
+    load,
+    selectBase,
+    getSelectedBase,
+    getDraftOperations,
+    isDirty,
+  } = useEBOMArchitectureStore();
   const [selectedPreviewNodeId, setSelectedPreviewNodeId] = useState<string | null>(null);
 
-  const selectedBase = mockEBOMBases.find((base) => base.id === selectedBaseId);
-  const inheritanceChain = useMemo(
-    () => (selectedBase ? getInheritanceChain(selectedBase.id, mockEBOMBases) : []),
-    [selectedBase],
-  );
-  const resolvedItems = useMemo(
-    () => (selectedBase ? resolveEBOMBase(selectedBase.id, mockEBOMBases, mockEBOMItems) : []),
-    [selectedBase],
-  );
-  const legacyPreviewRoot = useMemo<BOMNode | null>(() => {
+  useEffect(() => {
+    if (status === 'idle') {
+      void load();
+    }
+  }, [load, status]);
+
+  const selectedBase = getSelectedBase();
+  const draftOperations = getDraftOperations();
+  const dirty = isDirty();
+
+  const {
+    inheritanceChain,
+    resolvedItems,
+    resolutionError,
+  } = useMemo(() => {
     if (!selectedBase) {
-      return null;
+      return {
+        inheritanceChain: [],
+        resolvedItems: [],
+        resolutionError: null,
+      };
     }
 
     try {
-      return toLegacyBOMNode(resolvedItems, selectedBase.rootItemId);
-    } catch (error) {
-      console.error(error);
-      return null;
+      return {
+        inheritanceChain: getInheritanceChain(selectedBase.id, bases),
+        resolvedItems: resolveEBOMBase(selectedBase.id, bases, items),
+        resolutionError: null,
+      };
+    } catch {
+      return {
+        inheritanceChain: [],
+        resolvedItems: [],
+        resolutionError: 'Unable to resolve EBOM items.',
+      };
     }
-  }, [resolvedItems, selectedBase]);
+  }, [bases, items, selectedBase]);
+
+  const {
+    legacyPreviewRoot,
+    previewError,
+  } = useMemo<{ legacyPreviewRoot: BOMNode | null; previewError: string | null }>(() => {
+    if (!selectedBase || resolutionError) {
+      return { legacyPreviewRoot: null, previewError: null };
+    }
+
+    try {
+      return {
+        legacyPreviewRoot: toLegacyBOMNode(resolvedItems, selectedBase.rootItemId),
+        previewError: null,
+      };
+    } catch {
+      return {
+        legacyPreviewRoot: null,
+        previewError: 'Unable to build legacy BOM preview for this EBOM base.',
+      };
+    }
+  }, [resolutionError, resolvedItems, selectedBase]);
+
+  if ((status === 'idle' || status === 'loading') && bases.length === 0) {
+    return (
+      <div className="flex-1 bg-slate-50 p-6 text-sm font-semibold text-slate-600">
+        Loading EBOM architecture...
+      </div>
+    );
+  }
+
+  if (status === 'error' && bases.length === 0) {
+    return (
+      <div className="flex-1 bg-slate-50 p-6">
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          {error ?? 'Unable to load EBOM architecture.'}
+        </div>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto bg-slate-50">
@@ -72,10 +142,10 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                 <select
                   id="ebom-base-select"
                   value={selectedBaseId}
-                  onChange={(event) => setSelectedBaseId(event.target.value)}
+                  onChange={(event) => selectBase(event.target.value)}
                   className="w-full rounded-lg border border-white/20 bg-slate-950 px-3 py-2 text-sm font-semibold text-white focus:border-cyan-300 focus:outline-none"
                 >
-                  {mockEBOMBases.map((base) => (
+                  {bases.map((base) => (
                     <option key={base.id} value={base.id}>
                       {base.id}
                     </option>
@@ -87,7 +157,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
         </section>
 
         {selectedBase && (
-          <section className="grid gap-4 md:grid-cols-4">
+          <section className="grid gap-4 md:grid-cols-5">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Scope</div>
               <div className="mt-2 text-2xl font-bold capitalize text-slate-900">{selectedBase.scope}</div>
@@ -105,6 +175,12 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Resolved Items</div>
               <div className="mt-2 text-2xl font-bold text-slate-900">{resolvedItems.length}</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Draft Status</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">
+                {dirty ? `${draftOperations.length} pending` : 'Clean'}
+              </div>
             </div>
           </section>
         )}
@@ -140,6 +216,11 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
               Items are resolved through inheritance and shown read-only with their architecture state.
             </p>
           </div>
+          {resolutionError && (
+            <div role="alert" className="m-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+              {resolutionError}
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -196,7 +277,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
               />
             ) : (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
-                Unable to build legacy BOM preview for this EBOM base.
+                {previewError ?? 'Unable to build legacy BOM preview for this EBOM base.'}
               </div>
             )}
           </div>
