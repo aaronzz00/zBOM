@@ -12,6 +12,7 @@ interface BOMTableProps {
     onSelect: (node: BOMNode) => void;
     selectedId: string | null;
     isMBOMView: boolean;
+    initialExpandedIds?: string[];
 }
 
 // Flatten helper
@@ -58,11 +59,19 @@ const analyzeRefDesDuplicates = (rootNode: BOMNode) => {
     return duplicates;
 };
 
-export const BOMTable: React.FC<BOMTableProps> = ({ data, onSelect, selectedId, isMBOMView }) => {
+export const BOMTable: React.FC<BOMTableProps> = ({
+    data,
+    onSelect,
+    selectedId,
+    isMBOMView,
+    initialExpandedIds,
+}) => {
     const { hasPermission } = useAuth();
     const { attributeDefs } = useAppStore();
     const { isColumnVisible, toggleColumn } = useViewStore();
-    const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set(['root', 'n1', 'n2', 'n2-3']));
+    const [expandedIds, setExpandedIds] = React.useState<Set<string>>(
+        () => new Set(initialExpandedIds ?? ['root', 'n1', 'n2', 'n2-3'])
+    );
     const parentRef = useRef<HTMLDivElement>(null);
     const [whereUsedPart, setWhereUsedPart] = useState<string | null>(null);
 

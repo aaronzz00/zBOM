@@ -1,8 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { GitBranch, Layers3, Lock, ShieldCheck } from 'lucide-react';
+import { BOMTable } from '../components/BOMTable';
 import { mockEBOMBases, mockEBOMItems } from '../data/mockEBOMArchitecture';
 import type { EBOMBase, InheritanceState } from '../domain/ebomArchitectureTypes';
+import type { BOMNode } from '../types';
 import { getInheritanceChain, resolveEBOMBase } from '../utils/ebomInheritance';
+import { toLegacyBOMNode } from '../utils/legacyBomAdapter';
 
 const stateStyles: Record<InheritanceState, string> = {
   inherited: 'border-blue-200 bg-blue-50 text-blue-700',
@@ -22,6 +25,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
     ?? mockEBOMBases[0]?.id
     ?? '';
   const [selectedBaseId, setSelectedBaseId] = useState(defaultBaseId);
+  const [selectedPreviewNodeId, setSelectedPreviewNodeId] = useState<string | null>(null);
 
   const selectedBase = mockEBOMBases.find((base) => base.id === selectedBaseId);
   const inheritanceChain = useMemo(
@@ -32,6 +36,18 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
     () => (selectedBase ? resolveEBOMBase(selectedBase.id, mockEBOMBases, mockEBOMItems) : []),
     [selectedBase],
   );
+  const legacyPreviewRoot = useMemo<BOMNode | null>(() => {
+    if (!selectedBase) {
+      return null;
+    }
+
+    try {
+      return toLegacyBOMNode(resolvedItems, selectedBase.rootItemId);
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  }, [resolvedItems, selectedBase]);
 
   return (
     <div className="flex-1 overflow-auto bg-slate-50">
@@ -156,6 +172,31 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-slate-900">Legacy BOM Preview</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Read-only projection through the legacy BOM table. This does not write back to EBOM architecture state.
+            </p>
+          </div>
+          <div className="h-[420px]">
+            {legacyPreviewRoot ? (
+              <BOMTable
+                key={legacyPreviewRoot.id}
+                data={legacyPreviewRoot}
+                selectedId={selectedPreviewNodeId}
+                onSelect={(node) => setSelectedPreviewNodeId(node.id)}
+                isMBOMView={false}
+                initialExpandedIds={[legacyPreviewRoot.id]}
+              />
+            ) : (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+                Unable to build legacy BOM preview for this EBOM base.
+              </div>
+            )}
           </div>
         </section>
       </div>

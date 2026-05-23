@@ -1,5 +1,5 @@
 import React from 'react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { EBOMArchitectureWorkspace } from '../pages/EBOMArchitectureWorkspace';
 import { MBOMDeltaConsole } from '../pages/MBOMDeltaConsole';
@@ -7,6 +7,19 @@ import { ToolingHub } from '../pages/ToolingHub';
 import { useMBOMDeltaStore } from '../stores/useMBOMDeltaStore';
 import { useProductConfigStore } from '../stores/useProductConfigStore';
 import { useToolingStore } from '../stores/useToolingStore';
+
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: vi.fn(({ count }) => ({
+    getVirtualItems: () =>
+      Array.from({ length: count }).map((_, index) => ({
+        index,
+        start: index * 40,
+        size: 40,
+        measureElement: () => {},
+      })),
+    getTotalSize: () => count * 40,
+  })),
+}));
 
 describe('Phase 1 workflow pages', () => {
   beforeEach(() => {
@@ -24,15 +37,19 @@ describe('Phase 1 workflow pages', () => {
     expect(screen.getAllByText('ebom-platform-zp26').length).toBeGreaterThan(0);
     expect(screen.getAllByText('ebom-series-zp-a').length).toBeGreaterThan(0);
     expect(screen.getAllByText('ebom-structure-zp-a-std').length).toBeGreaterThan(0);
-    expect(screen.getByText('ZP26-3200')).toBeInTheDocument();
-    expect(screen.getByText('Battery Pack, 4500mAh')).toBeInTheDocument();
+    expect(screen.getAllByText('ZP26-3200').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Battery Pack, 4500mAh').length).toBeGreaterThan(0);
     expect(screen.getByText('locked')).toBeInTheDocument();
+    expect(screen.getByText('Legacy BOM Preview')).toBeInTheDocument();
+    expect(screen.getByText(/Read-only projection/i)).toBeInTheDocument();
+    expect(screen.getByText(/Virtual Tree View/i)).toBeInTheDocument();
+    expect(screen.getAllByText('ZP26-3200').length).toBeGreaterThan(1);
 
     fireEvent.change(baseSelect, { target: { value: 'ebom-structure-zp-a-pro' } });
 
     expect(baseSelect.value).toBe('ebom-structure-zp-a-pro');
-    expect(screen.getByText('Display Module, ProMotion OLED')).toBeInTheDocument();
-    expect(screen.getByText('Camera Module, Triple Lens Pro')).toBeInTheDocument();
+    expect(screen.getAllByText('Display Module, ProMotion OLED').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Camera Module, Triple Lens Pro').length).toBeGreaterThan(0);
   });
 
   it('renders SKU-first MBOM deltas grouped by delta type and reconciles stale selections', async () => {
