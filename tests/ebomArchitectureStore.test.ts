@@ -166,4 +166,66 @@ describe('useEBOMArchitectureStore', () => {
     expect(state.getDraftOperations()).toHaveLength(1);
     expect(state.isDirty()).toBe(true);
   });
+
+  it('publishes a draft base change package and clears dirty state', async () => {
+    await useEBOMArchitectureStore.getState().load();
+    await useEBOMArchitectureStore.getState().overrideField('item-std-display', 'quantity', 3);
+
+    await useEBOMArchitectureStore.getState().publishChangePackage('Standard draft update');
+
+    const state = useEBOMArchitectureStore.getState();
+    expect(state.getDraftOperations()).toEqual([]);
+    expect(state.isDirty()).toBe(false);
+    expect(state.getSelectedBase()).toMatchObject({ status: 'review', revision: 'A.01' });
+    expect(state.changeRecords).toEqual([
+      {
+        id: 'change-fixed',
+        baseId: 'ebom-structure-zp-a-std',
+        revision: 'A.01',
+        state: 'recorded',
+        summary: 'Standard draft update',
+        operationIds: expect.any(Array),
+        publishedAt: '2026-05-23T00:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('keeps review bases in review after publish', async () => {
+    await useEBOMArchitectureStore.getState().load();
+    useEBOMArchitectureStore.getState().selectBase('ebom-series-zp-a');
+    await useEBOMArchitectureStore.getState().overrideField('item-series-display', 'quantity', 2);
+
+    await useEBOMArchitectureStore.getState().publishChangePackage('Series update');
+
+    expect(useEBOMArchitectureStore.getState().getSelectedBase()).toMatchObject({
+      id: 'ebom-series-zp-a',
+      status: 'review',
+    });
+  });
+
+  it('blocks edits and publish for released bases', async () => {
+    await useEBOMArchitectureStore.getState().load();
+    useEBOMArchitectureStore.getState().selectBase('ebom-platform-zp26');
+
+    await useEBOMArchitectureStore.getState().overrideField('item-platform-display', 'quantity', 2);
+    expect(useEBOMArchitectureStore.getState().error).toMatch(/released EBOM base/i);
+    expect(useEBOMArchitectureStore.getState().isDirty()).toBe(false);
+  });
+
+  it('preserves dirty state and operations on publish failure', async () => {
+    const failingRepository = createInMemoryEBOMArchitectureRepository();
+    failingRepository.publishChangePackage = async () => {
+      throw new Error('publish failed');
+    };
+    useEBOMArchitectureStore.getState().setRepository(failingRepository);
+    await useEBOMArchitectureStore.getState().load();
+    await useEBOMArchitectureStore.getState().overrideField('item-std-display', 'quantity', 3);
+
+    await useEBOMArchitectureStore.getState().publishChangePackage('Broken publish');
+
+    const state = useEBOMArchitectureStore.getState();
+    expect(state.error).toMatch(/publish failed/);
+    expect(state.isDirty()).toBe(true);
+    expect(state.getDraftOperations()).toHaveLength(1);
+  });
 });

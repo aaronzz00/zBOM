@@ -498,5 +498,50 @@ export const useEBOMArchitectureStore = create<EBOMArchitectureState>((set, get)
     }
   },
 
-  publishChangePackage: async () => {},
+  publishChangePackage: async (summary) => {
+    const state = get();
+    const selectedBase = state.getSelectedBase();
+    if (!selectedBase) {
+      return;
+    }
+    if (selectedBase.status === 'released') {
+      set({ status: 'error', error: 'Cannot publish a released EBOM base.' });
+      return;
+    }
+
+    const operations = state.getDraftOperations(selectedBase.id);
+    if (operations.length === 0) {
+      return;
+    }
+
+    set({ status: 'publishing', error: undefined });
+    try {
+      const record = await state.repository.publishChangePackage({
+        baseId: selectedBase.id,
+        revision: selectedBase.revision,
+        summary,
+        operations,
+      });
+      const bases = state.bases.map((base) => (
+        base.id === selectedBase.id && base.status === 'draft'
+          ? { ...base, status: 'review' as const }
+          : base
+      ));
+      const draftOperationsByBaseId = {
+        ...state.draftOperationsByBaseId,
+        [selectedBase.id]: [],
+      };
+
+      set({
+        snapshotBases: bases,
+        snapshotItems: state.items,
+        bases,
+        changeRecords: [...state.changeRecords, record],
+        draftOperationsByBaseId,
+        status: 'ready',
+      });
+    } catch (error) {
+      set({ status: 'error', error: getErrorMessage(error, 'Unable to publish EBOM change package.') });
+    }
+  },
 }));
