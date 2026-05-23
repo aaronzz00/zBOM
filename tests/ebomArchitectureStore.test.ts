@@ -61,4 +61,109 @@ describe('useEBOMArchitectureStore', () => {
     expect(state.getResolvedItems().find((item) => item.id === 'item-std-display')?.quantity).toBe(4);
     expect(state.isDirty()).toBe(true);
   });
+
+  it('overrides an inherited field and records a draft operation', async () => {
+    await useEBOMArchitectureStore.getState().load();
+
+    await useEBOMArchitectureStore.getState().overrideField('item-std-display', 'quantity', 3);
+
+    const state = useEBOMArchitectureStore.getState();
+    const display = state.getResolvedItems().find((item) => item.id === 'item-std-display');
+    expect(display).toMatchObject({
+      quantity: 3,
+      inheritanceState: 'overridden',
+      baseId: 'ebom-structure-zp-a-std',
+    });
+    expect(state.getDraftOperations()).toMatchObject([
+      {
+        type: 'override-field',
+        field: 'quantity',
+        previousValue: 1,
+        nextValue: 3,
+      },
+    ]);
+    expect(state.isDirty()).toBe(true);
+  });
+
+  it('locks and unlocks fields while recording operations', async () => {
+    await useEBOMArchitectureStore.getState().load();
+
+    await useEBOMArchitectureStore.getState().lockField('item-std-display', 'quantity');
+    expect(useEBOMArchitectureStore.getState().getResolvedItems().find(
+      (item) => item.id === 'item-std-display',
+    )?.lockedFields).toEqual(['quantity']);
+
+    await useEBOMArchitectureStore.getState().unlockField('item-std-display', 'quantity');
+    const state = useEBOMArchitectureStore.getState();
+    expect(state.getResolvedItems().find((item) => item.id === 'item-std-display')?.lockedFields).toEqual([]);
+    expect(state.getDraftOperations().map((operation) => operation.type)).toEqual([
+      'lock-field',
+      'unlock-field',
+    ]);
+  });
+
+  it('adds a local child item under the selected base', async () => {
+    await useEBOMArchitectureStore.getState().load();
+
+    await useEBOMArchitectureStore.getState().addLocalItem({
+      parentItemId: 'item-std-root',
+      partNumber: 'ZP-A-STD-9900',
+      name: 'Local Test Fixture',
+      quantity: 1,
+      unit: 'EA',
+      revision: 'A',
+    });
+
+    const state = useEBOMArchitectureStore.getState();
+    expect(state.getResolvedItems().find((item) => item.partNumber === 'ZP-A-STD-9900')).toMatchObject({
+      inheritanceState: 'local',
+      baseId: 'ebom-structure-zp-a-std',
+    });
+    expect(state.getDraftOperations().at(-1)).toMatchObject({
+      type: 'add-local-item',
+      itemSnapshot: expect.objectContaining({ partNumber: 'ZP-A-STD-9900' }),
+    });
+  });
+
+  it('reverts one item draft while preserving other item operations', async () => {
+    await useEBOMArchitectureStore.getState().load();
+
+    await useEBOMArchitectureStore.getState().overrideField('item-std-display', 'quantity', 3);
+    await useEBOMArchitectureStore.getState().overrideField('item-std-battery-locked', 'revision', 'B');
+    await useEBOMArchitectureStore.getState().revertItemDraft('item-std-display');
+
+    const state = useEBOMArchitectureStore.getState();
+    expect(state.getResolvedItems().find((item) => item.id === 'item-std-display')?.quantity).toBe(1);
+    expect(state.getResolvedItems().find((item) => item.id === 'item-std-battery-locked')?.revision).toBe('B');
+    expect(state.getDraftOperations().map((operation) => operation.type)).toContain('revert-item');
+  });
+
+  it('resets draft changes for the selected base', async () => {
+    await useEBOMArchitectureStore.getState().load();
+
+    await useEBOMArchitectureStore.getState().overrideField('item-std-display', 'quantity', 3);
+    await useEBOMArchitectureStore.getState().resetDraft();
+
+    const state = useEBOMArchitectureStore.getState();
+    expect(state.getResolvedItems().find((item) => item.id === 'item-std-display')?.quantity).toBe(1);
+    expect(state.getDraftOperations()).toEqual([]);
+    expect(state.isDirty()).toBe(false);
+  });
+
+  it('keeps local draft state when saving draft operations fails', async () => {
+    const failingRepository = createInMemoryEBOMArchitectureRepository();
+    failingRepository.saveDraftOperations = async () => {
+      throw new Error('save failed');
+    };
+    useEBOMArchitectureStore.getState().setRepository(failingRepository);
+    await useEBOMArchitectureStore.getState().load();
+
+    await useEBOMArchitectureStore.getState().overrideField('item-std-display', 'quantity', 3);
+
+    const state = useEBOMArchitectureStore.getState();
+    expect(state.error).toMatch(/save failed/);
+    expect(state.getResolvedItems().find((item) => item.id === 'item-std-display')?.quantity).toBe(3);
+    expect(state.getDraftOperations()).toHaveLength(1);
+    expect(state.isDirty()).toBe(true);
+  });
 });
