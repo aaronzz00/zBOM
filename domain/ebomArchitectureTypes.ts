@@ -29,3 +29,42 @@ export interface EBOMItem {
   inheritanceState: InheritanceState;
   lockedFields?: Array<keyof EBOMItem>;
 }
+
+export type EBOMEditableField =
+  | 'partNumber'
+  | 'name'
+  | 'quantity'
+  | 'unit'
+  | 'revision'
+  | 'designMasterPartId';
+
+export type EBOMFieldValue = string | number | undefined;
+
+export type EBOMDraftOperationType =
+  | 'override-field'
+  | 'lock-field'
+  | 'unlock-field'
+  | 'add-local-item'
+  | 'revert-item';
+
+export interface EBOMDraftOperation {
+  id: string;
+  baseId: string;
+  itemId: string;
+  type: EBOMDraftOperationType;
+  field?: EBOMEditableField;
+  previousValue?: EBOMFieldValue;
+  nextValue?: EBOMFieldValue;
+  itemSnapshot?: EBOMItem;
+  createdAt: string;
+}
+
+export interface EBOMChangeRecord {
+  id: string;
+  baseId: string;
+  revision: string;
+  state: 'recorded';
+  summary: string;
+  operationIds: string[];
+  publishedAt: string;
+}
