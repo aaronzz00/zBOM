@@ -2,37 +2,39 @@ import { EBOMItem } from '../domain/ebomArchitectureTypes';
 import { BOMNode, ComponentType, LifecycleState } from '../types';
 
 type LegacyEBOMAttributes = {
-  baseId: string;
-  sourceItemId?: string;
-  sourceBaseId?: string;
-  inheritanceState: EBOMItem['inheritanceState'];
-  designMasterPartId?: string;
-  lockedFields?: EBOMItem['lockedFields'];
+  zbom: {
+    baseId: string;
+    sourceItemId?: string;
+    sourceBaseId?: string;
+    inheritanceState: EBOMItem['inheritanceState'];
+    designMasterPartId?: string;
+    lockedFields?: EBOMItem['lockedFields'];
+  };
 };
 
 const toCustomAttributes = (item: EBOMItem): LegacyEBOMAttributes => {
-  const customAttributes: LegacyEBOMAttributes = {
+  const zbom: LegacyEBOMAttributes['zbom'] = {
     baseId: item.baseId,
     inheritanceState: item.inheritanceState,
   };
 
   if (item.sourceItemId) {
-    customAttributes.sourceItemId = item.sourceItemId;
+    zbom.sourceItemId = item.sourceItemId;
   }
 
   if (item.sourceBaseId) {
-    customAttributes.sourceBaseId = item.sourceBaseId;
+    zbom.sourceBaseId = item.sourceBaseId;
   }
 
   if (item.designMasterPartId) {
-    customAttributes.designMasterPartId = item.designMasterPartId;
+    zbom.designMasterPartId = item.designMasterPartId;
   }
 
   if (item.lockedFields) {
-    customAttributes.lockedFields = [...item.lockedFields];
+    zbom.lockedFields = [...item.lockedFields];
   }
 
-  return customAttributes;
+  return { zbom };
 };
 
 export function toLegacyBOMNode(resolvedItems: EBOMItem[], rootItemId: string): BOMNode {
@@ -54,9 +56,14 @@ export function toLegacyBOMNode(resolvedItems: EBOMItem[], rootItemId: string): 
     childrenByParentId.set(item.parentItemId, siblings);
   }
 
-  const buildNode = (item: EBOMItem): BOMNode => {
+  const buildNode = (item: EBOMItem, ancestors: string[] = []): BOMNode => {
+    if (ancestors.includes(item.id)) {
+      throw new Error(`EBOM item parent cycle detected: ${[...ancestors, item.id].join(' -> ')}`);
+    }
+
+    const nextAncestors = [...ancestors, item.id];
     const childItems = childrenByParentId.get(item.id) ?? [];
-    const children = childItems.map(buildNode);
+    const children = childItems.map((child) => buildNode(child, nextAncestors));
 
     return {
       id: item.id,

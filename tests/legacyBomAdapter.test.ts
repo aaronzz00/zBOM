@@ -75,12 +75,14 @@ describe('legacyBomAdapter', () => {
     const root = toLegacyBOMNode(resolvedItems, 'root');
 
     expect(root.customAttributes).toEqual({
-      baseId: 'base-child',
-      sourceItemId: 'source-item',
-      sourceBaseId: 'base-parent',
-      inheritanceState: 'locked',
-      designMasterPartId: 'design-master-1',
-      lockedFields: ['quantity', 'revision'],
+      zbom: {
+        baseId: 'base-child',
+        sourceItemId: 'source-item',
+        sourceBaseId: 'base-parent',
+        inheritanceState: 'locked',
+        designMasterPartId: 'design-master-1',
+        lockedFields: ['quantity', 'revision'],
+      },
     });
   });
 
@@ -100,6 +102,17 @@ describe('legacyBomAdapter', () => {
     expect(() => toLegacyBOMNode([item({ id: 'other-root' })], 'missing-root')).toThrow(
       /EBOM root item not found: missing-root/,
     );
+  });
+
+  it('throws a clear error for item parent cycles reachable from the selected root', () => {
+    const resolvedItems: EBOMItem[] = [
+      item({ id: 'root' }),
+      item({ id: 'child-a', parentItemId: 'root' }),
+      item({ id: 'child-b', parentItemId: 'child-a' }),
+      item({ id: 'child-a', parentItemId: 'child-b' }),
+    ];
+
+    expect(() => toLegacyBOMNode(resolvedItems, 'root')).toThrow(/EBOM item parent cycle detected/);
   });
 
   it('does not mutate input items', () => {
