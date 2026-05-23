@@ -78,6 +78,8 @@ export interface EBOMArchitectureRepository {
 
 The first implementation should be an in-memory repository. It may resolve immediately, but it should still be asynchronous so UI and store error paths match a future backend adapter.
 
+`saveDraftOperations` should be called by explicit store actions, not as a background call after every keystroke. Field edits may update local draft state immediately, but persistence through the repository should happen when the user applies an edit, adds a local item, changes a lock state, resets a draft, or publishes. This keeps the first implementation deterministic and gives a future backend adapter a clear save boundary.
+
 ### 4.2 Domain additions
 
 Extend `domain/ebomArchitectureTypes.ts` with workflow concepts:
@@ -196,6 +198,8 @@ Supported first-version actions:
 
 Inherited rows become explicit current-base draft rows when overridden. Local rows remain local. Locked fields remain tracked through `lockedFields`.
 
+Item-level revert should remove unapplied draft state for that item from the current base and append a `revert-item` operation to the draft operation list. The operation list should preserve that a revert happened, while the resolved item state should return to the repository snapshot plus any remaining operations for other items.
+
 ### 5.3 Change package
 
 The page shows a change package summary for the selected base:
@@ -211,7 +215,17 @@ Publish should call the repository port. On success:
 - create a local `EBOMChangeRecord`
 - clear draft operations for that base
 - clear dirty state for that base
-- update local base status or revision metadata according to the implemented policy
+- update local base status according to the prototype policy
+
+Prototype publish policy:
+
+- released bases are read-only and cannot publish draft changes in this phase
+- publishing a `draft` base moves it to `review`
+- publishing a `review` base keeps it in `review`
+- publishing does not auto-increment `revision`
+- the created `EBOMChangeRecord` stores the current base `revision`
+
+Revision bumping and release approval remain part of the future release/change-control workflow.
 
 On failure:
 
@@ -325,4 +339,3 @@ EBOM domain store + repository port
 -> editable resolved EBOM workflow
 -> read-only legacy preview adapter
 ```
-
