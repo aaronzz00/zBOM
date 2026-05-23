@@ -45,6 +45,8 @@ describe('Phase 1 workflow pages', () => {
     expect(screen.getByText(/Read-only projection/i)).toBeInTheDocument();
     expect(within(preview).getByText(/Virtual Tree View/i)).toBeInTheDocument();
     expect(within(preview).getAllByText('ZP26-3200').length).toBeGreaterThan(0);
+    expect(within(preview).queryByText('Columns')).not.toBeInTheDocument();
+    expect(within(preview).queryByTitle('Where Used')).not.toBeInTheDocument();
 
     fireEvent.change(baseSelect, { target: { value: 'ebom-structure-zp-a-pro' } });
 

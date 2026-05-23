@@ -13,6 +13,8 @@ interface BOMTableProps {
     selectedId: string | null;
     isMBOMView: boolean;
     initialExpandedIds?: string[];
+    enableColumnControls?: boolean;
+    enableWhereUsed?: boolean;
 }
 
 // Flatten helper
@@ -65,10 +67,15 @@ export const BOMTable: React.FC<BOMTableProps> = ({
     selectedId,
     isMBOMView,
     initialExpandedIds,
+    enableColumnControls = true,
+    enableWhereUsed = true,
 }) => {
     const { hasPermission } = useAuth();
     const { attributeDefs } = useAppStore();
-    const { isColumnVisible, toggleColumn } = useViewStore();
+    const viewStore = useViewStore();
+    const isColumnVisible = enableColumnControls ? viewStore.isColumnVisible : () => true;
+    const toggleColumn = enableColumnControls ? viewStore.toggleColumn : () => {};
+    const collapseExpandedIds = initialExpandedIds ?? ['root'];
     const [expandedIds, setExpandedIds] = React.useState<Set<string>>(
         () => new Set(initialExpandedIds ?? ['root', 'n1', 'n2', 'n2-3'])
     );
@@ -142,7 +149,7 @@ export const BOMTable: React.FC<BOMTableProps> = ({
 
     return (
         <div className="flex-1 bg-white overflow-hidden flex flex-col h-full border rounded-lg border-slate-200 shadow-sm text-sm">
-            {whereUsedPart && <WhereUsedModal partNumber={whereUsedPart} onClose={() => setWhereUsedPart(null)} />}
+            {enableWhereUsed && whereUsedPart && <WhereUsedModal partNumber={whereUsedPart} onClose={() => setWhereUsedPart(null)} />}
 
             {/* Toolbar */}
             <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex items-center justify-between flex-shrink-0">
@@ -151,28 +158,30 @@ export const BOMTable: React.FC<BOMTableProps> = ({
                     {isMBOMView && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-200">MBOM</span>}
                 </div>
                 <div className="flex gap-2 text-xs">
-                    <button onClick={() => setExpandedIds(new Set(['root']))} className="px-2 py-1 text-slate-600 hover:bg-slate-200 rounded">Collapse All</button>
+                    <button onClick={() => setExpandedIds(new Set(collapseExpandedIds))} className="px-2 py-1 text-slate-600 hover:bg-slate-200 rounded">Collapse All</button>
 
-                    <div className="relative group">
-                        <button className="px-2 py-1 bg-white border border-slate-300 rounded text-slate-600 hover:bg-slate-50 flex items-center gap-1">
-                            <span>Columns</span>
-                        </button>
-                        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 shadow-lg rounded-md p-2 w-48 z-50 hidden group-hover:block">
-                            <div className="flex flex-col gap-1 max-h-60 overflow-auto">
-                                {['imageUrl', 'name', 'refDes', 'state', 'quantity', 'weightG', ...attributeDefs.map(a => a.key), 'targetCost', 'cost'].map(key => (
-                                    <label key={key} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 rounded cursor-pointer text-xs">
-                                        <input
-                                            type="checkbox"
-                                            checked={isColumnVisible(key)}
-                                            onChange={() => toggleColumn(key)}
-                                            className="rounded border-slate-300"
-                                        />
-                                        <span className="truncate">{key}</span>
-                                    </label>
-                                ))}
+                    {enableColumnControls && (
+                        <div className="relative group">
+                            <button className="px-2 py-1 bg-white border border-slate-300 rounded text-slate-600 hover:bg-slate-50 flex items-center gap-1">
+                                <span>Columns</span>
+                            </button>
+                            <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 shadow-lg rounded-md p-2 w-48 z-50 hidden group-hover:block">
+                                <div className="flex flex-col gap-1 max-h-60 overflow-auto">
+                                    {['imageUrl', 'name', 'refDes', 'state', 'quantity', 'weightG', ...attributeDefs.map(a => a.key), 'targetCost', 'cost'].map(key => (
+                                        <label key={key} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 rounded cursor-pointer text-xs">
+                                            <input
+                                                type="checkbox"
+                                                checked={isColumnVisible(key)}
+                                                onChange={() => toggleColumn(key)}
+                                                className="rounded border-slate-300"
+                                            />
+                                            <span className="truncate">{key}</span>
+                                        </label>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
 
@@ -224,13 +233,15 @@ export const BOMTable: React.FC<BOMTableProps> = ({
                                     <span className="opacity-70 mr-2" title={row.type}>{getTypeIcon(row.type)}</span>
                                     <span className="font-medium truncate text-slate-700 mr-2">{row.partNumber}</span>
 
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setWhereUsedPart(row.partNumber); }}
-                                        className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-slate-200 rounded text-slate-400 transition-opacity"
-                                        title="Where Used"
-                                    >
-                                        <Database className="w-3 h-3" />
-                                    </button>
+                                    {enableWhereUsed && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setWhereUsedPart(row.partNumber); }}
+                                            className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-slate-200 rounded text-slate-400 transition-opacity"
+                                            title="Where Used"
+                                        >
+                                            <Database className="w-3 h-3" />
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Image */}
