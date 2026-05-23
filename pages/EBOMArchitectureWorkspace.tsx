@@ -175,7 +175,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section data-testid="legacy-bom-preview" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4">
             <h2 className="text-lg font-bold text-slate-900">Legacy BOM Preview</h2>
             <p className="mt-1 text-sm text-slate-500">

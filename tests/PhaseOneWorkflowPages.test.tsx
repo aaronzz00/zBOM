@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { EBOMArchitectureWorkspace } from '../pages/EBOMArchitectureWorkspace';
 import { MBOMDeltaConsole } from '../pages/MBOMDeltaConsole';
 import { ToolingHub } from '../pages/ToolingHub';
@@ -32,6 +32,7 @@ describe('Phase 1 workflow pages', () => {
     render(<EBOMArchitectureWorkspace />);
 
     const baseSelect = screen.getByRole('combobox', { name: 'EBOM Base' }) as HTMLSelectElement;
+    const preview = screen.getByTestId('legacy-bom-preview');
 
     expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument();
     expect(screen.getAllByText('ebom-platform-zp26').length).toBeGreaterThan(0);
@@ -42,14 +43,14 @@ describe('Phase 1 workflow pages', () => {
     expect(screen.getByText('locked')).toBeInTheDocument();
     expect(screen.getByText('Legacy BOM Preview')).toBeInTheDocument();
     expect(screen.getByText(/Read-only projection/i)).toBeInTheDocument();
-    expect(screen.getByText(/Virtual Tree View/i)).toBeInTheDocument();
-    expect(screen.getAllByText('ZP26-3200').length).toBeGreaterThan(1);
+    expect(within(preview).getByText(/Virtual Tree View/i)).toBeInTheDocument();
+    expect(within(preview).getAllByText('ZP26-3200').length).toBeGreaterThan(0);
 
     fireEvent.change(baseSelect, { target: { value: 'ebom-structure-zp-a-pro' } });
 
     expect(baseSelect.value).toBe('ebom-structure-zp-a-pro');
     expect(screen.getAllByText('Display Module, ProMotion OLED').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Camera Module, Triple Lens Pro').length).toBeGreaterThan(0);
+    expect(within(screen.getByTestId('legacy-bom-preview')).getAllByText('Camera Module, Triple Lens Pro').length).toBeGreaterThan(0);
   });
 
   it('renders SKU-first MBOM deltas grouped by delta type and reconciles stale selections', async () => {
