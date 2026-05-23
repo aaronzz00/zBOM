@@ -183,6 +183,96 @@ describe('Phase 1 workflow pages', () => {
     expect(screen.getByText(/Unable to build legacy BOM preview/i)).toBeInTheDocument();
   });
 
+  it('edits inherited EBOM fields, updates the change package, and publishes', async () => {
+    render(<EBOMArchitectureWorkspace />);
+    await waitFor(() => expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Edit ZP26-4100/i }));
+    fireEvent.change(screen.getByLabelText('Part Number'), { target: { value: 'ZP26-4100-EDIT' } });
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Edited Display Module' } });
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Unit'), { target: { value: 'SET' } });
+    fireEvent.change(screen.getByLabelText('Revision'), { target: { value: 'B' } });
+    fireEvent.change(screen.getByLabelText('Design Master Part'), {
+      target: { value: 'dmp-edited-display' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Apply Override/i }));
+
+    await waitFor(() => expect(screen.getAllByText('6 pending').length).toBeGreaterThan(0));
+    expect(screen.getAllByText(/override-field/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('ZP26-4100-EDIT').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Edited Display Module').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('3 SET').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('B').length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: /Publish Change Package/i }));
+
+    await waitFor(() => expect(screen.getAllByText('Clean').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('review').length).toBeGreaterThan(0);
+  });
+
+  it('adds a local child item from the EBOM edit workflow', async () => {
+    render(<EBOMArchitectureWorkspace />);
+    await waitFor(() => expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Add Local Item/i }));
+    fireEvent.change(screen.getByLabelText('Local Part Number'), {
+      target: { value: 'ZP-A-STD-9900' },
+    });
+    fireEvent.change(screen.getByLabelText('Local Name'), {
+      target: { value: 'Local Test Fixture' },
+    });
+    fireEvent.change(screen.getByLabelText('Local Quantity'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Local Unit'), { target: { value: 'EA' } });
+    fireEvent.change(screen.getByLabelText('Local Revision'), { target: { value: 'A' } });
+    fireEvent.change(screen.getByLabelText('Local Design Master Part'), {
+      target: { value: 'dmp-local-test-fixture' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Create Local Item/i }));
+
+    await waitFor(() => expect(screen.getAllByText('1 pending').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('ZP-A-STD-9900').length).toBeGreaterThan(0);
+    expect(screen.getByText(/add-local-item/i)).toBeInTheDocument();
+  });
+
+  it('locks, unlocks, and reverts an EBOM item draft from the edit panel', async () => {
+    render(<EBOMArchitectureWorkspace />);
+    await waitFor(() => expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Edit ZP26-4100/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Lock Quantity$/i }));
+    await waitFor(() => expect(screen.getByText(/lock-field/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /^Unlock Quantity$/i }));
+    await waitFor(() => expect(screen.getByText(/unlock-field/i)).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: /Apply Override/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Revert Item Draft/i }));
+
+    await waitFor(() => expect(screen.getByText(/revert-item/i)).toBeInTheDocument());
+    expect(screen.queryByText('3 EA')).not.toBeInTheDocument();
+  });
+
+  it('keeps pending EBOM operations visible when publish fails', async () => {
+    const repository = createInMemoryEBOMArchitectureRepository();
+    repository.publishChangePackage = async () => {
+      throw new Error('publish failed');
+    };
+    useEBOMArchitectureStore.getState().setRepository(repository);
+
+    render(<EBOMArchitectureWorkspace />);
+    await waitFor(() => expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Edit ZP26-4100/i }));
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: /Apply Override/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Publish Change Package/i }));
+
+    await waitFor(() => expect(screen.getByText(/publish failed/i)).toBeInTheDocument());
+    expect(screen.getAllByText('1 pending').length).toBeGreaterThan(0);
+  });
+
   it('renders SKU-first MBOM deltas grouped by delta type and reconciles stale selections', async () => {
     useProductConfigStore.setState((state) => ({
       projects: [

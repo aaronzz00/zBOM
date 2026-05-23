@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { GitBranch, Layers3, Lock, ShieldCheck } from 'lucide-react';
 import { BOMTable } from '../components/BOMTable';
-import type { EBOMBase, InheritanceState } from '../domain/ebomArchitectureTypes';
+import type { EBOMBase, EBOMEditableField, EBOMItem, InheritanceState } from '../domain/ebomArchitectureTypes';
 import { useEBOMArchitectureStore } from '../stores/useEBOMArchitectureStore';
 import type { BOMNode } from '../types';
 import { getInheritanceChain, resolveEBOMBase } from '../utils/ebomInheritance';
@@ -20,6 +20,35 @@ const statusStyles: Record<EBOMBase['status'], string> = {
   released: 'bg-emerald-50 text-emerald-700',
 };
 
+type EditValues = Record<EBOMEditableField, string>;
+
+const editableFields: EBOMEditableField[] = [
+  'partNumber',
+  'name',
+  'quantity',
+  'unit',
+  'revision',
+  'designMasterPartId',
+];
+
+const emptyEditValues: EditValues = {
+  partNumber: '',
+  name: '',
+  quantity: '',
+  unit: '',
+  revision: '',
+  designMasterPartId: '',
+};
+
+const toEditValues = (item: EBOMItem | undefined): EditValues => ({
+  partNumber: item?.partNumber ?? '',
+  name: item?.name ?? '',
+  quantity: item ? String(item.quantity) : '',
+  unit: item?.unit ?? '',
+  revision: item?.revision ?? '',
+  designMasterPartId: item?.designMasterPartId ?? '',
+});
+
 export const EBOMArchitectureWorkspace: React.FC = () => {
   const {
     bases,
@@ -32,8 +61,27 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
     getSelectedBase,
     getDraftOperations,
     isDirty,
+    overrideField,
+    lockField,
+    unlockField,
+    addLocalItem,
+    revertItemDraft,
+    resetDraft,
+    publishChangePackage,
   } = useEBOMArchitectureStore();
   const [selectedPreviewNodeId, setSelectedPreviewNodeId] = useState<string | null>(null);
+  const [selectedEditItemId, setSelectedEditItemId] = useState<string | null>(null);
+  const [showLocalItemForm, setShowLocalItemForm] = useState(false);
+  const [editValues, setEditValues] = useState<EditValues>(emptyEditValues);
+  const [localItemValues, setLocalItemValues] = useState({
+    parentItemId: '',
+    partNumber: '',
+    name: '',
+    quantity: '1',
+    unit: 'EA',
+    revision: 'A',
+    designMasterPartId: '',
+  });
 
   useEffect(() => {
     if (status === 'idle') {
@@ -93,6 +141,57 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
       };
     }
   }, [resolutionError, resolvedItems, selectedBase]);
+
+  const selectedEditItem = resolvedItems.find((item) => item.id === selectedEditItemId);
+
+  useEffect(() => {
+    setEditValues(toEditValues(selectedEditItem));
+  }, [selectedEditItem]);
+
+  useEffect(() => {
+    if (selectedBase && !localItemValues.parentItemId) {
+      setLocalItemValues((values) => ({ ...values, parentItemId: selectedBase.rootItemId }));
+    }
+  }, [localItemValues.parentItemId, selectedBase]);
+
+  const handleApplyOverride = async () => {
+    if (!selectedEditItem) {
+      return;
+    }
+
+    for (const field of editableFields) {
+      const nextValue = field === 'quantity'
+        ? Number(editValues.quantity)
+        : editValues[field] || undefined;
+      const currentValue = selectedEditItem[field];
+
+      if (String(currentValue ?? '') !== String(nextValue ?? '')) {
+        await overrideField(selectedEditItem.id, field, nextValue);
+      }
+    }
+  };
+
+  const handleCreateLocalItem = async () => {
+    await addLocalItem({
+      parentItemId: localItemValues.parentItemId || selectedBase?.rootItemId,
+      partNumber: localItemValues.partNumber,
+      name: localItemValues.name,
+      quantity: Number(localItemValues.quantity),
+      unit: localItemValues.unit,
+      revision: localItemValues.revision,
+      designMasterPartId: localItemValues.designMasterPartId || undefined,
+    });
+    setLocalItemValues((values) => ({
+      ...values,
+      partNumber: '',
+      name: '',
+      quantity: '1',
+      unit: 'EA',
+      revision: 'A',
+      designMasterPartId: '',
+    }));
+    setShowLocalItemForm(false);
+  };
 
   if ((status === 'idle' || status === 'loading') && bases.length === 0) {
     return (
@@ -231,6 +330,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                   <th className="px-5 py-3">Revision</th>
                   <th className="px-5 py-3">State</th>
                   <th className="px-5 py-3">Source</th>
+                  <th className="px-5 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -249,10 +349,256 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-5 py-4 text-slate-500">{item.sourceBaseId ?? 'Local base'}</td>
+                    <td className="px-5 py-4">
+                      <button
+                        type="button"
+                        aria-label={`Edit ${item.partNumber}`}
+                        onClick={() => setSelectedEditItemId(item.id)}
+                        className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Edit
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">EBOM Draft Editor</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Edit the selected resolved item or add local child items to the current base.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLocalItemForm((value) => !value)}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+              >
+                Add Local Item
+              </button>
+            </div>
+
+            {selectedEditItem ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="edit-part-number">
+                  Part Number
+                  <input
+                    id="edit-part-number"
+                    value={editValues.partNumber}
+                    onChange={(event) => setEditValues((values) => ({ ...values, partNumber: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="edit-name">
+                  Name
+                  <input
+                    id="edit-name"
+                    value={editValues.name}
+                    onChange={(event) => setEditValues((values) => ({ ...values, name: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="edit-quantity">
+                  Quantity
+                  <input
+                    id="edit-quantity"
+                    type="number"
+                    value={editValues.quantity}
+                    onChange={(event) => setEditValues((values) => ({ ...values, quantity: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="edit-unit">
+                  Unit
+                  <input
+                    id="edit-unit"
+                    value={editValues.unit}
+                    onChange={(event) => setEditValues((values) => ({ ...values, unit: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="edit-revision">
+                  Revision
+                  <input
+                    id="edit-revision"
+                    value={editValues.revision}
+                    onChange={(event) => setEditValues((values) => ({ ...values, revision: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="edit-design-master-part">
+                  Design Master Part
+                  <input
+                    id="edit-design-master-part"
+                    value={editValues.designMasterPartId}
+                    onChange={(event) => setEditValues((values) => ({ ...values, designMasterPartId: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <div className="flex flex-wrap gap-2 md:col-span-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleApplyOverride()}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                  >
+                    Apply Override
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void lockField(selectedEditItem.id, 'quantity')}
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Lock Quantity
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void unlockField(selectedEditItem.id, 'quantity')}
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Unlock Quantity
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void revertItemDraft(selectedEditItem.id)}
+                    className="rounded-lg border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                  >
+                    Revert Item Draft
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+                Select an item from the resolved table to edit it.
+              </div>
+            )}
+
+            {showLocalItemForm && (
+              <div className="mt-5 grid gap-3 border-t border-slate-200 pt-5 md:grid-cols-2">
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="local-parent-item">
+                  Local Parent Item
+                  <select
+                    id="local-parent-item"
+                    value={localItemValues.parentItemId}
+                    onChange={(event) => setLocalItemValues((values) => ({ ...values, parentItemId: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  >
+                    {resolvedItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.partNumber}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="local-part-number">
+                  Local Part Number
+                  <input
+                    id="local-part-number"
+                    value={localItemValues.partNumber}
+                    onChange={(event) => setLocalItemValues((values) => ({ ...values, partNumber: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="local-name">
+                  Local Name
+                  <input
+                    id="local-name"
+                    value={localItemValues.name}
+                    onChange={(event) => setLocalItemValues((values) => ({ ...values, name: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="local-quantity">
+                  Local Quantity
+                  <input
+                    id="local-quantity"
+                    type="number"
+                    value={localItemValues.quantity}
+                    onChange={(event) => setLocalItemValues((values) => ({ ...values, quantity: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="local-unit">
+                  Local Unit
+                  <input
+                    id="local-unit"
+                    value={localItemValues.unit}
+                    onChange={(event) => setLocalItemValues((values) => ({ ...values, unit: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="local-revision">
+                  Local Revision
+                  <input
+                    id="local-revision"
+                    value={localItemValues.revision}
+                    onChange={(event) => setLocalItemValues((values) => ({ ...values, revision: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="local-design-master-part">
+                  Local Design Master Part
+                  <input
+                    id="local-design-master-part"
+                    value={localItemValues.designMasterPartId}
+                    onChange={(event) => setLocalItemValues((values) => ({ ...values, designMasterPartId: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateLocalItem()}
+                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                  >
+                    Create Local Item
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900">Change Package</h2>
+            <div className="mt-3 text-2xl font-bold text-slate-900">
+              {dirty ? `${draftOperations.length} pending` : 'Clean'}
+            </div>
+            {error && (
+              <div role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                {error}
+              </div>
+            )}
+            <ul className="mt-4 space-y-2 text-sm text-slate-700">
+              {draftOperations.map((operation) => (
+                <li key={operation.id} className="rounded-lg bg-slate-50 px-3 py-2 font-semibold">
+                  {operation.type}
+                  {operation.field ? ` · ${operation.field}` : ''}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!selectedBase || selectedBase.status === 'released' || draftOperations.length === 0 || status === 'publishing'}
+                onClick={() => selectedBase && void publishChangePackage(`${selectedBase.id} draft update`)}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                Publish Change Package
+              </button>
+              <button
+                type="button"
+                disabled={draftOperations.length === 0}
+                onClick={() => void resetDraft()}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                Reset Draft
+              </button>
+            </div>
           </div>
         </section>
 
