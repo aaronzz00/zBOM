@@ -93,6 +93,8 @@ export const useToolingStore = create<ToolingState>((set, get) => ({
             return null;
         }
 
-        return Math.round((t1Time - kickoffTime) / millisecondsPerDay);
+        const leadTimeDays = Math.round((t1Time - kickoffTime) / millisecondsPerDay);
+
+        return leadTimeDays < 0 ? null : leadTimeDays;
     },
 }));

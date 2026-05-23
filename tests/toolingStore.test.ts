@@ -110,6 +110,19 @@ describe('useToolingStore', () => {
         expect(useToolingStore.getState().getLeadTimeDays('tooling-unknown')).toBeNull();
     });
 
+    it('returns null when T1 is before kickoff', () => {
+        useToolingStore.getState().updateMilestone('tooling-zp-a-cover-injection', 'kickoff', {
+            plannedDate: '2026-05-20',
+            actualDate: undefined,
+        });
+        useToolingStore.getState().updateMilestone('tooling-zp-a-cover-injection', 't1', {
+            plannedDate: '2026-05-10',
+            actualDate: undefined,
+        });
+
+        expect(useToolingStore.getState().getLeadTimeDays('tooling-zp-a-cover-injection')).toBeNull();
+    });
+
     it('restores mutated milestone data on reset', () => {
         useToolingStore.getState().updateMilestone(actualDatesToolingId, 'dfm', {
             status: 'blocked',
