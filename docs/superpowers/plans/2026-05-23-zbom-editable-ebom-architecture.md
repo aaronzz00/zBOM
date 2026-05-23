@@ -96,6 +96,7 @@ export interface EBOMDraftOperation {
   field?: EBOMEditableField;
   previousValue?: EBOMFieldValue;
   nextValue?: EBOMFieldValue;
+  itemSnapshot?: EBOMItem;
   createdAt: string;
 }
 
@@ -545,6 +546,7 @@ Add a pure helper inside `stores/useEBOMArchitectureStore.ts`:
 
 ```ts
 const replayDraftOperations = (
+  snapshotBases: EBOMBase[],
   snapshotItems: EBOMItem[],
   operationsByBaseId: Record<string, EBOMDraftOperation[]>,
 ): EBOMItem[] => {
@@ -554,8 +556,9 @@ const replayDraftOperations = (
 
 Rules:
 
+- Pass `snapshotBases` into replay so inherited-item override replay can resolve source rows when no current-base item stub exists.
 - `override-field`, `lock-field`, and `unlock-field` must create/update a current-base item if needed.
-- `add-local-item` operations need enough operation data to recreate the local item. Store the local item fields in `nextValue` as a JSON-compatible object or introduce a dedicated `itemSnapshot` field if implementation prefers that shape.
+- `add-local-item` operations must store the complete created local item in `itemSnapshot`; do not overload `nextValue` with object payloads.
 - `revert-item` removes prior operations for the same `baseId` and `itemId` during replay, but leaves operations for other items intact.
 - `resetDraft(baseId)` clears operations for that base, calls `saveDraftOperations(baseId, [])`, and recomputes from `snapshotItems`.
 
@@ -673,6 +676,23 @@ it('resets draft changes for the selected base', async () => {
   expect(state.getResolvedItems().find((item) => item.id === 'item-std-display')?.quantity).toBe(1);
   expect(state.getDraftOperations()).toEqual([]);
   expect(state.isDirty()).toBe(false);
+});
+
+it('keeps local draft state when saving draft operations fails', async () => {
+  const failingRepository = createInMemoryEBOMArchitectureRepository();
+  failingRepository.saveDraftOperations = async () => {
+    throw new Error('save failed');
+  };
+  useEBOMArchitectureStore.getState().setRepository(failingRepository);
+  await useEBOMArchitectureStore.getState().load();
+
+  await useEBOMArchitectureStore.getState().overrideField('item-std-display', 'quantity', 3);
+
+  const state = useEBOMArchitectureStore.getState();
+  expect(state.error).toMatch(/save failed/);
+  expect(state.getResolvedItems().find((item) => item.id === 'item-std-display')?.quantity).toBe(3);
+  expect(state.getDraftOperations()).toHaveLength(1);
+  expect(state.isDirty()).toBe(true);
 });
 ```
 
@@ -882,6 +902,7 @@ In `tests/PhaseOneWorkflowPages.test.tsx`, import the store:
 
 ```ts
 import { useEBOMArchitectureStore } from '../stores/useEBOMArchitectureStore';
+import { createInMemoryEBOMArchitectureRepository } from '../repositories/ebomArchitectureRepository';
 ```
 
 Update `beforeEach`:
@@ -892,10 +913,11 @@ beforeEach(() => {
   useMBOMDeltaStore.getState().reset();
   useToolingStore.getState().reset();
   useEBOMArchitectureStore.getState().reset();
+  useEBOMArchitectureStore.getState().setRepository(createInMemoryEBOMArchitectureRepository());
 });
 ```
 
-Do not preload the EBOM store in the page tests. The page itself must call `load()` when it renders with an idle store.
+Do not preload the EBOM store in the page tests. The page itself must call `load()` when it renders with an idle store. Always install a fresh in-memory repository in `beforeEach` so draft operations, change records, and status changes cannot leak between page tests.
 
 - [ ] **Step 2: Add failing self-loading page assertions**
 
