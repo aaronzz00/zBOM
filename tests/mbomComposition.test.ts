@@ -257,6 +257,53 @@ describe('composeMBOMPreview', () => {
         });
     });
 
+    it('creates independent warning rows for repeated missing-target deltas', () => {
+        const preview = composeMBOMPreview(baseItems, [
+            delta({
+                id: 'delta-remove-missing',
+                type: 'remove',
+                targetPartNumber: 'MISSING-404',
+                reason: 'Attempted removal of unknown part',
+            }),
+            delta({
+                id: 'delta-quantity-missing',
+                type: 'quantity-change',
+                targetPartNumber: 'MISSING-404',
+                quantity: 7,
+                reason: 'Attempted quantity change for unknown part',
+            }),
+        ]);
+
+        const warningRows = preview.filter((row) => row.warning);
+
+        expect(warningRows).toEqual([
+            {
+                id: 'warning:delta-remove-missing',
+                partNumber: 'MISSING-404',
+                name: 'Attempted removal of unknown part',
+                quantity: 1,
+                unit: 'EA',
+                source: 'delta-remove',
+                deltaItemId: 'delta-remove-missing',
+                targetPartNumber: 'MISSING-404',
+                reason: 'Attempted removal of unknown part',
+                warning: 'Target part number not found: MISSING-404',
+            },
+            {
+                id: 'warning:delta-quantity-missing',
+                partNumber: 'MISSING-404',
+                name: 'Attempted quantity change for unknown part',
+                quantity: 7,
+                unit: 'EA',
+                source: 'quantity-change',
+                deltaItemId: 'delta-quantity-missing',
+                targetPartNumber: 'MISSING-404',
+                reason: 'Attempted quantity change for unknown part',
+                warning: 'Target part number not found: MISSING-404',
+            },
+        ]);
+    });
+
     it('marks quantity-change when it is the final delta on the target row', () => {
         const preview = composeMBOMPreview(baseItems, [
             delta({

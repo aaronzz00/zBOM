@@ -70,7 +70,8 @@ const findTargetRowIndex = (
     }
 
     return rows.findIndex((row) => (
-        row.partNumber === targetPartNumber || row.targetPartNumber === targetPartNumber
+        !row.warning
+        && (row.partNumber === targetPartNumber || row.targetPartNumber === targetPartNumber)
     ));
 };
 
