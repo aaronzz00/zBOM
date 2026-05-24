@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { EBOMArchitectureWorkspace } from '../pages/EBOMArchitectureWorkspace';
 import { MBOMDeltaConsole } from '../pages/MBOMDeltaConsole';
+import { ProductMatrixCenter } from '../pages/ProductMatrixCenter';
 import { ToolingHub } from '../pages/ToolingHub';
 import { createInMemoryEBOMArchitectureRepository } from '../repositories/ebomArchitectureRepository';
 import { useEBOMArchitectureStore } from '../stores/useEBOMArchitectureStore';
@@ -31,6 +32,48 @@ describe('Phase 1 workflow pages', () => {
     useToolingStore.getState().reset();
     useEBOMArchitectureStore.getState().reset();
     useEBOMArchitectureStore.getState().setRepository(createInMemoryEBOMArchitectureRepository());
+  });
+
+  it('carries the selected Pro SKU from product matrix through EBOM publish into MBOM preview', async () => {
+    const productMatrix = render(<ProductMatrixCenter />);
+
+    fireEvent.click(screen.getByTestId('select-workflow-sku-zp-a-pro-blk-us-rtl'));
+
+    expect(useProductConfigStore.getState().selectedWorkflowSKUId).toBe('sku-zp-a-pro-blk-us-rtl');
+    expect(screen.getByTestId('sku-row-sku-zp-a-pro-blk-us-rtl')).toHaveTextContent('Selected');
+
+    productMatrix.unmount();
+
+    const ebomWorkspace = render(<EBOMArchitectureWorkspace />);
+
+    await waitFor(() => expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument());
+    expect(screen.getByText(/ZP-A-PRO-BLK-US-RTL/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Pro Structure/).length).toBeGreaterThan(0);
+
+    const baseSelect = screen.getByRole('combobox', { name: 'EBOM Base' }) as HTMLSelectElement;
+    await waitFor(() => expect(baseSelect.value).toBe('ebom-structure-zp-a-pro'));
+
+    fireEvent.click(screen.getByRole('button', { name: /Edit ZP26-3200/i }));
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: /Apply Override/i }));
+
+    await waitFor(() => expect(screen.getAllByText('1 pending').length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getByRole('button', { name: /Publish Change Package/i }));
+
+    await waitFor(() => expect(screen.getAllByText('Clean').length).toBeGreaterThan(0));
+
+    ebomWorkspace.unmount();
+
+    render(<MBOMDeltaConsole />);
+
+    expect(screen.getByText('MBOM Delta Console')).toBeInTheDocument();
+    expect(screen.getAllByText('ZP-A-PRO-BLK-US-RTL').length).toBeGreaterThan(0);
+    expect(screen.getByText('Composed MBOM Preview')).toBeInTheDocument();
+
+    const composedPreview = screen.getByRole('table');
+    await waitFor(() => expect(within(composedPreview).getByText('ZP26-3200')).toBeInTheDocument());
+    expect(within(composedPreview).getByText('2 EA')).toBeInTheDocument();
   });
 
   it('renders EBOM architecture inheritance chain and resolved item states', async () => {
