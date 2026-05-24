@@ -21,7 +21,13 @@ describe('useEBOMArchitectureStore', () => {
     expect(state.selectedBaseId).toBe('ebom-structure-zp-a-std');
     expect(state.bases.map((base) => base.id)).toContain('ebom-structure-zp-a-std');
     expect(state.getSelectedBase()?.id).toBe('ebom-structure-zp-a-std');
-    expect(state.getResolvedItems()).toHaveLength(3);
+    expect(state.getResolvedItems().map((item) => item.id)).toEqual(expect.arrayContaining([
+      'item-std-root',
+      'item-std-display',
+      'item-std-battery-locked',
+      'item-std-packaging-label-base',
+      'item-std-chassis-screw',
+    ]));
   });
 
   it('switches selected bases and resolves the selected item list', async () => {
