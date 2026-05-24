@@ -69,7 +69,9 @@ const findTargetRowIndex = (
         return -1;
     }
 
-    return rows.findIndex((row) => row.partNumber === targetPartNumber);
+    return rows.findIndex((row) => (
+        row.partNumber === targetPartNumber || row.targetPartNumber === targetPartNumber
+    ));
 };
 
 export const composeMBOMPreview = (

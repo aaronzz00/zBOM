@@ -256,4 +256,54 @@ describe('composeMBOMPreview', () => {
             warning: 'Target part number not found: MISSING-404',
         });
     });
+
+    it('marks quantity-change when it is the final delta on the target row', () => {
+        const preview = composeMBOMPreview(baseItems, [
+            delta({
+                id: 'delta-quantity-display',
+                type: 'quantity-change',
+                targetPartNumber: 'DSP-1000',
+                quantity: 2,
+                reason: 'Use two display protectors during manufacturing',
+            }),
+        ]);
+
+        expect(preview.find((row) => row.id === 'base:item-display')).toMatchObject({
+            partNumber: 'DSP-1000',
+            quantity: 2,
+            source: 'quantity-change',
+            deltaItemId: 'delta-quantity-display',
+            targetPartNumber: 'DSP-1000',
+            reason: 'Use two display protectors during manufacturing',
+        });
+    });
+
+    it('matches later deltas against the original target after a replace changes the part number', () => {
+        const preview = composeMBOMPreview(baseItems, [
+            delta({
+                id: 'delta-replace-display',
+                type: 'replace',
+                targetPartNumber: 'DSP-1000',
+                newPartNumber: 'DSP-1000-US',
+                reason: 'Use US display supplier',
+            }),
+            delta({
+                id: 'delta-quantity-display',
+                type: 'quantity-change',
+                targetPartNumber: 'DSP-1000',
+                quantity: 2,
+                reason: 'Use two display protectors during manufacturing',
+            }),
+        ]);
+
+        expect(preview.find((row) => row.id === 'base:item-display')).toMatchObject({
+            partNumber: 'DSP-1000-US',
+            quantity: 2,
+            source: 'quantity-change',
+            deltaItemId: 'delta-quantity-display',
+            targetPartNumber: 'DSP-1000',
+            reason: 'Use two display protectors during manufacturing',
+        });
+        expect(preview.find((row) => row.id === 'warning:delta-quantity-display')).toBeUndefined();
+    });
 });
