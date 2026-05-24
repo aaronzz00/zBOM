@@ -15,6 +15,14 @@ describe('useMBOMDeltaStore', () => {
 
         expect(state.deltaPacks).toEqual(mockMBOMDeltaPacks);
         expect(state.deltaItems).toEqual(mockMBOMDeltaItems);
+        expect(new Set(state.deltaItems.map((item) => item.type))).toEqual(new Set([
+            'add',
+            'remove',
+            'replace',
+            'quantity-change',
+            'manufacturing-only-material',
+            'packaging-label-regional',
+        ]));
     });
 
     it('returns delta packs for the selected SKU', () => {

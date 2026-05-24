@@ -119,6 +119,16 @@ export const mockSKUs: SKU[] = [
     generatedByRule: true,
   },
   {
+    id: 'sku-zp-a-pro-blk-us-rtl-active',
+    projectId: 'project-zphone-2026',
+    seriesId: 'series-zp-a',
+    structureId: 'structure-zp-a-pro',
+    code: 'ZP-A-PRO-BLK-US-RTL-ACTIVE',
+    status: 'active',
+    optionIds: ['opt-color-black', 'opt-region-us', 'opt-packaging-retail'],
+    generatedByRule: false,
+  },
+  {
     id: 'sku-zp-a-pro-slv-eu-bulk',
     projectId: 'project-zphone-2026',
     seriesId: 'series-zp-a',

@@ -116,6 +116,32 @@ describe('useProductConfigStore', () => {
         expect(skus.every((sku) => sku.structureId === 'structure-zp-a-std')).toBe(true);
     });
 
+    it('seeds realistic trial SKUs across structures and lifecycle statuses', () => {
+        const skus = useProductConfigStore.getState().skus;
+        const statuses = new Set(skus.map((sku) => sku.status));
+        const structuresByStatus = skus.reduce<Record<string, Set<string>>>((groups, sku) => ({
+            ...groups,
+            [sku.status]: new Set([...(groups[sku.status] ?? []), sku.structureId]),
+        }), {});
+
+        expect(statuses).toEqual(new Set(['active', 'candidate', 'suppressed', 'frozen']));
+        expect(new Set(skus.map((sku) => sku.structureId))).toEqual(new Set([
+            'structure-zp-a-std',
+            'structure-zp-a-pro',
+        ]));
+        expect(structuresByStatus.active).toEqual(new Set([
+            'structure-zp-a-std',
+            'structure-zp-a-pro',
+        ]));
+        expect(skus).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                id: 'sku-zp-a-pro-blk-us-rtl-active',
+                structureId: 'structure-zp-a-pro',
+                status: 'active',
+            }),
+        ]));
+    });
+
     it('activates a candidate SKU', () => {
         const store = useProductConfigStore.getState();
 
@@ -186,8 +212,8 @@ describe('useProductConfigStore', () => {
 
         const activeSkus = useProductConfigStore.getState().getActiveSKUs('project-zphone-2026');
 
-        expect(activeSkus).toHaveLength(2);
-        expect(activeSkus.map((sku) => sku.status).sort()).toEqual(['active', 'frozen']);
+        expect(activeSkus).toHaveLength(3);
+        expect(activeSkus.map((sku) => sku.status).sort()).toEqual(['active', 'active', 'frozen']);
         expect(activeSkus.every((sku) => sku.projectId === 'project-zphone-2026')).toBe(true);
     });
 
