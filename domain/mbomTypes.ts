@@ -35,3 +35,26 @@ export interface ReleasedMBOM {
     releasedAt: string;
     revision: string;
 }
+
+export type ComposedMBOMSource =
+    | 'base'
+    | 'delta-add'
+    | 'delta-remove'
+    | 'delta-replace'
+    | 'quantity-change'
+    | 'manufacturing-only'
+    | 'packaging-label-regional';
+
+export interface ComposedMBOMRow {
+    id: string;
+    partNumber: string;
+    name: string;
+    quantity: number;
+    unit: string;
+    revision?: string;
+    source: ComposedMBOMSource;
+    deltaItemId?: string;
+    targetPartNumber?: string;
+    reason?: string;
+    warning?: string;
+}
