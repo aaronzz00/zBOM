@@ -3,6 +3,7 @@ import {
     ProductSeries,
     ProductStructure,
     ProjectProgram,
+    SelectedWorkflowSKUContext,
     SKU,
     VariationAxis,
     VariationOption,
@@ -22,8 +23,11 @@ export interface ProductConfigState {
     variationAxes: VariationAxis[];
     skus: SKU[];
     activeProjectId: string;
+    selectedWorkflowSKUId: string;
     reset: () => void;
     setActiveProject: (projectId: string) => void;
+    selectWorkflowSKU: (skuId: string) => void;
+    getSelectedWorkflowSKUContext: () => SelectedWorkflowSKUContext | null;
     activateSKU: (skuId: string) => void;
     freezeSKU: (skuId: string) => void;
     suppressSKU: (skuId: string) => void;
@@ -41,6 +45,7 @@ const createInitialState = () => ({
     variationAxes: clone(mockVariationAxes),
     skus: clone(mockSKUs),
     activeProjectId: mockProjectPrograms[0]?.id ?? '',
+    selectedWorkflowSKUId: mockSKUs[0]?.id ?? '',
 });
 
 const getOptionSlug = (option: VariationOption, slugsInCombination: string[]) => {
@@ -71,6 +76,34 @@ export const useProductConfigStore = create<ProductConfigState>((set, get) => ({
 
     setActiveProject: (projectId: string) => {
         set({ activeProjectId: projectId });
+    },
+
+    selectWorkflowSKU: (skuId: string) => {
+        set((state) => ({
+            selectedWorkflowSKUId: state.skus.some((sku) => sku.id === skuId) ? skuId : state.selectedWorkflowSKUId,
+        }));
+    },
+
+    getSelectedWorkflowSKUContext: () => {
+        const { activeProjectId, projects, series, structures, skus, selectedWorkflowSKUId } = get();
+        const selectedSKU = skus.find((sku) => sku.id === selectedWorkflowSKUId);
+        const sku = selectedSKU?.projectId === activeProjectId
+            ? selectedSKU
+            : skus.find((item) => item.projectId === activeProjectId);
+        const project = projects.find((item) => item.id === activeProjectId);
+        const productSeries = sku ? series.find((item) => item.id === sku.seriesId) : undefined;
+        const structure = sku ? structures.find((item) => item.id === sku.structureId) : undefined;
+
+        if (!sku || !project || !productSeries || !structure) {
+            return null;
+        }
+
+        return {
+            sku,
+            project,
+            series: productSeries,
+            structure,
+        };
     },
 
     activateSKU: (skuId: string) => {

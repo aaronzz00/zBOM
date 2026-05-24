@@ -56,3 +56,10 @@ export interface SKU {
   generatedByRule: boolean;
   frozenAt?: string;
 }
+
+export interface SelectedWorkflowSKUContext {
+  sku: SKU;
+  project: ProjectProgram;
+  series: ProductSeries;
+  structure: ProductStructure;
+}

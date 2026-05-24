@@ -20,6 +20,81 @@ describe('useProductConfigStore', () => {
         expect(useProductConfigStore.getState().activeProjectId).toBe('project-next-platform');
     });
 
+    it('tracks the selected workflow SKU and resolves its context', () => {
+        const store = useProductConfigStore.getState();
+
+        store.selectWorkflowSKU('sku-zp-a-pro-blk-us-rtl');
+
+        expect(useProductConfigStore.getState().selectedWorkflowSKUId).toBe('sku-zp-a-pro-blk-us-rtl');
+        expect(useProductConfigStore.getState().getSelectedWorkflowSKUContext()).toMatchObject({
+            sku: { id: 'sku-zp-a-pro-blk-us-rtl' },
+            structure: { id: 'structure-zp-a-pro' },
+            series: { id: 'series-zp-a' },
+            project: { id: 'project-zphone-2026' },
+        });
+    });
+
+    it('falls back to the first SKU in the active project when the selected workflow SKU is out of scope', () => {
+        const store = useProductConfigStore.getState();
+
+        useProductConfigStore.setState((state) => ({
+            projects: [
+                ...state.projects,
+                {
+                    id: 'project-next-platform',
+                    code: 'NP27',
+                    name: 'Next Platform',
+                    phase: 'EVT',
+                    primarySeriesId: 'series-next-a',
+                    status: 'active',
+                },
+            ],
+            series: [
+                ...state.series,
+                {
+                    id: 'series-next-a',
+                    projectId: 'project-next-platform',
+                    code: 'NP-A',
+                    name: 'Next A Series',
+                    isPrimary: true,
+                },
+            ],
+            structures: [
+                ...state.structures,
+                {
+                    id: 'structure-next-a-std',
+                    projectId: 'project-next-platform',
+                    seriesId: 'series-next-a',
+                    code: 'STD',
+                    name: 'Next Standard Structure',
+                },
+            ],
+            skus: [
+                ...state.skus,
+                {
+                    id: 'sku-next-a-std-blk-us-rtl',
+                    projectId: 'project-next-platform',
+                    seriesId: 'series-next-a',
+                    structureId: 'structure-next-a-std',
+                    code: 'NP-A-STD-BLK-US-RTL',
+                    status: 'active',
+                    optionIds: [],
+                    generatedByRule: true,
+                },
+            ],
+        }));
+
+        store.selectWorkflowSKU('sku-zp-a-pro-blk-us-rtl');
+        store.setActiveProject('project-next-platform');
+
+        expect(useProductConfigStore.getState().getSelectedWorkflowSKUContext()).toMatchObject({
+            sku: { id: 'sku-next-a-std-blk-us-rtl' },
+            structure: { id: 'structure-next-a-std' },
+            series: { id: 'series-next-a' },
+            project: { id: 'project-next-platform' },
+        });
+    });
+
     it('resets mutated state to the initial mock configuration', () => {
         const store = useProductConfigStore.getState();
 
