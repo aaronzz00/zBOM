@@ -37,8 +37,10 @@ When optional Feishu data is used, `Audio Frame` and `Hearing Frame` represent m
 - Standard SKU selected:
 - Pro SKU selected:
 - Completed tasks:
+- Expected behavior:
+- Actual behavior:
 - Blockers or hesitations:
-- Confusing terminology:
+- Confusing or missing terminology:
 - Missing decision points:
 - EBOM inheritance/edit/publish notes:
 - MBOM delta/preview notes:
