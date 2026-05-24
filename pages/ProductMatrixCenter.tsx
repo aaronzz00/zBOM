@@ -25,9 +25,11 @@ export const ProductMatrixCenter: React.FC = () => {
     variationAxes,
     skus,
     activeProjectId,
+    selectedWorkflowSKUId,
     activateSKU,
     freezeSKU,
     suppressSKU,
+    selectWorkflowSKU,
   } = useProductConfigStore();
 
   const activeProject = projects.find((project) => project.id === activeProjectId);
@@ -187,6 +189,7 @@ export const ProductMatrixCenter: React.FC = () => {
                 {projectSKUs.map((sku) => {
                   const structure = projectStructures.find((item) => item.id === sku.structureId);
                   const optionCodes = sku.optionIds.map((optionId) => optionLookup.get(optionId)?.code ?? 'UNKNOWN');
+                  const isSelectedForWorkflow = selectedWorkflowSKUId === sku.id;
 
                   return (
                     <tr key={sku.id} data-testid={`sku-row-${sku.id}`} className="bg-white">
@@ -205,12 +208,28 @@ export const ProductMatrixCenter: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <span className={`rounded-full border px-2.5 py-1 text-xs font-bold uppercase ${statusStyles[sku.status]}`}>
-                          {sku.status}
-                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          <span className={`rounded-full border px-2.5 py-1 text-xs font-bold uppercase ${statusStyles[sku.status]}`}>
+                            {sku.status}
+                          </span>
+                          {isSelectedForWorkflow && (
+                            <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                              Selected
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex justify-end gap-2">
+                          <button
+                            data-testid={`select-workflow-${sku.id}`}
+                            type="button"
+                            onClick={() => selectWorkflowSKU(sku.id)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700"
+                          >
+                            <PackageCheck className="h-3.5 w-3.5" />
+                            Select for Workflow
+                          </button>
                           <button
                             data-testid={`activate-${sku.id}`}
                             type="button"

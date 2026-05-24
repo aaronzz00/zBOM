@@ -26,5 +26,10 @@ describe('ProductMatrixCenter', () => {
     fireEvent.click(screen.getByTestId('activate-sku-zp-a-pro-blk-us-rtl'));
 
     expect(skuRow).toHaveTextContent('active');
+
+    fireEvent.click(screen.getByTestId('select-workflow-sku-zp-a-pro-blk-us-rtl'));
+
+    expect(useProductConfigStore.getState().selectedWorkflowSKUId).toBe('sku-zp-a-pro-blk-us-rtl');
+    expect(screen.getByTestId('sku-row-sku-zp-a-pro-blk-us-rtl')).toHaveTextContent('Selected');
   });
 });
