@@ -26,10 +26,10 @@ Current branch:
 main
 ```
 
-Integrated implementation HEAD before this handoff refresh:
+Current HEAD before this design-status update:
 
 ```text
-99344eb docs: add editable ebom handoff
+8374e0b docs: update editable ebom handoff after merge
 ```
 
 Merge status:
@@ -62,6 +62,66 @@ Completed tasks:
 6. `EBOMArchitectureWorkspace` refactor to load from store with loading, recoverable load errors, resolver errors, and legacy preview fallback.
 7. Editable EBOM UI for row editing, local child items, lock/unlock/revert, change package summary, publish, and reset.
 8. Final review fixes for publish/reload persistence, reset failure preservation, unlock inheritance semantics, local item parent validity, quantity validation, and stale error cleanup.
+
+## Status Against 2026-05-22 Platform Redesign
+
+Source design:
+
+```text
+docs/superpowers/specs/2026-05-22-zbom-platform-redesign-design.md
+```
+
+### Completed Or Largely Completed
+
+The following design expectations now have working Phase 1 coverage:
+
+| Design expectation | Current status | Evidence |
+| --- | --- | --- |
+| Split the new platform domain away from the old single BOM tree | Largely complete for Phase 1 | `domain/productTypes.ts`, `domain/ebomArchitectureTypes.ts`, `domain/mbomTypes.ts`, `domain/toolingTypes.ts` |
+| Split store responsibilities instead of extending only the legacy BOM store | Largely complete for Phase 1 | `stores/useProductConfigStore.ts`, `stores/useEBOMArchitectureStore.ts`, `stores/useMBOMDeltaStore.ts`, `stores/useToolingStore.ts` |
+| Add Product Matrix Center | Implemented | `pages/ProductMatrixCenter.tsx`, `tests/ProductMatrixCenter.test.tsx`, `tests/productConfigStore.test.ts` |
+| Add EBOM Architecture Workspace using base/inheritance thinking | Implemented and now editable | `pages/EBOMArchitectureWorkspace.tsx`, `stores/useEBOMArchitectureStore.ts`, `utils/ebomInheritance.ts`, EBOM tests |
+| Support EBOM inheritance states: inherited, overridden, local, locked | Implemented | `domain/ebomArchitectureTypes.ts`, `utils/ebomInheritance.ts`, `tests/ebomInheritance.test.ts` |
+| Allow EBOM overrides, locks, unlocks, local additions, and manual publish/change package semantics | Implemented for in-memory Phase 1 | `stores/useEBOMArchitectureStore.ts`, `repositories/ebomArchitectureRepository.ts`, `tests/ebomArchitectureStore.test.ts` |
+| Keep legacy BOM preview read-only and isolated from editable EBOM state | Implemented | `utils/legacyBomAdapter.ts`, `pages/EBOMArchitectureWorkspace.tsx`, `tests/PhaseOneWorkflowPages.test.tsx` |
+| Add MBOM Delta Console with SKU-first difference retrieval and grouping by delta type | Implemented as a delta review console | `pages/MBOMDeltaConsole.tsx`, `stores/useMBOMDeltaStore.ts`, `tests/mbomDeltaStore.test.ts` |
+| Add Tooling Hub based on Design Master Part / Tooling Subject | Implemented as read-oriented milestone view | `domain/toolingTypes.ts`, `stores/useToolingStore.ts`, `pages/ToolingHub.tsx`, `tests/toolingStore.test.ts` |
+| Track tooling milestones for Drawing Release, DFM, Quotation, Kickoff, and T1 | Implemented | `domain/toolingTypes.ts`, `data/mockTooling.ts`, `pages/ToolingHub.tsx` |
+| Derive kickoff-to-T1 lead time | Implemented with invalid-date and negative-duration guards | `stores/useToolingStore.ts`, `tests/toolingStore.test.ts` |
+| Add navigation and viewer visibility for Phase 1 BOM-facing modules | Implemented | `components/Sidebar.tsx`, `App.tsx`, `tests/AppNavigation.test.tsx` |
+
+### Partially Completed
+
+The following areas exist, but are intentionally narrower than the 2026-05-22 target design:
+
+| Design expectation | Current status | Remaining gap |
+| --- | --- | --- |
+| Core project should contain two series and two structures under each series | Partially complete | Mock data has two series, but only `series-zp-a` has structures; second-series expansion is represented by `baseSeriesId` only, not a full UI workflow. |
+| Product Matrix should generate candidates and allow manual activation/freezing/suppression | Partially complete | Store has `generateCandidateSKUs`, `activateSKU`, `freezeSKU`, and `suppressSKU`; page shows existing mock SKUs and actions, but does not yet expose a generate-candidates action. |
+| SKU freezing should connect to ReleasedMBOM | Partially complete | SKU status can become `frozen`; `ReleasedMBOM` is only a type in `domain/mbomTypes.ts`, with no release store, snapshot generation, or audit workflow. |
+| EBOMBase minimum fields | Partially complete | Implemented fields support Phase 1 inheritance; design fields such as `scopeType`, `scopeId`, and `syncMode` are represented differently or absent. |
+| EBOMItem minimum fields | Partially complete | Implemented editable fields cover part number, name, revision, quantity, unit, inheritance state, and `designMasterPartId`; `description` and `itemType` are not present. |
+| Product / Series / Structure / Variation / SKU minimum fields | Partially complete | Current types are simplified: several design fields such as owner, description, status, sequence, notes, axis type, active flag, `releasedMbomId`, and `isGenerated` naming are absent or represented differently. |
+| MBOM delta pack/item minimum fields | Partially complete | Current model is SKU-based and supports typed items; design fields for base/target scope typing, old quantity, replacement part number naming, and effective axes are simplified. |
+| Tooling and DesignMasterPart minimum fields | Partially complete | Current model supports DMP, concrete part numbers, supplier, cavity count, milestones, and lead time; fields such as seriesId, category, status, toolingStrategy, owner, target SOP date, overallStatus, and explicit L/T milestone field are not yet modeled. |
+| Tooling daily operation with impact scope | Partially complete | User can select a Design Master Part and view records; affected structures/SKUs and risk prioritization are not computed. |
+| MBOM full preview expansion | Placeholder only | `MBOMDeltaConsole` explicitly marks full MBOM preview as a later phase. |
+
+### Not Yet Implemented
+
+The following design expectations remain open:
+
+| Design expectation | Current status |
+| --- | --- |
+| Release and Change Control module for freezing `ReleasedMBOM` | Not implemented beyond `ReleasedMBOM` type and SKU `frozen` status. |
+| `useReleaseStore` or equivalent release workflow store | Not implemented. |
+| Frozen full MBOM outputs for selected key SKUs | Not implemented. |
+| Impact analysis for base/delta changes | Not implemented: no affected structures, affected SKUs, affected released MBOMs, or locked-object confirmation workflow. |
+| Prevention of all full SKU BOM editing outside delta logic | Not complete globally: legacy `BOMEditor` remains available as a transitional module. |
+| Full project initialization workflow | Not implemented: current project, series, structures, axes, SKUs, EBOM bases, MBOM deltas, and tooling are seeded mock data. |
+| Second-series expansion workflow | Not implemented beyond mock `series-zp-b` with `baseSeriesId`. |
+| Backend persistence | Not implemented; only EBOM has a repository port backed by an in-memory adapter. |
+| Approval workflow, ERP integration, external system integration, and advanced reporting | Intentionally postponed by the 2026-05-22 design and still not implemented. |
 
 ## Commits
 
@@ -276,4 +336,12 @@ npm run build
 
 2. Leave `.superpowers/` and `graphify-out/` alone unless the user explicitly asks to clean or inspect them.
 
-3. Backend persistence remains out of scope for this phase. The next backend-facing phase should replace the in-memory repository through the existing repository interface rather than wiring UI or store code directly to transport calls.
+3. Next product-platform work should start with Release and Change Control: add a release store, frozen `ReleasedMBOM` snapshot creation, and impact calculation for base/delta changes.
+
+4. Next MBOM work should replace the placeholder full preview with actual base-plus-delta composition.
+
+5. Next Product Matrix work should expose candidate SKU generation in the UI and add the second-series expansion workflow.
+
+6. Next Tooling work should add impact scope, risk summary, filters, and editable milestone details.
+
+7. Backend persistence remains out of scope for this phase. The next backend-facing phase should replace the in-memory repository through the existing repository interface rather than wiring UI or store code directly to transport calls.
