@@ -138,7 +138,7 @@ const getUpdatedItemForOperation = (
 
     return {
       ...baseItem,
-      inheritanceState: lockedFields.length > 0 ? 'locked' : 'overridden',
+      inheritanceState: lockedFields.length > 0 ? 'locked' : 'inherited',
       lockedFields,
     };
   }
@@ -263,7 +263,7 @@ export const useEBOMArchitectureStore = create<EBOMArchitectureState>((set, get)
   },
 
   selectBase: (baseId) => {
-    set({ selectedBaseId: baseId });
+    set({ selectedBaseId: baseId, error: undefined });
   },
 
   getSelectedBase: () => {
@@ -294,6 +294,10 @@ export const useEBOMArchitectureStore = create<EBOMArchitectureState>((set, get)
     }
     if (selectedBase.status === 'released') {
       set({ status: 'error', error: 'Cannot edit a released EBOM base.' });
+      return;
+    }
+    if (field === 'quantity' && (typeof value !== 'number' || !Number.isFinite(value))) {
+      set({ status: 'error', error: 'Quantity must be a valid number.' });
       return;
     }
 
@@ -409,11 +413,20 @@ export const useEBOMArchitectureStore = create<EBOMArchitectureState>((set, get)
       set({ status: 'error', error: 'Cannot edit a released EBOM base.' });
       return;
     }
+    if (!Number.isFinite(input.quantity)) {
+      set({ status: 'error', error: 'Quantity must be a valid number.' });
+      return;
+    }
+
+    const resolvedItemIds = new Set(state.getResolvedItems(selectedBase.id).map((item) => item.id));
+    const parentItemId = input.parentItemId && resolvedItemIds.has(input.parentItemId)
+      ? input.parentItemId
+      : selectedBase.rootItemId;
 
     const itemSnapshot: EBOMItem = {
       id: createItemId(),
       baseId: selectedBase.id,
-      parentItemId: input.parentItemId ?? selectedBase.rootItemId,
+      parentItemId,
       partNumber: input.partNumber,
       name: input.name,
       quantity: input.quantity,
@@ -483,16 +496,16 @@ export const useEBOMArchitectureStore = create<EBOMArchitectureState>((set, get)
   resetDraft: async (baseId) => {
     const state = get();
     const selectedBaseId = getBaseId(state, baseId);
-    const draftOperationsByBaseId = {
-      ...state.draftOperationsByBaseId,
-      [selectedBaseId]: [],
-    };
-    const items = replayDraftOperations(state.snapshotBases, state.snapshotItems, draftOperationsByBaseId);
-
-    set({ draftOperationsByBaseId, items, status: 'saving', error: undefined });
+    set({ status: 'saving', error: undefined });
     try {
       await state.repository.saveDraftOperations(selectedBaseId, []);
-      set({ status: 'ready' });
+      const draftOperationsByBaseId = {
+        ...state.draftOperationsByBaseId,
+        [selectedBaseId]: [],
+      };
+      const items = replayDraftOperations(state.snapshotBases, state.snapshotItems, draftOperationsByBaseId);
+
+      set({ draftOperationsByBaseId, items, status: 'ready' });
     } catch (error) {
       set({ status: 'error', error: getErrorMessage(error, 'Unable to reset EBOM draft.') });
     }

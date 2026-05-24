@@ -73,6 +73,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
   const [selectedEditItemId, setSelectedEditItemId] = useState<string | null>(null);
   const [showLocalItemForm, setShowLocalItemForm] = useState(false);
   const [editValues, setEditValues] = useState<EditValues>(emptyEditValues);
+  const [draftInputError, setDraftInputError] = useState<string | null>(null);
   const [localItemValues, setLocalItemValues] = useState({
     parentItemId: '',
     partNumber: '',
@@ -92,6 +93,8 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
   const selectedBase = getSelectedBase();
   const draftOperations = getDraftOperations();
   const dirty = isDirty();
+  const canEditSelectedBase = selectedBase?.status !== 'released';
+  const draftError = draftInputError ?? error;
 
   const {
     inheritanceChain,
@@ -149,19 +152,35 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
   }, [selectedEditItem]);
 
   useEffect(() => {
-    if (selectedBase && !localItemValues.parentItemId) {
+    if (selectedBase) {
       setLocalItemValues((values) => ({ ...values, parentItemId: selectedBase.rootItemId }));
     }
-  }, [localItemValues.parentItemId, selectedBase]);
+    setSelectedEditItemId(null);
+    setSelectedPreviewNodeId(null);
+    setDraftInputError(null);
+  }, [selectedBase?.rootItemId, selectedBaseId]);
+
+  const parseQuantityInput = (value: string) => {
+    const quantity = Number(value);
+
+    return value.trim() !== '' && Number.isFinite(quantity) ? quantity : null;
+  };
 
   const handleApplyOverride = async () => {
     if (!selectedEditItem) {
       return;
     }
 
+    const quantity = parseQuantityInput(editValues.quantity);
+    if (quantity === null) {
+      setDraftInputError('Quantity must be a valid number.');
+      return;
+    }
+
+    setDraftInputError(null);
     for (const field of editableFields) {
       const nextValue = field === 'quantity'
-        ? Number(editValues.quantity)
+        ? quantity
         : editValues[field] || undefined;
       const currentValue = selectedEditItem[field];
 
@@ -172,11 +191,18 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
   };
 
   const handleCreateLocalItem = async () => {
+    const quantity = parseQuantityInput(localItemValues.quantity);
+    if (quantity === null) {
+      setDraftInputError('Quantity must be a valid number.');
+      return;
+    }
+
+    setDraftInputError(null);
     await addLocalItem({
       parentItemId: localItemValues.parentItemId || selectedBase?.rootItemId,
       partNumber: localItemValues.partNumber,
       name: localItemValues.name,
-      quantity: Number(localItemValues.quantity),
+      quantity,
       unit: localItemValues.unit,
       revision: localItemValues.revision,
       designMasterPartId: localItemValues.designMasterPartId || undefined,
@@ -353,8 +379,9 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                       <button
                         type="button"
                         aria-label={`Edit ${item.partNumber}`}
+                        disabled={!canEditSelectedBase}
                         onClick={() => setSelectedEditItemId(item.id)}
-                        className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
                       >
                         Edit
                       </button>
@@ -377,8 +404,9 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
               </div>
               <button
                 type="button"
+                disabled={!canEditSelectedBase}
                 onClick={() => setShowLocalItemForm((value) => !value)}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 Add Local Item
               </button>
@@ -444,29 +472,33 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                 <div className="flex flex-wrap gap-2 md:col-span-2">
                   <button
                     type="button"
+                    disabled={!canEditSelectedBase}
                     onClick={() => void handleApplyOverride()}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
                     Apply Override
                   </button>
                   <button
                     type="button"
+                    disabled={!canEditSelectedBase}
                     onClick={() => void lockField(selectedEditItem.id, 'quantity')}
-                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
                   >
                     Lock Quantity
                   </button>
                   <button
                     type="button"
+                    disabled={!canEditSelectedBase}
                     onClick={() => void unlockField(selectedEditItem.id, 'quantity')}
-                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
                   >
                     Unlock Quantity
                   </button>
                   <button
                     type="button"
+                    disabled={!canEditSelectedBase}
                     onClick={() => void revertItemDraft(selectedEditItem.id)}
-                    className="rounded-lg border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                    className="rounded-lg border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-300"
                   >
                     Revert Item Draft
                   </button>
@@ -553,8 +585,9 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                 <div className="flex items-end">
                   <button
                     type="button"
+                    disabled={!canEditSelectedBase}
                     onClick={() => void handleCreateLocalItem()}
-                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
                     Create Local Item
                   </button>
@@ -568,9 +601,9 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
             <div className="mt-3 text-2xl font-bold text-slate-900">
               {dirty ? `${draftOperations.length} pending` : 'Clean'}
             </div>
-            {error && (
+            {draftError && (
               <div role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
-                {error}
+                {draftError}
               </div>
             )}
             <ul className="mt-4 space-y-2 text-sm text-slate-700">

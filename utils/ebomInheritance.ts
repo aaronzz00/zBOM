@@ -69,7 +69,9 @@ export function resolveEBOMBase(baseId: string, bases: EBOMBase[], items: EBOMIt
       const resolvedItem =
         item.inheritanceState === 'locked' && sourceItem
           ? mergeLockedItem(sourceItem, item)
-          : cloneItem(item);
+          : item.inheritanceState === 'inherited' && sourceItem
+            ? mergeInheritedItem(sourceItem, item)
+            : cloneItem(item);
 
       if (replacementIndex >= 0) {
         resolved.splice(replacementIndex, 1, resolvedItem);
@@ -128,6 +130,19 @@ function mergeLockedItem(sourceItem: EBOMItem, localItem: EBOMItem): EBOMItem {
   }
 
   return merged;
+}
+
+function mergeInheritedItem(sourceItem: EBOMItem, localItem: EBOMItem): EBOMItem {
+  return {
+    ...cloneItem(sourceItem),
+    id: localItem.id,
+    baseId: localItem.baseId,
+    parentItemId: localItem.parentItemId,
+    sourceItemId: localItem.sourceItemId,
+    sourceBaseId: localItem.sourceBaseId,
+    inheritanceState: 'inherited',
+    lockedFields: localItem.lockedFields ? [...localItem.lockedFields] : undefined,
+  };
 }
 
 function cloneItem(item: EBOMItem): EBOMItem {

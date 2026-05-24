@@ -235,6 +235,45 @@ describe('Phase 1 workflow pages', () => {
     expect(screen.getByText(/add-local-item/i)).toBeInTheDocument();
   });
 
+  it('resets the local item parent when switching EBOM bases', async () => {
+    render(<EBOMArchitectureWorkspace />);
+    await waitFor(() => expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Add Local Item/i }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'EBOM Base' }), {
+      target: { value: 'ebom-structure-zp-a-pro' },
+    });
+    await waitFor(() => expect(screen.getByLabelText('Local Parent Item')).toHaveValue('item-pro-root'));
+
+    fireEvent.change(screen.getByLabelText('Local Part Number'), {
+      target: { value: 'ZP-A-PRO-9900' },
+    });
+    fireEvent.change(screen.getByLabelText('Local Name'), {
+      target: { value: 'Pro Local Fixture' },
+    });
+    fireEvent.change(screen.getByLabelText('Local Quantity'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: /Create Local Item/i }));
+
+    await waitFor(() => expect(screen.getAllByText('1 pending').length).toBeGreaterThan(0));
+    expect(useEBOMArchitectureStore.getState().getDraftOperations().at(-1)?.itemSnapshot).toMatchObject({
+      baseId: 'ebom-structure-zp-a-pro',
+      parentItemId: 'item-pro-root',
+    });
+  });
+
+  it('rejects invalid EBOM quantities without recording draft operations', async () => {
+    render(<EBOMArchitectureWorkspace />);
+    await waitFor(() => expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Edit ZP26-4100/i }));
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /Apply Override/i }));
+
+    await waitFor(() => expect(screen.getByText(/Quantity must be a valid number/i)).toBeInTheDocument());
+    expect(useEBOMArchitectureStore.getState().getDraftOperations()).toEqual([]);
+    expect(screen.getAllByText('Clean').length).toBeGreaterThan(0);
+  });
+
   it('locks, unlocks, and reverts an EBOM item draft from the edit panel', async () => {
     render(<EBOMArchitectureWorkspace />);
     await waitFor(() => expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument());

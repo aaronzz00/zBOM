@@ -102,6 +102,25 @@ describe('useEBOMArchitectureStore', () => {
     ]);
   });
 
+  it('unlocks a locked inherited field back to the source value', async () => {
+    await useEBOMArchitectureStore.getState().load();
+
+    expect(useEBOMArchitectureStore.getState().getResolvedItems().find(
+      (item) => item.id === 'item-std-battery-locked',
+    )?.quantity).toBe(2);
+
+    await useEBOMArchitectureStore.getState().unlockField('item-std-battery-locked', 'quantity');
+
+    const unlockedBattery = useEBOMArchitectureStore.getState().getResolvedItems().find(
+      (item) => item.id === 'item-std-battery-locked',
+    );
+    expect(unlockedBattery).toMatchObject({
+      quantity: 1,
+      inheritanceState: 'inherited',
+      lockedFields: [],
+    });
+  });
+
   it('adds a local child item under the selected base', async () => {
     await useEBOMArchitectureStore.getState().load();
 
@@ -150,6 +169,24 @@ describe('useEBOMArchitectureStore', () => {
     expect(state.isDirty()).toBe(false);
   });
 
+  it('keeps local draft state when resetting draft operations fails', async () => {
+    const failingRepository = createInMemoryEBOMArchitectureRepository();
+    useEBOMArchitectureStore.getState().setRepository(failingRepository);
+    await useEBOMArchitectureStore.getState().load();
+    await useEBOMArchitectureStore.getState().overrideField('item-std-display', 'quantity', 3);
+    failingRepository.saveDraftOperations = async () => {
+      throw new Error('reset failed');
+    };
+
+    await useEBOMArchitectureStore.getState().resetDraft();
+
+    const state = useEBOMArchitectureStore.getState();
+    expect(state.error).toMatch(/reset failed/);
+    expect(state.getResolvedItems().find((item) => item.id === 'item-std-display')?.quantity).toBe(3);
+    expect(state.getDraftOperations()).toHaveLength(1);
+    expect(state.isDirty()).toBe(true);
+  });
+
   it('keeps local draft state when saving draft operations fails', async () => {
     const failingRepository = createInMemoryEBOMArchitectureRepository();
     failingRepository.saveDraftOperations = async () => {
@@ -190,6 +227,24 @@ describe('useEBOMArchitectureStore', () => {
     ]);
   });
 
+  it('keeps published item edits after reloading from the repository', async () => {
+    const repository = createInMemoryEBOMArchitectureRepository({
+      now: () => '2026-05-23T00:00:00.000Z',
+      id: (prefix) => `${prefix}-fixed`,
+    });
+    useEBOMArchitectureStore.getState().setRepository(repository);
+    await useEBOMArchitectureStore.getState().load();
+    await useEBOMArchitectureStore.getState().overrideField('item-std-display', 'quantity', 3);
+    await useEBOMArchitectureStore.getState().publishChangePackage('Standard draft update');
+
+    await useEBOMArchitectureStore.getState().load();
+
+    const state = useEBOMArchitectureStore.getState();
+    expect(state.getResolvedItems().find((item) => item.id === 'item-std-display')?.quantity).toBe(3);
+    expect(state.getDraftOperations()).toEqual([]);
+    expect(state.isDirty()).toBe(false);
+  });
+
   it('keeps review bases in review after publish', async () => {
     await useEBOMArchitectureStore.getState().load();
     useEBOMArchitectureStore.getState().selectBase('ebom-series-zp-a');
@@ -210,6 +265,16 @@ describe('useEBOMArchitectureStore', () => {
     await useEBOMArchitectureStore.getState().overrideField('item-platform-display', 'quantity', 2);
     expect(useEBOMArchitectureStore.getState().error).toMatch(/released EBOM base/i);
     expect(useEBOMArchitectureStore.getState().isDirty()).toBe(false);
+  });
+
+  it('clears stale repository errors when selecting another base', async () => {
+    await useEBOMArchitectureStore.getState().load();
+    useEBOMArchitectureStore.getState().selectBase('ebom-platform-zp26');
+    await useEBOMArchitectureStore.getState().overrideField('item-platform-display', 'quantity', 2);
+
+    useEBOMArchitectureStore.getState().selectBase('ebom-structure-zp-a-std');
+
+    expect(useEBOMArchitectureStore.getState().error).toBeUndefined();
   });
 
   it('preserves dirty state and operations on publish failure', async () => {

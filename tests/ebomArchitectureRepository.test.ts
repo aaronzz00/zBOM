@@ -74,4 +74,38 @@ describe('ebomArchitectureRepository', () => {
     });
     await expect(repository.loadDraftOperations('ebom-structure-zp-a-std')).resolves.toEqual([]);
   });
+
+  it('persists published draft operations into the repository snapshot', async () => {
+    const repository = createInMemoryEBOMArchitectureRepository({
+      now: () => '2026-05-23T01:00:00.000Z',
+      id: (prefix) => `${prefix}-fixed`,
+    });
+    const operation = {
+      id: 'op-1',
+      baseId: 'ebom-structure-zp-a-std',
+      itemId: 'item-std-display',
+      type: 'override-field' as const,
+      field: 'quantity' as const,
+      previousValue: 1,
+      nextValue: 2,
+      createdAt: '2026-05-23T00:00:00.000Z',
+    };
+
+    await repository.saveDraftOperations('ebom-structure-zp-a-std', [operation]);
+    await repository.publishChangePackage({
+      baseId: 'ebom-structure-zp-a-std',
+      revision: 'A.01',
+      summary: 'Update Standard EBOM draft',
+      operations: [operation],
+    });
+
+    const snapshot = await repository.loadSnapshot();
+    expect(snapshot.bases.find((base) => base.id === 'ebom-structure-zp-a-std')?.status).toBe('review');
+    expect(snapshot.items.find((item) => item.id === 'item-std-display')).toMatchObject({
+      baseId: 'ebom-structure-zp-a-std',
+      quantity: 2,
+      inheritanceState: 'overridden',
+    });
+    expect(snapshot.changeRecords).toHaveLength(1);
+  });
 });
