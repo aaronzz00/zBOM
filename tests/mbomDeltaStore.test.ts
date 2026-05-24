@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { mockEBOMBases, mockEBOMItems } from '../data/mockEBOMArchitecture';
 import { mockMBOMDeltaItems, mockMBOMDeltaPacks } from '../data/mockMBOMDeltas';
 import { useMBOMDeltaStore } from '../stores/useMBOMDeltaStore';
+import { resolveEBOMBase } from '../utils/ebomInheritance';
 
 const selectedSKUId = 'sku-zp-a-std-blk-us-rtl';
 const unknownSKUId = 'sku-unknown';
@@ -97,5 +99,21 @@ describe('useMBOMDeltaStore', () => {
             newPartNumber: 'MFG-ADH-FIX-003',
         });
         expect(manufacturingOnlyItem?.targetPartNumber).toBeUndefined();
+    });
+
+    it('returns a composed MBOM preview for resolved EBOM base items and SKU deltas', () => {
+        const resolvedEBOMItems = resolveEBOMBase(
+            'ebom-structure-zp-a-std',
+            mockEBOMBases,
+            mockEBOMItems
+        );
+
+        const rows = useMBOMDeltaStore.getState().getComposedMBOMPreview({
+            skuId: 'sku-zp-a-std-blk-us-rtl',
+            baseItems: resolvedEBOMItems,
+        });
+
+        expect(rows.some((row) => row.source === 'quantity-change')).toBe(true);
+        expect(rows.some((row) => row.source === 'manufacturing-only')).toBe(true);
     });
 });

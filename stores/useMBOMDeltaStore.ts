@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { mockMBOMDeltaItems, mockMBOMDeltaPacks } from '../data/mockMBOMDeltas';
-import { MBOMDeltaItem, MBOMDeltaPack, MBOMDeltaType } from '../domain/mbomTypes';
+import type { EBOMItem } from '../domain/ebomArchitectureTypes';
+import type { ComposedMBOMRow, MBOMDeltaItem, MBOMDeltaPack, MBOMDeltaType } from '../domain/mbomTypes';
+import { composeMBOMPreview } from '../utils/mbomComposition';
 
 export interface MBOMDeltaState {
     deltaPacks: MBOMDeltaPack[];
@@ -9,6 +11,7 @@ export interface MBOMDeltaState {
     getDeltaPacksBySKU: (skuId: string) => MBOMDeltaPack[];
     getDeltaItemsBySKU: (skuId: string) => MBOMDeltaItem[];
     groupDeltaItemsByType: (skuId: string) => Partial<Record<MBOMDeltaType, MBOMDeltaItem[]>>;
+    getComposedMBOMPreview: (input: { skuId: string; baseItems: EBOMItem[] }) => ComposedMBOMRow[];
 }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -48,5 +51,10 @@ export const useMBOMDeltaStore = create<MBOMDeltaState>((set, get) => ({
             }),
             {}
         )
+    ),
+
+    getComposedMBOMPreview: ({ skuId, baseItems }) => composeMBOMPreview(
+        baseItems,
+        get().getDeltaItemsBySKU(skuId)
     ),
 }));
