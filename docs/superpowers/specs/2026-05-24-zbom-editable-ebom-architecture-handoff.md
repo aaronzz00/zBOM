@@ -123,6 +123,13 @@ The following design expectations remain open:
 | Backend persistence | Not implemented; only EBOM has a repository port backed by an in-memory adapter. |
 | Approval workflow, ERP integration, external system integration, and advanced reporting | Intentionally postponed by the 2026-05-22 design and still not implemented. |
 
+Priority adjustment after user feedback:
+
+```text
+Do not start the next batch with Release and Change Control, Tooling expansion, or backend persistence.
+The next development target should make the EBOM/MBOM-related workflow realistic enough for real user testing.
+```
+
 ## Commits
 
 Implementation commits after the finalized plan, now integrated into `main`:
@@ -327,6 +334,10 @@ docs/superpowers/specs/2026-05-24-zbom-editable-ebom-architecture-handoff.md
 
 ## Suggested Next Steps
 
+### Next Goal: EBOM/MBOM User-Testable Workflow
+
+The next development batch should prioritize getting EBOM and MBOM modules to a realistic trial state. The success criterion is not production completeness; it is whether real users can run through representative EBOM/MBOM tasks and reveal workflow, data, terminology, and usability problems.
+
 1. Re-run verification from `main` before starting the next implementation batch:
 
 ```bash
@@ -336,12 +347,57 @@ npm run build
 
 2. Leave `.superpowers/` and `graphify-out/` alone unless the user explicitly asks to clean or inspect them.
 
-3. Next product-platform work should start with Release and Change Control: add a release store, frozen `ReleasedMBOM` snapshot creation, and impact calculation for base/delta changes.
+3. Build an EBOM-to-MBOM user test path:
 
-4. Next MBOM work should replace the placeholder full preview with actual base-plus-delta composition.
+```text
+Select project/SKU -> inspect EBOM inheritance source -> edit or publish EBOM draft -> inspect MBOM delta packs for the same SKU -> preview the resulting base-plus-delta MBOM.
+```
 
-5. Next Product Matrix work should expose candidate SKU generation in the UI and add the second-series expansion workflow.
+4. Replace the MBOM full-preview placeholder with a working base-plus-delta composition preview.
 
-6. Next Tooling work should add impact scope, risk summary, filters, and editable milestone details.
+Minimum behavior:
 
-7. Backend persistence remains out of scope for this phase. The next backend-facing phase should replace the in-memory repository through the existing repository interface rather than wiring UI or store code directly to transport calls.
+```text
+Resolve selected SKU -> determine base structure -> load base manufacturing structure or EBOM-derived preview -> apply delta items in display order -> show composed rows with source markers: base, delta add, delta remove, delta replace, quantity change, manufacturing-only, packaging/label/regional.
+```
+
+5. Connect Product Matrix, EBOM Architecture, and MBOM Delta around the same selected SKU/context.
+
+Minimum behavior:
+
+```text
+When a user chooses a SKU, the EBOM view and MBOM view should make it clear which project, series, structure, EBOM base, and delta pack are in scope.
+```
+
+6. Improve EBOM/MBOM test data for realistic user testing.
+
+Minimum data additions:
+
+```text
+At least two structures with meaningful EBOM differences.
+At least several SKUs spanning active, candidate, suppressed, and frozen states.
+At least several MBOM delta packs covering add, remove, replace, quantity change, manufacturing-only material, and packaging/label/regional changes.
+At least one locked EBOM item and one inherited item whose source change is visible in a child base.
+```
+
+7. Add a lightweight user-test support surface.
+
+Minimum behavior:
+
+```text
+Provide a short in-app or documented test script with 5-8 user tasks.
+Expose enough state and labels for observers to capture where users get confused.
+Do not build heavy analytics yet; simple manual observation notes are enough for this phase.
+```
+
+8. Defer these areas unless they directly block EBOM/MBOM user testing:
+
+```text
+Release and Change Control module.
+useReleaseStore.
+Frozen ReleasedMBOM snapshot workflow.
+Tooling risk dashboard, impact scope, filters, and editable milestone details.
+Backend persistence and external integrations.
+```
+
+9. Backend persistence remains out of scope for this phase. If persistence becomes necessary for user testing, keep it narrow and adapter-based; do not wire UI or store code directly to transport calls.
