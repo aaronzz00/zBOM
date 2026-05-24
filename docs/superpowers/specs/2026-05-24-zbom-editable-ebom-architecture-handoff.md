@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 ## Purpose
 
-This handoff captures the completed editable EBOM Architecture workflow implementation, verification evidence, and the recommended starting point for the next session.
+This handoff captures the completed editable EBOM Architecture workflow implementation, post-merge verification evidence, and the recommended starting point for the next session.
 
 Use this together with:
 
@@ -14,35 +14,38 @@ Use this together with:
 
 ## Current Repository State
 
-Implementation worktree:
+Primary checkout:
 
 ```text
-/Users/zz-orka/zOS/10_PROJECTS/PJ-2026-07_zBOM/.worktrees/editable-ebom-architecture
+/Users/zz-orka/zOS/10_PROJECTS/PJ-2026-07_zBOM
 ```
 
 Current branch:
 
 ```text
-feature/editable-ebom-architecture
+main
 ```
 
-Current HEAD at handoff creation:
+Integrated implementation HEAD before this handoff refresh:
 
 ```text
-ac2fa73857ea69a8f4600c6ed50dbb01c4b6638c fix: harden editable ebom draft workflow
+99344eb docs: add editable ebom handoff
 ```
 
-Working tree status before creating this handoff file:
+Merge status:
 
 ```text
-clean
+feature/editable-ebom-architecture was fast-forward merged into main.
+The feature worktree .worktrees/editable-ebom-architecture was removed.
+The local feature/editable-ebom-architecture branch was deleted.
 ```
 
-Main repository notes:
+Working tree status after merge cleanup, before this handoff refresh:
 
 ```text
-The main checkout still has unrelated untracked .superpowers/ and graphify-out/ directories.
-Do not remove them unless the user explicitly asks.
+Only unrelated untracked directories remain:
+?? .superpowers/
+?? graphify-out/
 ```
 
 ## Completed Scope
@@ -62,7 +65,7 @@ Completed tasks:
 
 ## Commits
 
-Implementation commits after the finalized plan:
+Implementation commits after the finalized plan, now integrated into `main`:
 
 ```text
 224d481 feat: add ebom draft workflow types
@@ -86,6 +89,8 @@ Earlier supporting design and plan commits on the same branch:
 ```
 
 ## Verification Completed
+
+Final verification was run directly from `main` after the feature branch was merged and the feature worktree was removed.
 
 Focused EBOM verification:
 
@@ -132,6 +137,12 @@ Vitest emits Node localStorage experimental warnings in jsdom-related tests.
 tests/AppNavigation.test.tsx emits existing Recharts chart-size warnings under jsdom.
 npm run build emits a Vite chunk-size warning for the main JS bundle.
 npm run build emits a Node DEP0205 module.register deprecation warning.
+```
+
+Note:
+
+```text
+One verification run before worktree cleanup scanned both the main checkout and .worktrees/editable-ebom-architecture, producing duplicate counts of 32 files and 204 tests. After cleanup, the final main-only run returned 16 files and 102 tests.
 ```
 
 ## Important Implementation Notes
@@ -256,19 +267,13 @@ docs/superpowers/specs/2026-05-24-zbom-editable-ebom-architecture-handoff.md
 
 ## Suggested Next Steps
 
-1. Re-run verification from the worktree if continuing this branch:
+1. Re-run verification from `main` before starting the next implementation batch:
 
 ```bash
 npx vitest run
 npm run build
 ```
 
-2. Use `superpowers:finishing-a-development-branch` before merging or opening a PR.
+2. Leave `.superpowers/` and `graphify-out/` alone unless the user explicitly asks to clean or inspect them.
 
-3. Decide integration path:
-
-```text
-Merge feature/editable-ebom-architecture into main, open a PR, or keep the worktree for additional backend-persistence planning.
-```
-
-4. Backend persistence remains out of scope for this phase. The next backend-facing phase should replace the in-memory repository through the existing repository interface rather than wiring UI or store code directly to transport calls.
+3. Backend persistence remains out of scope for this phase. The next backend-facing phase should replace the in-memory repository through the existing repository interface rather than wiring UI or store code directly to transport calls.
