@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Boxes, FileStack, Layers, PackageSearch } from 'lucide-react';
-import type { MBOMDeltaType } from '../domain/mbomTypes';
+import type { ComposedMBOMSource, MBOMDeltaType } from '../domain/mbomTypes';
+import { useEBOMArchitectureStore } from '../stores/useEBOMArchitectureStore';
 import { useMBOMDeltaStore } from '../stores/useMBOMDeltaStore';
 import { useProductConfigStore } from '../stores/useProductConfigStore';
+import { resolveEBOMBase } from '../utils/ebomInheritance';
 
 const deltaTypeLabels: Record<MBOMDeltaType, string> = {
   add: 'add',
@@ -20,33 +22,91 @@ const statusStyles = {
   suppressed: 'bg-slate-100 text-slate-600 border-slate-200',
 };
 
+const previewSourceLabels: Record<ComposedMBOMSource, string> = {
+  base: 'base',
+  'delta-add': 'delta add',
+  'delta-remove': 'delta remove',
+  'delta-replace': 'delta replace',
+  'quantity-change': 'quantity change',
+  'manufacturing-only': 'manufacturing only',
+  'packaging-label-regional': 'packaging/label/regional',
+};
+
 export const MBOMDeltaConsole: React.FC = () => {
-  const { projects, structures, variationAxes, skus, activeProjectId } = useProductConfigStore();
-  const { getDeltaPacksBySKU, groupDeltaItemsByType } = useMBOMDeltaStore();
+  const {
+    activeProjectId,
+    getSelectedWorkflowSKUContext,
+    selectWorkflowSKU,
+    variationAxes,
+    skus,
+  } = useProductConfigStore();
+  const { getDeltaPacksBySKU, groupDeltaItemsByType, getComposedMBOMPreview } = useMBOMDeltaStore();
+  const {
+    bases: ebomBases,
+    items: ebomItems,
+    status: ebomStatus,
+    error: ebomError,
+    load: loadEBOM,
+  } = useEBOMArchitectureStore();
   const projectSKUs = useMemo(
     () => skus.filter((sku) => sku.projectId === activeProjectId),
     [activeProjectId, skus],
   );
-  const defaultSKUId = projectSKUs.find((sku) => getDeltaPacksBySKU(sku.id).length > 0)?.id
-    ?? projectSKUs[0]?.id
-    ?? '';
-  const [selectedSKUId, setSelectedSKUId] = useState(defaultSKUId);
+  const selectedContext = getSelectedWorkflowSKUContext();
 
   useEffect(() => {
-    if (!projectSKUs.some((sku) => sku.id === selectedSKUId)) {
-      setSelectedSKUId(projectSKUs[0]?.id ?? '');
+    if (ebomStatus === 'idle') {
+      void loadEBOM();
     }
-  }, [projectSKUs, selectedSKUId]);
+  }, [ebomStatus, loadEBOM]);
 
-  const selectedSKU = projectSKUs.find((sku) => sku.id === selectedSKUId);
-  const selectedProject = projects.find((project) => project.id === selectedSKU?.projectId);
-  const selectedStructure = structures.find((structure) => structure.id === selectedSKU?.structureId);
+  const selectedSKU = selectedContext?.sku;
+  const selectedProject = selectedContext?.project;
+  const selectedStructure = selectedContext?.structure;
   const optionLookup = useMemo(
     () => new Map(variationAxes.flatMap((axis) => axis.options.map((option) => [option.id, option]))),
     [variationAxes],
   );
   const deltaPacks = selectedSKU ? getDeltaPacksBySKU(selectedSKU.id) : [];
   const groupedDeltaItems = selectedSKU ? groupDeltaItemsByType(selectedSKU.id) : {};
+  const previewResult = useMemo(() => {
+    if (!selectedSKU || !selectedStructure || ebomStatus === 'idle' || ebomStatus === 'loading') {
+      return { rows: [], error: undefined };
+    }
+
+    const structureBase = ebomBases.find((base) => (
+      base.scope === 'structure' && base.structureId === selectedStructure.id
+    ));
+
+    if (!structureBase) {
+      return {
+        rows: [],
+        error: `Unable to resolve EBOM base for ${selectedStructure.name}.`,
+      };
+    }
+
+    try {
+      const baseItems = resolveEBOMBase(structureBase.id, ebomBases, ebomItems);
+
+      return {
+        rows: getComposedMBOMPreview({ skuId: selectedSKU.id, baseItems }),
+        error: undefined,
+      };
+    } catch (error) {
+      return {
+        rows: [],
+        error: error instanceof Error ? error.message : 'Unable to resolve EBOM items.',
+      };
+    }
+  }, [
+    ebomBases,
+    ebomItems,
+    ebomStatus,
+    getComposedMBOMPreview,
+    selectedSKU,
+    selectedStructure,
+  ]);
+  const previewError = ebomError ?? previewResult.error;
 
   return (
     <div className="flex-1 overflow-auto bg-slate-50">
@@ -70,8 +130,8 @@ export const MBOMDeltaConsole: React.FC = () => {
                 </label>
                 <select
                   id="mbom-sku-select"
-                  value={selectedSKUId}
-                  onChange={(event) => setSelectedSKUId(event.target.value)}
+                  value={selectedSKU?.id ?? ''}
+                  onChange={(event) => selectWorkflowSKU(event.target.value)}
                   className="w-full rounded-lg border border-white/20 bg-slate-950 px-3 py-2 text-sm font-semibold text-white focus:border-indigo-300 focus:outline-none"
                 >
                   {projectSKUs.map((sku) => (
@@ -166,14 +226,56 @@ export const MBOMDeltaConsole: React.FC = () => {
           </section>
         </div>
 
-        <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-2">
             <Boxes className="h-5 w-5 text-slate-500" />
-            <h2 className="text-lg font-bold text-slate-900">Full MBOM Preview</h2>
+            <h2 className="text-lg font-bold text-slate-900">Composed MBOM Preview</h2>
           </div>
-          <p className="mt-2 text-sm text-slate-500">
-            Placeholder only: full resolved MBOM preview will compose the base manufacturing structure and selected delta packs in a later phase.
-          </p>
+          {previewError && (
+            <div role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              {previewError}
+            </div>
+          )}
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th scope="col" className="px-3 py-3">Part Number</th>
+                  <th scope="col" className="px-3 py-3">Name</th>
+                  <th scope="col" className="px-3 py-3">Qty</th>
+                  <th scope="col" className="px-3 py-3">Source</th>
+                  <th scope="col" className="px-3 py-3">Target Part</th>
+                  <th scope="col" className="px-3 py-3">Reason/warning</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {previewResult.rows.length > 0 ? previewResult.rows.map((row) => (
+                  <tr key={row.id} className="align-top">
+                    <td className="px-3 py-3 font-semibold text-slate-900">{row.partNumber}</td>
+                    <td className="px-3 py-3 text-slate-700">{row.name}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-700">
+                      {row.quantity} {row.unit}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                        {previewSourceLabels[row.source]}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-slate-600">{row.targetPartNumber ?? '-'}</td>
+                    <td className="max-w-md px-3 py-3 text-slate-600">{row.warning ?? row.reason ?? '-'}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-6 text-sm text-slate-500">
+                      {ebomStatus === 'idle' || ebomStatus === 'loading'
+                        ? 'Loading EBOM base items...'
+                        : 'No composed MBOM rows are available for this SKU.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
       </div>
     </div>

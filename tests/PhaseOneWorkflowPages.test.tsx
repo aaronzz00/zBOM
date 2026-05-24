@@ -384,7 +384,7 @@ describe('Phase 1 workflow pages', () => {
     expect(screen.getByText('packaging label regional')).toBeInTheDocument();
     expect(screen.getByText('manufacturing only material')).toBeInTheDocument();
     expect(screen.getByText('quantity change')).toBeInTheDocument();
-    expect(screen.getByText('Full MBOM Preview')).toBeInTheDocument();
+    expect(screen.getByText('Composed MBOM Preview')).toBeInTheDocument();
 
     fireEvent.change(skuSelect, { target: { value: 'sku-zp-a-pro-blk-us-rtl' } });
 
@@ -398,6 +398,28 @@ describe('Phase 1 workflow pages', () => {
     await waitFor(() => expect(skuSelect.value).toBe('sku-alt-std'));
     expect(screen.getAllByText('ALT-A-STD').length).toBeGreaterThan(0);
     expect(screen.getByText('Alternate Standard Structure')).toBeInTheDocument();
+  });
+
+  it('renders a composed MBOM preview for the selected Standard SKU', async () => {
+    useProductConfigStore.getState().selectWorkflowSKU('sku-zp-a-std-blk-us-rtl');
+
+    render(<MBOMDeltaConsole />);
+
+    expect(screen.getByText('Composed MBOM Preview')).toBeInTheDocument();
+    expect(screen.queryByText(/Placeholder only/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(within(screen.getByRole('table')).getByText('quantity change')).toBeInTheDocument());
+    expect(within(screen.getByRole('table')).getByText('manufacturing only')).toBeInTheDocument();
+  });
+
+  it('renders add, remove, and replace source markers for the selected Pro SKU', async () => {
+    useProductConfigStore.getState().selectWorkflowSKU('sku-zp-a-pro-blk-us-rtl-active');
+
+    render(<MBOMDeltaConsole />);
+
+    expect(screen.getByText('Composed MBOM Preview')).toBeInTheDocument();
+    await waitFor(() => expect(within(screen.getByRole('table')).getByText('delta add')).toBeInTheDocument());
+    expect(within(screen.getByRole('table')).getByText('delta remove')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByText('delta replace')).toBeInTheDocument();
   });
 
   it('renders tooling by design master part with milestones and kickoff-to-T1 lead time', () => {
