@@ -121,7 +121,7 @@ export const MBOMDeltaConsole: React.FC = () => {
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight">SKU-first Manufacturing Delta Review</h1>
                 <p className="mt-2 max-w-3xl text-sm text-slate-300">
-                  Review manufacturing delta packs and grouped delta items before full MBOM preview is implemented.
+                  Review manufacturing delta packs alongside the composed base-plus-delta MBOM preview.
                 </p>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/10 p-4 backdrop-blur">
