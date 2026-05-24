@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { GitBranch, Layers3, Lock, ShieldCheck } from 'lucide-react';
 import { BOMTable } from '../components/BOMTable';
 import type { EBOMBase, EBOMEditableField, EBOMItem, InheritanceState } from '../domain/ebomArchitectureTypes';
 import { useEBOMArchitectureStore } from '../stores/useEBOMArchitectureStore';
+import { useProductConfigStore } from '../stores/useProductConfigStore';
 import type { BOMNode } from '../types';
 import { getInheritanceChain, resolveEBOMBase } from '../utils/ebomInheritance';
 import { toLegacyBOMNode } from '../utils/legacyBomAdapter';
@@ -69,6 +70,13 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
     resetDraft,
     publishChangePackage,
   } = useEBOMArchitectureStore();
+  const selectedWorkflowSKUId = useProductConfigStore((state) => state.selectedWorkflowSKUId);
+  const getSelectedWorkflowSKUContext = useProductConfigStore((state) => state.getSelectedWorkflowSKUContext);
+  const selectedWorkflowContext = useMemo(
+    () => getSelectedWorkflowSKUContext(),
+    [getSelectedWorkflowSKUContext, selectedWorkflowSKUId],
+  );
+  const lastSyncedWorkflowSKUId = useRef<string | null>(null);
   const [selectedPreviewNodeId, setSelectedPreviewNodeId] = useState<string | null>(null);
   const [selectedEditItemId, setSelectedEditItemId] = useState<string | null>(null);
   const [showLocalItemForm, setShowLocalItemForm] = useState(false);
@@ -89,6 +97,36 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
       void load();
     }
   }, [load, status]);
+
+  useEffect(() => {
+    if (status !== 'ready' || !selectedWorkflowContext?.structure.id) {
+      return;
+    }
+
+    if (lastSyncedWorkflowSKUId.current === selectedWorkflowContext.sku.id) {
+      return;
+    }
+
+    const matchingStructureBase = bases.find((base) => (
+      base.scope === 'structure' && base.structureId === selectedWorkflowContext.structure.id
+    ));
+
+    if (!matchingStructureBase) {
+      return;
+    }
+
+    if (selectedBaseId !== matchingStructureBase.id) {
+      selectBase(matchingStructureBase.id);
+    }
+    lastSyncedWorkflowSKUId.current = selectedWorkflowContext.sku.id;
+  }, [
+    bases,
+    selectBase,
+    selectedBaseId,
+    selectedWorkflowContext?.sku.id,
+    selectedWorkflowContext?.structure.id,
+    status,
+  ]);
 
   const selectedBase = getSelectedBase();
   const draftOperations = getDraftOperations();
@@ -280,6 +318,39 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {selectedWorkflowContext && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="grid gap-3 text-sm md:grid-cols-5">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Project</div>
+                <div className="mt-1 font-semibold text-slate-900">
+                  {selectedWorkflowContext.project.code} · {selectedWorkflowContext.project.name}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Series</div>
+                <div className="mt-1 font-semibold text-slate-900">{selectedWorkflowContext.series.code}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Structure</div>
+                <div className="mt-1 font-semibold text-slate-900">
+                  {selectedWorkflowContext.structure.name} · {selectedWorkflowContext.structure.code}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">SKU</div>
+                <div className="mt-1 font-semibold text-slate-900">
+                  {selectedWorkflowContext.sku.code} · {selectedWorkflowContext.sku.status}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">EBOM Base</div>
+                <div className="mt-1 font-semibold text-slate-900">{selectedBaseId || 'Unselected'}</div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {selectedBase && (
           <section className="grid gap-4 md:grid-cols-5">

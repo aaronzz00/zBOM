@@ -63,6 +63,20 @@ describe('Phase 1 workflow pages', () => {
     expect(within(screen.getByTestId('legacy-bom-preview')).getAllByText('Camera Module, Triple Lens Pro').length).toBeGreaterThan(0);
   });
 
+  it('scopes EBOM workspace context to the selected workflow SKU', async () => {
+    useProductConfigStore.getState().selectWorkflowSKU('sku-zp-a-pro-blk-us-rtl');
+
+    render(<EBOMArchitectureWorkspace />);
+
+    await waitFor(() => expect(screen.getByText('EBOM Architecture Workspace')).toBeInTheDocument());
+
+    expect(screen.getByText(/ZP-A-PRO-BLK-US-RTL/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Pro Structure/).length).toBeGreaterThan(0);
+
+    const baseSelect = screen.getByRole('combobox', { name: 'EBOM Base' }) as HTMLSelectElement;
+    await waitFor(() => expect(baseSelect.value).toBe('ebom-structure-zp-a-pro'));
+  });
+
   it('shows a recoverable EBOM load error', async () => {
     const repository = createInMemoryEBOMArchitectureRepository();
     repository.loadSnapshot = async () => {
