@@ -1,35 +1,48 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Search, Filter, Plus, Package, Cpu, Zap, Activity, Grid, List, MoreHorizontal, X, Edit, Save, Network, ArrowRight, MapPin, Scale, Coins, Trash2 } from 'lucide-react';
+import { Search, Filter, Plus, Package, Cpu, Zap, Activity, Grid, List, MoreHorizontal, X, Edit, Save, Network, ArrowRight, MapPin, Scale, Coins, Trash2, Archive, Hammer, History } from 'lucide-react';
 import { LifecycleState, LibraryPart, ComponentType, BOMNode, Permission, PricingTier } from '../types';
 import { useAppStore } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { coreRepository } from '../repositories/core/coreRepository';
 
 const CATEGORIES = ['All', 'Semiconductors', 'Passives', 'Mechanical', 'Electromechanical', 'Software'];
-const INVENTORY_LOCATIONS = ['WH-A', 'WH-B', 'WH-C']; 
+const INVENTORY_LOCATIONS = ['WH-A', 'WH-B', 'WH-C'];
 
 export const PartLibrary: React.FC = () => {
   const { libraryParts, suppliers, updateLibraryPart, addLibraryPart, bomData } = useAppStore();
   const { hasPermission } = useAuth();
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedLifecycle, setSelectedLifecycle] = useState<'All' | LifecycleState>('All');
+  const [stockFilter, setStockFilter] = useState<'All' | 'Below minimum' | 'In stock'>('All');
+  const [sortBy, setSortBy] = useState<'partNumber' | 'description' | 'supplier' | 'stock' | 'state'>('partNumber');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [selectedLocations, setSelectedLocations] = useState<string[]>(INVENTORY_LOCATIONS);
-  
+
   // Edit State
   const [selectedPart, setSelectedPart] = useState<LibraryPart | null>(null);
   const [isEditPanelOpen, setIsEditPanelOpen] = useState(false);
   const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
   const [editForm, setEditForm] = useState<Partial<LibraryPart>>({});
-  const [createForm, setCreateForm] = useState({
-    partNumber: '',
-    mpn: '',
-    manufacturer: '',
-    description: '',
-    category: 'Mechanical',
-    cost: '0',
-  });
-  const [panelTab, setPanelTab] = useState<'details' | 'usage'>('details');
+	  const [createForm, setCreateForm] = useState({
+	    partNumber: '',
+	    mpn: '',
+	    manufacturer: '',
+	    description: '',
+	    category: 'Mechanical',
+	    cost: '0',
+	    leadTimeWeeks: '',
+	    supplierId: '',
+	    moq: '',
+	    spq: '',
+	    stock: '0',
+	    minStock: '0',
+	  });
+	  const [panelTab, setPanelTab] = useState<'details' | 'usage' | 'tooling' | 'audit'>('details');
+	  const [createError, setCreateError] = useState('');
+	  const [editError, setEditError] = useState('');
+	  const [saveStatus, setSaveStatus] = useState('');
 
   const canEditMetadata = hasPermission(Permission.EDIT_BOM_METADATA);
   const canViewCommercial = hasPermission(Permission.VIEW_COMMERCIAL_FIELDS) || hasPermission(Permission.VIEW_COST);
@@ -37,6 +50,15 @@ export const PartLibrary: React.FC = () => {
   const canSave = canEditMetadata || canEditCommercial;
 
   useEffect(() => {
+    const pendingSearch = window.sessionStorage.getItem('zbom.partLibrary.search');
+    if (pendingSearch) {
+      setSearchQuery(pendingSearch);
+      setSelectedCategory('All');
+      setSelectedLifecycle('All');
+      setStockFilter('All');
+      window.sessionStorage.removeItem('zbom.partLibrary.search');
+    }
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsCreatePanelOpen(false);
@@ -49,11 +71,11 @@ export const PartLibrary: React.FC = () => {
   }, []);
 
   // Where Used Calculation
-  const whereUsedList = useMemo(() => {
+	  const whereUsedList = useMemo(() => {
     if (!selectedPart) return [];
-    
+
     const results: { path: string[], parent: string, qty: number }[] = [];
-    
+
     // Recursive search in BOM
     const search = (node: BOMNode, path: string[]) => {
         if (node.partNumber === selectedPart.partNumber) {
@@ -64,31 +86,83 @@ export const PartLibrary: React.FC = () => {
                 qty: node.quantity
             });
         }
-        
+
         if (node.children) {
             node.children.forEach(child => search(child, [...path, node.partNumber]));
         }
     };
-    
+
     search(bomData, []);
     return results;
-  }, [selectedPart, bomData]);
+	  }, [selectedPart, bomData]);
+
+	  const toolingLinks = useMemo(() => {
+	    if (!selectedPart) return [];
+	    try {
+	      return coreRepository.getToolingLinksForPart(selectedPart.id);
+	    } catch {
+	      return [];
+	    }
+	  }, [selectedPart, libraryParts]);
+
+	  const auditEvents = useMemo(() => {
+	    if (!selectedPart) return [];
+	    try {
+	      return coreRepository.getAuditEvents('part', selectedPart.id).slice(0, 8);
+	    } catch {
+	      return [];
+	    }
+	  }, [selectedPart, libraryParts]);
+
+	  const selectedPartAvl = useMemo(() => {
+	    if (!selectedPart) return [];
+	    try {
+	      return coreRepository.loadWorkspace().avl.filter((entry) => entry.partId === selectedPart.id);
+	    } catch {
+	      return [];
+	    }
+	  }, [selectedPart, libraryParts]);
+
+  const getSupplierLabel = (supplierId?: string) => {
+    if (!supplierId) return 'Unassigned';
+    return suppliers.find((supplier) => supplier.id === supplierId)?.name ?? 'Unknown';
+  };
 
   // Filter Logic
   const filteredParts = useMemo(() => {
     return libraryParts.filter(part => {
-      const matchesSearch = 
+      const supplierName = getSupplierLabel(part.supplierId).toLowerCase();
+      const matchesSearch =
         part.partNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         part.mpn.toLowerCase().includes(searchQuery.toLowerCase()) ||
         part.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        part.manufacturer.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesCategory = selectedCategory === 'All' || part.category === selectedCategory;
-      const matchesLocation = part.category === 'Software' || selectedLocations.some(loc => part.location.startsWith(loc));
+        part.manufacturer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        supplierName.includes(searchQuery.toLowerCase());
 
-      return matchesSearch && matchesCategory && matchesLocation;
+      const matchesCategory = selectedCategory === 'All' || part.category === selectedCategory;
+      const matchesLifecycle = selectedLifecycle === 'All' || part.state === selectedLifecycle;
+      const matchesLocation = part.category === 'Software' || selectedLocations.some(loc => part.location.startsWith(loc));
+      const belowMinimum = part.category !== 'Software' && part.stock < part.minStock;
+      const matchesStock = stockFilter === 'All' || (stockFilter === 'Below minimum' ? belowMinimum : !belowMinimum);
+
+      return matchesSearch && matchesCategory && matchesLifecycle && matchesLocation && matchesStock;
+    }).sort((left, right) => {
+      const compareText = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+      switch (sortBy) {
+        case 'description':
+          return compareText(left.description, right.description);
+        case 'supplier':
+          return compareText(getSupplierLabel(left.supplierId), getSupplierLabel(right.supplierId));
+        case 'stock':
+          return left.stock - right.stock;
+        case 'state':
+          return compareText(left.state, right.state);
+        case 'partNumber':
+        default:
+          return compareText(left.partNumber, right.partNumber);
+      }
     });
-  }, [searchQuery, selectedCategory, libraryParts, selectedLocations]);
+  }, [searchQuery, selectedCategory, selectedLifecycle, stockFilter, sortBy, libraryParts, selectedLocations, suppliers]);
 
   // UI Helpers
   const getCategoryIcon = (cat: string) => {
@@ -149,16 +223,43 @@ export const PartLibrary: React.FC = () => {
   const handleEditClick = (part: LibraryPart) => {
       setSelectedPart(part);
       setEditForm(JSON.parse(JSON.stringify(part))); // Deep copy for tiers
+      setEditError('');
       setPanelTab('details');
       setIsEditPanelOpen(true);
   };
 
-  const handleSave = () => {
-      if (selectedPart && editForm) {
-          updateLibraryPart(selectedPart.id, editForm);
-          setIsEditPanelOpen(false);
-      }
-  };
+	  const validatePricingTiers = (tiers?: PricingTier[]) => {
+	      if (!tiers || tiers.length === 0) return '';
+	      const seenMinQty = new Set<number>();
+	      for (const tier of tiers) {
+	          if (!Number.isFinite(tier.minQty) || tier.minQty < 0) return 'Pricing tier minimum quantity must be zero or greater.';
+	          if (!Number.isFinite(tier.price) || tier.price < 0) return 'Pricing tier price must be zero or greater.';
+	          if (seenMinQty.has(tier.minQty)) return 'Pricing tiers cannot reuse the same minimum quantity.';
+	          seenMinQty.add(tier.minQty);
+	      }
+	      return '';
+	  };
+
+	  const handleSave = () => {
+	      if (selectedPart && editForm) {
+	          const tierError = validatePricingTiers(editForm.pricingTiers);
+	          if (tierError) {
+	              setEditError(tierError);
+	              return;
+	          }
+	          updateLibraryPart(selectedPart.id, editForm);
+	          setSaveStatus(`Saved ${selectedPart.partNumber}. BOM and Tooling links will read the updated master data.`);
+	          setIsEditPanelOpen(false);
+	      }
+	  };
+
+	  const handleArchivePart = () => {
+	      if (!selectedPart) return;
+	      if (!window.confirm(`Archive ${selectedPart.partNumber}? Existing BOM usage remains traceable.`)) return;
+	      updateLibraryPart(selectedPart.id, { state: LifecycleState.Obsolete, stock: 0 });
+	      setSaveStatus(`Archived ${selectedPart.partNumber}.`);
+	      setIsEditPanelOpen(false);
+	  };
 
   const toggleLocation = (loc: string) => {
       if (selectedLocations.includes(loc)) {
@@ -185,39 +286,60 @@ export const PartLibrary: React.FC = () => {
     setEditForm({ ...editForm, pricingTiers: currentTiers });
   };
 
-  const handleCreatePart = () => {
-    const partNumber = createForm.partNumber.trim();
-    const mpn = createForm.mpn.trim();
-    const description = createForm.description.trim();
-    if (!partNumber || !mpn || !description) return;
+	  const handleCreatePart = () => {
+	    const partNumber = createForm.partNumber.trim();
+	    const mpn = createForm.mpn.trim();
+	    const description = createForm.description.trim();
+	    if (!partNumber || !mpn || !description) return;
+	    if (libraryParts.some((part) => part.partNumber.toLowerCase() === partNumber.toLowerCase())) {
+	      setCreateError(`Part number ${partNumber} already exists.`);
+	      return;
+	    }
 
-    const cost = Number(createForm.cost);
-    addLibraryPart({
-      id: `lib-${partNumber.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+	    const cost = Number(createForm.cost);
+	    const leadTimeWeeks = Number(createForm.leadTimeWeeks);
+	    const moq = Number(createForm.moq);
+	    const spq = Number(createForm.spq);
+	    const stock = Number(createForm.stock);
+	    const minStock = Number(createForm.minStock);
+	    addLibraryPart({
+	      id: `lib-${partNumber.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
       partNumber,
       mpn,
       manufacturer: createForm.manufacturer.trim() || 'Unassigned',
       description,
       category: createForm.category,
-      cost: Number.isFinite(cost) && cost >= 0 ? cost : 0,
-      stock: 0,
-      minStock: 0,
-      state: LifecycleState.Draft,
-      location: createForm.category === 'Software' ? 'Git/Repo' : 'WH-A-NEW',
-      type: createForm.category === 'Software' ? ComponentType.Software : ComponentType.Part,
-    });
-    setSelectedCategory('All');
-    setSearchQuery(partNumber);
+	      cost: Number.isFinite(cost) && cost >= 0 ? cost : 0,
+	      stock: Number.isFinite(stock) && stock >= 0 ? stock : 0,
+	      minStock: Number.isFinite(minStock) && minStock >= 0 ? minStock : 0,
+	      state: LifecycleState.Draft,
+	      location: createForm.category === 'Software' ? 'Git/Repo' : 'WH-A-NEW',
+	      type: createForm.category === 'Software' ? ComponentType.Software : ComponentType.Part,
+	      supplierId: createForm.supplierId || undefined,
+	      leadTimeWeeks: Number.isFinite(leadTimeWeeks) && leadTimeWeeks >= 0 ? leadTimeWeeks : undefined,
+	      moq: Number.isFinite(moq) && moq >= 0 ? moq : undefined,
+	      spq: Number.isFinite(spq) && spq >= 0 ? spq : undefined,
+	    });
+	    setSelectedCategory('All');
+	    setSearchQuery(partNumber);
     setCreateForm({
       partNumber: '',
       mpn: '',
       manufacturer: '',
       description: '',
-      category: 'Mechanical',
-      cost: '0',
-    });
-    setIsCreatePanelOpen(false);
-  };
+	      category: 'Mechanical',
+	      cost: '0',
+	      leadTimeWeeks: '',
+	      supplierId: '',
+	      moq: '',
+	      spq: '',
+	      stock: '0',
+	      minStock: '0',
+	    });
+	    setCreateError('');
+	    setSaveStatus(`Created ${partNumber} in Part Library.`);
+	    setIsCreatePanelOpen(false);
+	  };
 
   return (
     <div className="flex h-full bg-slate-50 overflow-hidden relative">
@@ -237,8 +359,8 @@ export const PartLibrary: React.FC = () => {
                         key={cat}
                         onClick={() => setSelectedCategory(cat)}
                         className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors ${
-                            selectedCategory === cat 
-                            ? 'bg-blue-50 text-blue-700 font-medium' 
+                            selectedCategory === cat
+                            ? 'bg-blue-50 text-blue-700 font-medium'
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                     >
@@ -252,15 +374,55 @@ export const PartLibrary: React.FC = () => {
             </div>
 
             <div className="mt-8">
+                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Lifecycle</h3>
+                 <div className="space-y-1">
+                    {(['All', ...Object.values(LifecycleState)] as Array<'All' | LifecycleState>).map((state) => (
+                         <button
+                            key={state}
+                            type="button"
+                            onClick={() => setSelectedLifecycle(state)}
+                            className={`w-full rounded px-3 py-2 text-left text-sm ${
+                                selectedLifecycle === state
+                                ? 'bg-blue-50 font-medium text-blue-700'
+                                : 'text-slate-600 hover:bg-slate-50'
+                            }`}
+                         >
+                            {state}
+                         </button>
+                    ))}
+                 </div>
+            </div>
+
+            <div className="mt-8">
+                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Stock Status</h3>
+                 <div className="space-y-1">
+                    {(['All', 'Below minimum', 'In stock'] as const).map((status) => (
+                         <button
+                            key={status}
+                            type="button"
+                            onClick={() => setStockFilter(status)}
+                            className={`w-full rounded px-3 py-2 text-left text-sm ${
+                                stockFilter === status
+                                ? 'bg-blue-50 font-medium text-blue-700'
+                                : 'text-slate-600 hover:bg-slate-50'
+                            }`}
+                         >
+                            {status}
+                         </button>
+                    ))}
+                 </div>
+            </div>
+
+            <div className="mt-8">
                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Inventory Locations</h3>
                  <div className="space-y-2">
                     {INVENTORY_LOCATIONS.map(loc => (
                          <label key={loc} className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-900">
-                            <input 
-                                type="checkbox" 
+                            <input
+                                type="checkbox"
                                 checked={selectedLocations.includes(loc)}
                                 onChange={() => toggleLocation(loc)}
-                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                             />
                             {loc} Zone
                          </label>
@@ -276,17 +438,34 @@ export const PartLibrary: React.FC = () => {
         <div className="h-16 border-b border-slate-200 bg-white px-6 flex items-center justify-between flex-shrink-0">
              <div className="relative w-96">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                    type="text" 
-                    placeholder="Search by Part Number, MPN, Description..." 
+                <input
+                    type="text"
+                    placeholder="Search by Part Number, MPN, Description..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                 />
              </div>
-             <div className="flex items-center gap-3">
+	             <div className="flex items-center gap-3">
+	                {saveStatus && <span className="text-xs font-semibold text-emerald-700">{saveStatus}</span>}
+	                <label className="flex items-center gap-2 text-xs font-semibold text-slate-500" htmlFor="part-sort">
+	                    Sort
+	                    <select
+	                        id="part-sort"
+	                        aria-label="Sort parts"
+	                        value={sortBy}
+	                        onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
+	                        className="rounded border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700"
+	                    >
+	                        <option value="partNumber">Part No.</option>
+	                        <option value="description">Description</option>
+	                        <option value="supplier">Supplier</option>
+	                        <option value="stock">Stock</option>
+	                        <option value="state">Lifecycle</option>
+	                    </select>
+	                </label>
                 <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
-                    <button 
+                    <button
                         type="button"
                         aria-label="Show list view"
                         title="Show list view"
@@ -295,7 +474,7 @@ export const PartLibrary: React.FC = () => {
                     >
                         <List className="w-4 h-4" />
                     </button>
-                    <button 
+                    <button
                         type="button"
                         aria-label="Show grid view"
                         title="Show grid view"
@@ -337,8 +516,8 @@ export const PartLibrary: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {filteredParts.length > 0 ? filteredParts.map((part) => (
-                            <tr 
-                                key={part.id} 
+                            <tr
+                                key={part.id}
                                 className="hover:bg-blue-50/30 group transition-colors cursor-pointer"
                                 onClick={() => handleEditClick(part)}
                             >
@@ -376,7 +555,7 @@ export const PartLibrary: React.FC = () => {
                                     {getLifecycleBadge(part.state)}
                                 </td>
                                 <td className="px-6 py-3 text-right">
-                                    <button 
+                                    <button
                                         type="button"
                                         aria-label={`Edit ${part.partNumber}`}
                                         title={`Edit ${part.partNumber}`}
@@ -395,8 +574,8 @@ export const PartLibrary: React.FC = () => {
                                             <Search className="w-6 h-6 text-slate-300" />
                                         </div>
                                         <p>No parts found matching your filters.</p>
-                                        <button 
-                                            onClick={() => {setSearchQuery(''); setSelectedCategory('All');}}
+                                        <button
+                                            onClick={() => {setSearchQuery(''); setSelectedCategory('All'); setSelectedLifecycle('All'); setStockFilter('All');}}
                                             className="text-blue-600 text-sm font-medium hover:underline"
                                         >
                                             Clear filters
@@ -483,8 +662,8 @@ export const PartLibrary: React.FC = () => {
                             className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
                           />
                       </label>
-                      <label className="block text-sm font-semibold text-slate-700" htmlFor="create-cost">
-                          Initial Unit Cost
+	                      <label className="block text-sm font-semibold text-slate-700" htmlFor="create-cost">
+	                          Initial Unit Cost
                           <input
                             id="create-cost"
                             type="number"
@@ -492,7 +671,58 @@ export const PartLibrary: React.FC = () => {
                             onChange={(event) => setCreateForm((value) => ({ ...value, cost: event.target.value }))}
                             className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
                           />
-                      </label>
+	                      </label>
+	                      <div className="grid gap-4 md:grid-cols-2">
+	                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-supplier">
+	                              Supplier
+	                              <select
+	                                id="create-supplier"
+	                                value={createForm.supplierId}
+	                                onChange={(event) => setCreateForm((value) => ({ ...value, supplierId: event.target.value }))}
+	                                className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+	                              >
+	                                  <option value="">Unassigned</option>
+	                                  {suppliers.map((supplier) => (
+	                                      <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+	                                  ))}
+	                              </select>
+	                          </label>
+	                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-lead-time">
+	                              Lead Time (Wks)
+	                              <input
+	                                id="create-lead-time"
+	                                type="number"
+	                                value={createForm.leadTimeWeeks}
+	                                onChange={(event) => setCreateForm((value) => ({ ...value, leadTimeWeeks: event.target.value }))}
+	                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+	                              />
+	                          </label>
+	                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-moq">
+	                              MOQ
+	                              <input
+	                                id="create-moq"
+	                                type="number"
+	                                value={createForm.moq}
+	                                onChange={(event) => setCreateForm((value) => ({ ...value, moq: event.target.value }))}
+	                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+	                              />
+	                          </label>
+	                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-spq">
+	                              SPQ
+	                              <input
+	                                id="create-spq"
+	                                type="number"
+	                                value={createForm.spq}
+	                                onChange={(event) => setCreateForm((value) => ({ ...value, spq: event.target.value }))}
+	                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+	                              />
+	                          </label>
+	                      </div>
+	                      {createError && (
+	                        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+	                          {createError}
+	                        </div>
+	                      )}
                       <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
                           <button
                             type="button"
@@ -535,30 +765,52 @@ export const PartLibrary: React.FC = () => {
 
               {/* Tabs */}
               <div className="flex border-b border-slate-200">
-                  <button 
+                  <button
                       onClick={() => setPanelTab('details')}
                       className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
-                          panelTab === 'details' 
-                          ? 'text-blue-600 border-blue-600 bg-white' 
+                          panelTab === 'details'
+                          ? 'text-blue-600 border-blue-600 bg-white'
                           : 'text-slate-500 border-transparent hover:bg-slate-50'
                       }`}
                   >
                       <Edit className="w-4 h-4" />
                       Details
                   </button>
-                  <button 
-                      onClick={() => setPanelTab('usage')}
+	                  <button
+	                      onClick={() => setPanelTab('usage')}
                       className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
-                          panelTab === 'usage' 
-                          ? 'text-blue-600 border-blue-600 bg-white' 
+                          panelTab === 'usage'
+                          ? 'text-blue-600 border-blue-600 bg-white'
                           : 'text-slate-500 border-transparent hover:bg-slate-50'
                       }`}
                   >
                       <Network className="w-4 h-4" />
-                      Where Used <span className="text-[10px] bg-slate-200 px-1.5 rounded-full">{whereUsedList.length}</span>
-                  </button>
+	                      Where Used <span className="text-[10px] bg-slate-200 px-1.5 rounded-full">{whereUsedList.length}</span>
+	                  </button>
+	                  <button
+	                      onClick={() => setPanelTab('tooling')}
+	                      className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
+	                          panelTab === 'tooling'
+	                          ? 'text-blue-600 border-blue-600 bg-white'
+	                          : 'text-slate-500 border-transparent hover:bg-slate-50'
+	                      }`}
+	                  >
+	                      <Hammer className="w-4 h-4" />
+	                      Tooling <span className="text-[10px] bg-slate-200 px-1.5 rounded-full">{toolingLinks.length}</span>
+	                  </button>
+	                  <button
+	                      onClick={() => setPanelTab('audit')}
+	                      className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
+	                          panelTab === 'audit'
+	                          ? 'text-blue-600 border-blue-600 bg-white'
+	                          : 'text-slate-500 border-transparent hover:bg-slate-50'
+	                      }`}
+	                  >
+	                      <History className="w-4 h-4" />
+	                      Audit
+	                  </button>
               </div>
-              
+
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                   {panelTab === 'details' ? (
                       <>
@@ -567,7 +819,7 @@ export const PartLibrary: React.FC = () => {
                             <div className="space-y-3">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                                    <textarea 
+                                    <textarea
                                         disabled={!canEditMetadata}
                                         rows={2}
                                         value={editForm.description}
@@ -578,7 +830,7 @@ export const PartLibrary: React.FC = () => {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-                                        <select 
+                                        <select
                                             disabled={!canEditMetadata}
                                             value={editForm.category}
                                             onChange={(e) => setEditForm({...editForm, category: e.target.value})}
@@ -589,7 +841,7 @@ export const PartLibrary: React.FC = () => {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">State</label>
-                                        <select 
+                                        <select
                                             disabled={!canEditMetadata}
                                             value={editForm.state}
                                             onChange={(e) => setEditForm({...editForm, state: e.target.value as LifecycleState})}
@@ -604,7 +856,7 @@ export const PartLibrary: React.FC = () => {
                                      <div className="flex items-center gap-2">
                                          <Scale className="w-4 h-4 text-slate-400" />
                                          <span className="text-sm text-slate-600">Weight</span>
-                                         <input 
+                                         <input
                                             disabled={!canEditMetadata}
                                             type="number"
                                             value={editForm.weightG || ''}
@@ -624,7 +876,7 @@ export const PartLibrary: React.FC = () => {
                                 <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label htmlFor="part-unit-cost" className="block text-sm font-medium text-slate-700 mb-1">Unit Cost ($)</label>
-                                            <input 
+                                            <input
                                                 id="part-unit-cost"
                                                 type="number"
                                                 step="0.001"
@@ -636,7 +888,7 @@ export const PartLibrary: React.FC = () => {
                                         </div>
                                         <div>
                                             <label htmlFor="part-lead-time" className="block text-sm font-medium text-slate-700 mb-1">Lead Time (Wks)</label>
-                                            <input 
+                                            <input
                                                 id="part-lead-time"
                                                 type="number"
                                                 value={editForm.leadTimeWeeks || ''}
@@ -648,7 +900,7 @@ export const PartLibrary: React.FC = () => {
                                 </div>
                                 <div>
                                         <label htmlFor="part-supplier" className="block text-sm font-medium text-slate-700 mb-1">Supplier</label>
-                                        <select 
+                                        <select
                                             id="part-supplier"
                                             value={editForm.supplierId || ''}
                                             onChange={(e) => setEditForm({...editForm, supplierId: e.target.value})}
@@ -662,10 +914,25 @@ export const PartLibrary: React.FC = () => {
                                         </select>
                                 </div>
 
+                                <div className="rounded border border-slate-200 bg-slate-50 p-3">
+                                    <div className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">AVL / Supplier Status</div>
+                                    {selectedPartAvl.length > 0 ? selectedPartAvl.map((entry) => (
+                                        <div key={entry.id} className="flex items-center justify-between rounded bg-white px-3 py-2 text-xs">
+                                            <div>
+                                                <div className="font-bold text-slate-700">{getSupplierLabel(entry.supplierId)}</div>
+                                                <div className="font-mono text-slate-500">{entry.manufacturer} · {entry.mpn}</div>
+                                            </div>
+                                            <span className="rounded-full bg-emerald-50 px-2 py-1 font-bold text-emerald-700">{entry.status}</span>
+                                        </div>
+                                    )) : (
+                                        <div className="text-xs text-slate-400">No AVL record yet. Assigning a supplier creates the current preferred supplier context.</div>
+                                    )}
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label htmlFor="part-moq" className="block text-sm font-medium text-slate-700 mb-1">MOQ</label>
-                                        <input 
+                                        <input
                                             id="part-moq"
                                             type="number"
                                             value={editForm.moq || ''}
@@ -676,7 +943,7 @@ export const PartLibrary: React.FC = () => {
                                     </div>
                                     <div>
                                         <label htmlFor="part-spq" className="block text-sm font-medium text-slate-700 mb-1">SPQ</label>
-                                        <input 
+                                        <input
                                             id="part-spq"
                                             type="number"
                                             value={editForm.spq || ''}
@@ -702,16 +969,16 @@ export const PartLibrary: React.FC = () => {
                                         {editForm.pricingTiers?.map((tier, idx) => (
                                             <div key={idx} className="flex items-center gap-2">
                                                 <span className="text-xs text-slate-500">Qty &ge;</span>
-                                                <input 
-                                                    type="number" 
+                                                <input
+                                                    type="number"
                                                     value={tier.minQty}
                                                     onChange={(e) => handleUpdateTier(idx, 'minQty', parseInt(e.target.value))}
                                                     className="w-16 px-1 py-0.5 text-xs border border-slate-300 rounded"
                                                     disabled={!canEditCommercial}
                                                 />
                                                 <span className="text-xs text-slate-500">@ $</span>
-                                                <input 
-                                                    type="number" 
+                                                <input
+                                                    type="number"
                                                     value={tier.price}
                                                     onChange={(e) => handleUpdateTier(idx, 'price', parseFloat(e.target.value))}
                                                     className="flex-1 px-1 py-0.5 text-xs border border-slate-300 rounded"
@@ -732,7 +999,7 @@ export const PartLibrary: React.FC = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Current Stock</label>
-                                    <input 
+                                    <input
                                         disabled={!canEditCommercial}
                                         type="number"
                                         value={editForm.stock}
@@ -742,7 +1009,7 @@ export const PartLibrary: React.FC = () => {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Min. Stock</label>
-                                    <input 
+                                    <input
                                         disabled={!canEditCommercial}
                                         type="number"
                                         value={editForm.minStock}
@@ -758,14 +1025,20 @@ export const PartLibrary: React.FC = () => {
                                 You do not have permission to edit this part.
                             </div>
                         )}
+	                        {editError && (
+	                            <div className="bg-rose-50 text-rose-700 p-3 rounded text-sm mt-4 border border-rose-200 flex items-center gap-2">
+	                                <Activity className="w-4 h-4" />
+	                                {editError}
+	                            </div>
+	                        )}
                       </>
-                  ) : (
-                      // Usage Tab Content
+	                  ) : panelTab === 'usage' ? (
+	                      // Usage Tab Content
                       <div className="space-y-4">
                           <div className="bg-blue-50 border border-blue-100 rounded p-3 text-xs text-blue-700 mb-4">
                               This list shows all assemblies in the active BOM that directly consume this part number.
                           </div>
-                          
+
                           {whereUsedList.length > 0 ? (
                               whereUsedList.map((usage, idx) => (
                                   <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded flex items-start gap-3">
@@ -796,26 +1069,74 @@ export const PartLibrary: React.FC = () => {
                               </div>
                           )}
                       </div>
-                  )}
-              </div>
+	                  ) : panelTab === 'tooling' ? (
+	                      <div className="space-y-4">
+	                          <div className="bg-emerald-50 border border-emerald-100 rounded p-3 text-xs text-emerald-700">
+	                              Tooling links are resolved through design-master to concrete part mappings in the durable core repository.
+	                          </div>
+	                          {toolingLinks.length > 0 ? toolingLinks.map((tooling) => (
+	                              <div key={tooling.id} className="rounded border border-slate-200 bg-slate-50 p-3">
+	                                  <div className="text-sm font-bold text-slate-800">{tooling.name}</div>
+	                                  <div className="mt-1 text-xs text-slate-500">
+	                                      {tooling.supplier ?? 'Supplier TBD'} · {tooling.cavityCount ? `${tooling.cavityCount} cavities` : 'Cavity TBD'}
+	                                  </div>
+	                              </div>
+	                          )) : (
+	                              <div className="text-center py-8 text-slate-400 text-sm">
+	                                  No tooling links for this part.
+	                              </div>
+	                          )}
+	                      </div>
+	                  ) : (
+	                      <div className="space-y-4">
+	                          <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600">
+	                              Audit events are written by the durable core repository for create, update, archive, and relationship actions.
+	                          </div>
+	                          {auditEvents.length > 0 ? auditEvents.map((event) => (
+	                              <div key={event.id} className="rounded border border-slate-200 bg-white p-3">
+	                                  <div className="text-sm font-bold text-slate-800">{event.summary}</div>
+	                                  <div className="mt-1 text-xs text-slate-500">
+	                                      {event.sourceModule} · {event.actor.name} · {new Date(event.timestamp).toLocaleString()}
+	                                  </div>
+	                              </div>
+	                          )) : (
+	                              <div className="text-center py-8 text-slate-400 text-sm">
+	                                  No audit events for this part yet.
+	                              </div>
+	                          )}
+	                      </div>
+	                  )}
+	              </div>
 
-              {panelTab === 'details' && canSave && (
-                <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
-                    <button 
-                        onClick={() => setIsEditPanelOpen(false)}
+	              {panelTab === 'details' && canSave && (
+	                <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-between gap-3">
+	                    {canEditMetadata ? (
+	                        <button
+	                            type="button"
+	                            onClick={handleArchivePart}
+	                            className="inline-flex items-center gap-2 rounded border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+	                        >
+	                            <Archive className="h-4 w-4" />
+	                            Archive
+	                        </button>
+	                    ) : <span />}
+	                    <div className="flex gap-3">
+	                    <button
+	                        onClick={() => setIsEditPanelOpen(false)}
                         className="px-4 py-2 border border-slate-300 rounded text-sm font-medium text-slate-700 hover:bg-slate-100"
                     >
                         Cancel
                     </button>
-                    <button 
+                    <button
                         onClick={handleSave}
                         className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 shadow-sm flex items-center gap-2"
                     >
                         <Save className="w-4 h-4" />
-                        Save Changes
-                    </button>
-                </div>
-              )}
+	                        Save Changes
+	                    </button>
+	                    </div>
+	                </div>
+	              )}
           </div>
       )}
     </div>

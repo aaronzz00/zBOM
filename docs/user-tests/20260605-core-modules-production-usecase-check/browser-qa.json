@@ -1,0 +1,97 @@
+{
+  "baseUrl": "http://127.0.0.1:3001/",
+  "chromePath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "generatedAt": "2026-06-05T08:49:35.705Z",
+  "results": [
+    {
+      "viewport": "desktop",
+      "width": 1440,
+      "height": 900,
+      "nav": "BOM Editor",
+      "proof": "BOM Editor",
+      "screenshotPath": "docs/user-tests/20260605-core-modules-production-usecase-check/screenshots/desktop-bom-editor.png",
+      "pass": true
+    },
+    {
+      "viewport": "desktop",
+      "width": 1440,
+      "height": 900,
+      "nav": "Part Library",
+      "proof": "Library Filters",
+      "screenshotPath": "docs/user-tests/20260605-core-modules-production-usecase-check/screenshots/desktop-part-library.png",
+      "pass": true
+    },
+    {
+      "viewport": "desktop",
+      "width": 1440,
+      "height": 900,
+      "nav": "Tooling Hub",
+      "proof": "Tooling Records",
+      "screenshotPath": "docs/user-tests/20260605-core-modules-production-usecase-check/screenshots/desktop-tooling-hub.png",
+      "pass": true
+    },
+    {
+      "viewport": "desktop",
+      "width": 1440,
+      "height": 900,
+      "nav": "Dashboard",
+      "proof": "Development Preview - not part of the production core test scope.",
+      "screenshotPath": "docs/user-tests/20260605-core-modules-production-usecase-check/screenshots/desktop-development-preview.png",
+      "pass": true
+    },
+    {
+      "viewport": "desktop",
+      "width": 1440,
+      "height": 900,
+      "nav": "Core production flows",
+      "proof": "BOM add flow, supplier search/sort, and Tooling to Part Library link",
+      "screenshotPath": "docs/user-tests/20260605-core-modules-production-usecase-check/screenshots/desktop-tooling-to-part-library.png",
+      "pass": true
+    },
+    {
+      "viewport": "narrow",
+      "width": 390,
+      "height": 844,
+      "nav": "BOM Editor",
+      "proof": "BOM Editor",
+      "screenshotPath": "docs/user-tests/20260605-core-modules-production-usecase-check/screenshots/narrow-bom-editor.png",
+      "pass": true
+    },
+    {
+      "viewport": "narrow",
+      "width": 390,
+      "height": 844,
+      "nav": "Part Library",
+      "proof": "Library Filters",
+      "screenshotPath": "docs/user-tests/20260605-core-modules-production-usecase-check/screenshots/narrow-part-library.png",
+      "pass": true
+    },
+    {
+      "viewport": "narrow",
+      "width": 390,
+      "height": 844,
+      "nav": "Tooling Hub",
+      "proof": "Tooling Records",
+      "screenshotPath": "docs/user-tests/20260605-core-modules-production-usecase-check/screenshots/narrow-tooling-hub.png",
+      "pass": true
+    },
+    {
+      "viewport": "narrow",
+      "width": 390,
+      "height": 844,
+      "nav": "Dashboard",
+      "proof": "Development Preview - not part of the production core test scope.",
+      "screenshotPath": "docs/user-tests/20260605-core-modules-production-usecase-check/screenshots/narrow-development-preview.png",
+      "pass": true
+    },
+    {
+      "viewport": "narrow",
+      "width": 390,
+      "height": 844,
+      "nav": "Core production flows",
+      "proof": "BOM add flow, supplier search/sort, and Tooling to Part Library link",
+      "screenshotPath": "docs/user-tests/20260605-core-modules-production-usecase-check/screenshots/narrow-tooling-to-part-library.png",
+      "pass": true
+    }
+  ]
+}

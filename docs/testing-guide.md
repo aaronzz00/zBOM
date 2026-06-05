@@ -6,11 +6,13 @@
 
 ## 测试目标
 
-当前测试重点不是验证真实后端，而是确保前端原型在不同使用角色下具备稳定、可解释、可回归的使用路径。
+当前测试重点是验证三大生产核心模块的本地 durable repository 流程，以及非核心 Development Preview 模块在不同角色下具备稳定、可解释、可回归的使用路径。
 
 重点覆盖：
 
 - Viewer 只读与商业数据保护
+- BOM Editor、Part Library、Tooling Hub 的 durable core repository 读写
+- Part Library -> BOM usage -> Tooling design-master/concrete part 关系
 - Sourcing 商业字段维护
 - Engineer 技术审查和 EBOM draft edit
 - Admin 本地管理动作和确定性预览
@@ -61,8 +63,21 @@ VITE_ENABLE_FEEDBACK_OVERLAY=true npm run dev
 
 当前基线：
 
-- 18 个测试文件通过
-- 131 个测试用例通过
+- 全量 Vitest 应通过，包括 `tests/coreRepository.test.ts` 与 `tests/CoreProductionFlows.test.tsx`
+- 最近验证：20 个测试文件、150 个测试用例通过
+
+### Core Browser QA
+
+```bash
+npm run test:core-browser
+```
+
+当前浏览器基线：
+
+- 本机 Chrome headless QA 通过
+- 覆盖 10 个页面/关键路径检查：BOM Editor、Part Library、Tooling Hub、Development Preview banner、BOM Add flow、Part Library supplier search/sort、Tooling -> Part Library link
+- 覆盖 1440px desktop 与 390px narrow viewport
+- 截图和结构化结果位于 `docs/user-tests/20260605-core-modules-production-usecase-check/`
 
 ### 角色/use-case 聚焦回归
 
@@ -99,8 +114,10 @@ npm run build
 
 | 文件 | 覆盖重点 |
 | --- | --- |
+| `tests/coreRepository.test.ts` | canonical Part/BOM/Tooling repository、持久化、关系完整性、角色策略、audit |
+| `tests/CoreProductionFlows.test.tsx` | 三大生产核心模块用户路径：现有料号加入 BOM、CSV import preview/commit、重复校验、Tooling linkage、milestone status/date/owner/blocker edit |
 | `tests/RoleUseCases.test.tsx` | 角色 use-case 标准、商业字段保护、Sourcing 维护、Admin 本地动作、Supply Chain 预览、Settings/ERP setup |
-| `tests/AppNavigation.test.tsx` | 页面导航、Viewer 可见模块、窄屏 shell 约束 |
+| `tests/AppNavigation.test.tsx` | 页面导航、Production Core / Development Preview 状态、Viewer 可见模块、窄屏 shell 约束 |
 | `tests/BOMTable.test.tsx` | BOM 表格、Columns 菜单、键盘关闭与可访问状态 |
 | `tests/ProductMatrixCenter.test.tsx` | SKU 生命周期操作与产品矩阵工作流 |
 | `tests/PhaseOneWorkflowPages.test.tsx` | Product Matrix -> EBOM Architecture -> MBOM Delta -> Tooling 的跨模块流程 |
@@ -123,7 +140,8 @@ VITE_ENABLE_DEMO_ROLE_SWITCHER=true npm run dev
 | --- | --- | --- | --- |
 | UC-A1 | Dashboard governance review | Admin -> Dashboard | KPI、成本、图表、近期 ECO 可见；图表稳定；QA 浮层默认不遮挡 |
 | UC-A2 | BOM workspace entry | Admin -> BOM Editor | Tree/Matrix/Flat 和 EBOM/MBOM 可切换；snapshot/import/export/Add 等入口有可见结果或明确状态 |
-| UC-A3 | Add BOM item | Admin -> BOM Editor -> Add Item | 打开真实本地表单，包含 parent、part number、name、quantity、unit、type、save/cancel 和校验 |
+| UC-A3 | Add BOM item | Admin -> BOM Editor -> Add Item | 可选择现有 Part Library 料号，或创建 local/custom item；包含 parent、quantity、unit、save/cancel 和重复校验 |
+| UC-A4 | Tooling operation | Admin -> Tooling Hub | 可创建设计主件、创建 tooling record、编辑 milestone 状态、计划/实际日期、owner、notes、blocker reason |
 
 ### Engineer
 
@@ -139,6 +157,7 @@ VITE_ENABLE_DEMO_ROLE_SWITCHER=true npm run dev
 | UC-S1 | Supplier risk triage | Sourcing -> Supply Chain -> search/filter -> expand supplier | 搜索会过滤行；无结果有 empty state；风险 insight 有 `Simulated insight` 和静态时间 |
 | UC-S2 | Commercial part maintenance | Sourcing -> Part Library -> search part -> Edit | cost、lead time、supplier、MOQ、SPQ、pricing tiers 等商业字段可编辑；工程元数据可保持受限 |
 | UC-S3 | Procurement flat BOM review | Sourcing -> BOM Editor -> Flat | 可审查 MOQ、SPQ、required/buy quantity、spend、excess inventory；导出/报告入口有可见结果或明确状态 |
+| UC-S4 | Part relationship inspection | Sourcing -> Part Library -> search concrete part -> Tooling tab | 可查看 Tooling linkage；BOM usage 和 tooling mapping 分开展示 |
 
 ### Viewer
 
@@ -155,6 +174,7 @@ VITE_ENABLE_DEMO_ROLE_SWITCHER=true npm run dev
 | --- | --- | --- | --- |
 | UC-C1 | Narrow viewport usability | 390 x 844 viewport -> Dashboard | sidebar 收窄为 rail；main content 不被固定 sidebar 挤掉；核心内容可读 |
 | UC-C2 | QA/demo chrome gating | 默认环境 -> 任意页面 | Feedback overlay 和 demo role switcher 默认隐藏；仅显式 env flag 开启 |
+| UC-C3 | Non-core status clarity | 任意非核心模块 | 页面顶部出现 `Development Preview - not part of the production core test scope.` |
 
 ## 最终通过状态
 
@@ -180,11 +200,13 @@ VITE_ENABLE_DEMO_ROLE_SWITCHER=true npm run dev
 | `docs/user-tests/20260604-role-usecase-hardening-final/final-pass-fail-report.md` | 最终 pass/fail 报告 |
 | `docs/user-tests/20260604-role-usecase-hardening-final/dashboard.png` | Dashboard 最终截图 |
 | `docs/user-tests/20260604-role-usecase-hardening-final/supply-chain.png` | Supply Chain 最终截图 |
+| `docs/user-tests/20260605-core-modules-production-wave0/wave0-discovery-and-wave1-plan.md` | Wave 0 差距清单与 Wave 1 实施方案 |
+| `docs/user-tests/20260605-core-modules-production-usecase-check/` | 三大核心模块 granular use-case 检查结果 |
 
 ## 已知限制
 
-- 当前权限 hardening 仅发生在前端，不能替代后端授权。
-- 数据是 mock/in-memory，刷新后不会保留业务变更。
+- 核心 repository 有角色策略层，但不能替代真实服务端授权。
+- 三大核心模块使用本地 durable repository；非核心 Development Preview 模块仍可能使用 mock/in-memory。
 - Settings、ERP Connect、Risk Report、Supplier Audit、Compare Export 等是确定性前端预览或 checklist，不代表真实外部服务已接通。
 - AI 分析依赖 `GEMINI_API_KEY`，缺少 key 时应视为不可用。
 - in-app Browser 工具曾阻止 synthetic `data:` 390px viewport harness，因此窄屏证据采用响应式回归测试和直接浏览器 smoke，而不是保存的 synthetic 390px 截图。

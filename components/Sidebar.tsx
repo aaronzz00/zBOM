@@ -13,24 +13,50 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
   const canShowRoleSwitcher = hasPermission(Permission.VIEW_DEMO_ROLE_SWITCHER)
     && import.meta.env.VITE_ENABLE_DEMO_ROLE_SWITCHER === 'true';
 
-  // Define nav items with required permissions
-  const navItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', requiredPerm: Permission.VIEW_DASHBOARD },
+  const productionCoreItems = [
     { id: 'bom', icon: Layers, label: 'BOM Editor', requiredPerm: Permission.VIEW_BOM },
+    { id: 'parts', icon: Box, label: 'Part Library', requiredPerm: Permission.VIEW_BOM },
+    { id: 'tooling', icon: Hammer, label: 'Tooling Hub', requiredPerm: Permission.VIEW_BOM },
+  ];
+
+  const developmentPreviewItems = [
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', requiredPerm: Permission.VIEW_DASHBOARD },
     { id: 'product-matrix', icon: Grid3X3, label: 'Product Matrix', requiredPerm: Permission.VIEW_BOM },
     { id: 'ebom-architecture', icon: GitBranch, label: 'EBOM Architecture', requiredPerm: Permission.VIEW_BOM },
     { id: 'mbom-delta', icon: PackageSearch, label: 'MBOM Delta', requiredPerm: Permission.VIEW_BOM },
-    { id: 'tooling', icon: Hammer, label: 'Tooling Hub', requiredPerm: Permission.VIEW_BOM },
     { id: 'eco', icon: FileSignature, label: 'Change Orders', requiredPerm: Permission.VIEW_ECO },
     { id: 'compare', icon: GitCompare, label: 'Compare Revisions', requiredPerm: Permission.VIEW_BOM },
-    { id: 'parts', icon: Box, label: 'Part Library', requiredPerm: Permission.VIEW_BOM },
     { id: 'suppliers', icon: Share2, label: 'Supply Chain', requiredPerm: Permission.VIEW_SUPPLY_CHAIN },
-    { id: 'erp', icon: Database, label: 'ERP Connect', requiredPerm: Permission.MANAGE_AVL }, // Assuming ERP needs higher privs
+    { id: 'erp', icon: Database, label: 'ERP Connect', requiredPerm: Permission.MANAGE_AVL },
   ];
 
   // Filter items based on permissions
-  const visibleNavItems = navItems.filter(item => 
+  const visibleCoreItems = productionCoreItems.filter(item =>
     !item.requiredPerm || hasPermission(item.requiredPerm)
+  );
+  const visiblePreviewItems = developmentPreviewItems.filter(item =>
+    !item.requiredPerm || hasPermission(item.requiredPerm)
+  );
+
+  const renderNavItem = (item: typeof productionCoreItems[number], developmentPreview = false) => (
+    <button
+      key={item.id}
+      aria-label={item.label}
+      onClick={() => onNavigate(item.id)}
+      className={`w-full flex items-center justify-center lg:justify-start gap-3 px-3 lg:px-4 py-3 rounded-md transition-colors text-sm font-medium ${
+        activePage === item.id
+          ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
+          : 'hover:bg-slate-800 hover:text-white'
+      }`}
+    >
+      <item.icon className="w-5 h-5" />
+      <span className="hidden min-w-0 flex-1 truncate text-left lg:inline">{item.label}</span>
+      {developmentPreview && (
+        <span className="hidden rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-200 lg:inline">
+          In dev
+        </span>
+      )}
+    </button>
   );
 
   return (
@@ -42,22 +68,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
         <span className="hidden lg:inline text-xl font-bold text-white tracking-tight">zBOM</span>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
-        {visibleNavItems.map((item) => (
-          <button
-            key={item.id}
-            aria-label={item.label}
-            onClick={() => onNavigate(item.id)}
-            className={`w-full flex items-center justify-center lg:justify-start gap-3 px-3 lg:px-4 py-3 rounded-md transition-colors text-sm font-medium ${
-              activePage === item.id
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
-                : 'hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <item.icon className="w-5 h-5" />
-            <span className="hidden lg:inline">{item.label}</span>
-          </button>
-        ))}
+      <nav className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="space-y-1">
+          <div className="hidden px-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 lg:block">Production Core</div>
+          {visibleCoreItems.map((item) => renderNavItem(item))}
+        </div>
+        <div className="space-y-1">
+          <div className="hidden px-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 lg:block">Development Preview</div>
+          {visiblePreviewItems.map((item) => renderNavItem(item, true))}
+        </div>
       </nav>
 
       {canShowRoleSwitcher && (
@@ -67,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
                   <Shield className="w-3 h-3" />
                   Simulate Role
               </div>
-              <select 
+              <select
                   className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
                   value={currentUser.role}
                   onChange={(e) => switchRole(e.target.value as UserRole)}
@@ -89,6 +108,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
         >
           <Settings className="w-5 h-5" />
           <span className="hidden lg:inline">Settings</span>
+          <span className="hidden rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-200 lg:inline">
+            In dev
+          </span>
         </button>
         <div className="mt-4 hidden px-4 text-xs text-slate-600 lg:block">
           v2.5.0 (Build 9924)<br/>

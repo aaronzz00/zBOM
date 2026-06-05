@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { SetupPage } from './pages/SetupPage';
@@ -19,6 +19,17 @@ const SupplyChain = lazy(() => import('./pages/SupplyChain').then(({ SupplyChain
 const PageFallback = () => (
   <div className="flex flex-1 items-center justify-center bg-slate-50 text-sm font-medium text-slate-400" role="status">
     Loading module...
+  </div>
+);
+
+const DevelopmentPreviewFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="flex min-h-0 flex-1 flex-col">
+    <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-800">
+      Development Preview - not part of the production core test scope.
+    </div>
+    <div className="min-h-0 flex-1 overflow-hidden">
+      {children}
+    </div>
   </div>
 );
 
@@ -58,32 +69,44 @@ function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const showFeedbackOverlay = import.meta.env.VITE_ENABLE_FEEDBACK_OVERLAY === 'true';
 
+  useEffect(() => {
+    const handleNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<{ page?: string }>).detail;
+      if (detail?.page) {
+        setActivePage(detail.page);
+      }
+    };
+
+    window.addEventListener('zbom:navigate', handleNavigate);
+    return () => window.removeEventListener('zbom:navigate', handleNavigate);
+  }, []);
+
   const renderContent = () => {
     switch (activePage) {
-      case 'dashboard':
-        return <Dashboard />;
+	      case 'dashboard':
+	        return <DevelopmentPreviewFrame><Dashboard /></DevelopmentPreviewFrame>;
       case 'bom':
         return <BOMEditor />;
-      case 'product-matrix':
-        return <ProductMatrixCenter />;
-      case 'ebom-architecture':
-        return <EBOMArchitectureWorkspace />;
-      case 'mbom-delta':
-        return <MBOMDeltaConsole />;
+	      case 'product-matrix':
+	        return <DevelopmentPreviewFrame><ProductMatrixCenter /></DevelopmentPreviewFrame>;
+	      case 'ebom-architecture':
+	        return <DevelopmentPreviewFrame><EBOMArchitectureWorkspace /></DevelopmentPreviewFrame>;
+	      case 'mbom-delta':
+	        return <DevelopmentPreviewFrame><MBOMDeltaConsole /></DevelopmentPreviewFrame>;
       case 'tooling':
         return <ToolingHub />;
-      case 'eco':
-        return <ECOManager />;
-      case 'compare':
-        return <BOMCompare />;
+	      case 'eco':
+	        return <DevelopmentPreviewFrame><ECOManager /></DevelopmentPreviewFrame>;
+	      case 'compare':
+	        return <DevelopmentPreviewFrame><BOMCompare /></DevelopmentPreviewFrame>;
       case 'parts':
         return <PartLibrary />;
-      case 'suppliers':
-        return <SupplyChain />;
+	      case 'suppliers':
+	        return <DevelopmentPreviewFrame><SupplyChain /></DevelopmentPreviewFrame>;
       case 'erp':
         return (
-          <SetupPage
-            eyebrow="ERP Connect"
+	          <DevelopmentPreviewFrame><SetupPage
+	            eyebrow="ERP Connect"
             title="ERP Connector Setup"
             description="Mock integration checklist for mapping zBOM part, cost, AVL, and lifecycle fields before connecting a production ERP endpoint."
             checklistTitle="Mock integration checklist"
@@ -93,12 +116,12 @@ function App() {
               'Review export payload rules with commercial-field permissions applied.',
               'Run a dry-run sync report before enabling any writeback path.',
             ]}
-          />
-        );
-      case 'settings':
-        return (
-          <SetupPage
-            eyebrow="Admin Console"
+	          /></DevelopmentPreviewFrame>
+	        );
+	      case 'settings':
+	        return (
+	          <DevelopmentPreviewFrame><SetupPage
+	            eyebrow="Admin Console"
             title="System Settings"
             description="Role access and application preferences are collected here as a deterministic setup surface for frontend testing."
             checklistTitle="Configuration areas"
@@ -108,8 +131,8 @@ function App() {
               'BOM import, export, snapshot, and approval workflow preferences.',
               'Integration readiness checks for ERP and supplier audit modules.',
             ]}
-          />
-        );
+	          /></DevelopmentPreviewFrame>
+	        );
       default:
         return (
           <div className="flex-1 flex items-center justify-center bg-slate-50 text-slate-400">

@@ -19,6 +19,9 @@ export interface ToolingMilestone {
     plannedDate?: string;
     status: 'not-started' | 'in-progress' | 'done' | 'blocked';
     actualDate?: string;
+    owner?: string;
+    notes?: string;
+    blockerReason?: string;
 }
 
 export interface Tooling {
@@ -28,5 +31,6 @@ export interface Tooling {
     name: string;
     supplier?: string;
     cavityCount?: number;
+    owner?: string;
     milestones: ToolingMilestone[];
 }

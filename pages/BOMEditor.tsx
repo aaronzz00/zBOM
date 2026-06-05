@@ -8,9 +8,10 @@ import { useAuth } from '../context/AuthContext';
 import { BOMNode, ComponentType, LifecycleState, LibraryPart, AVLEntry, Permission, PricingTier } from '../types';
 import { Filter, Download, Upload, Plus, Minus, Bot, History, RotateCcw, Info, X, Search, Database, Box, Camera, FileSpreadsheet, CircuitBoard, Tags, LayoutGrid, ListTree, Trash2, Check, Star, Table2, Target, Lock, ToggleLeft, ToggleRight, Scale, PackageCheck, Coins, Hash, Paperclip, FileText, Settings, FileBox } from 'lucide-react';
 import { exportBOMToCSV, parseCSVToBOM } from '../utils/csvHelper';
+import { coreRepository } from '../repositories/core/coreRepository';
 
 export const BOMEditor: React.FC = () => {
-  const { bomData, setBOMData, libraryParts, updateBOMNode, addBOMNode, createSnapshot, attributeDefs, addAttributeDef, addAttachment, deleteAttachment } = useAppStore();
+  const { bomData, setBOMData, libraryParts, updateBOMNode, addBOMNode, deleteBOMNode, createSnapshot, loadSnapshot, snapshots, attributeDefs, addAttributeDef, addAttachment, deleteAttachment } = useAppStore();
   const { hasPermission } = useAuth();
   
   const [selectedNode, setSelectedNode] = useState<BOMNode | null>(null);
@@ -22,10 +23,20 @@ export const BOMEditor: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
 
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newBomItem, setNewBomItem] = useState({
-    parentId: 'root',
-    partNumber: '',
+	  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+	  const [addMode, setAddMode] = useState<'library' | 'local'>('local');
+	  const [addError, setAddError] = useState('');
+	  const [saveStatus, setSaveStatus] = useState('');
+	  const [importPreview, setImportPreview] = useState<{
+	    fileName: string;
+	    tree: BOMNode;
+	    rowCount: number;
+	    errors: string[];
+	  } | null>(null);
+	  const [newBomItem, setNewBomItem] = useState({
+	    parentId: 'root',
+	    partId: '',
+	    partNumber: '',
     name: '',
     type: ComponentType.Part,
     quantity: '1',
@@ -140,7 +151,17 @@ export const BOMEditor: React.FC = () => {
       return findNode(bomData) || selectedNode;
   })() : null;
 
-  const assemblyOptions = useMemo(() => {
+	  const activeNodeAuditEvents = useMemo(() => {
+	    if (!activeNode) return [];
+	    return coreRepository.getAuditEvents().filter((event) => (
+	        event.entityId === activeNode.id ||
+	        event.entityType === 'bom' ||
+	        event.entityType === 'bom-node' ||
+	        event.entityType === 'bom-snapshot'
+	    )).slice(0, 8);
+	  }, [activeNode, bomData, snapshots]);
+
+	  const assemblyOptions = useMemo(() => {
       const options: Array<{ id: string; partNumber: string; name: string }> = [];
       const collect = (node: BOMNode) => {
           if (node.type === ComponentType.Assembly) {
@@ -150,7 +171,20 @@ export const BOMEditor: React.FC = () => {
       };
       collect(bomData);
       return options;
-  }, [bomData]);
+	  }, [bomData]);
+
+	  const selectedLibraryPart = useMemo(() => (
+	    libraryParts.find((part) => part.id === newBomItem.partId) ?? libraryParts[0]
+	  ), [libraryParts, newBomItem.partId]);
+
+	  const findNodeById = (node: BOMNode, nodeId: string): BOMNode | null => {
+	    if (node.id === nodeId) return node;
+	    for (const child of node.children ?? []) {
+	        const found = findNodeById(child, nodeId);
+	        if (found) return found;
+	    }
+	    return null;
+	  };
 
   useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
@@ -169,6 +203,13 @@ export const BOMEditor: React.FC = () => {
     const name = prompt("Enter a name for this snapshot:", `Snapshot ${new Date().toLocaleTimeString()}`);
     if (name) createSnapshot(name);
   };
+
+	  const handleLoadSnapshot = (snapshotId: string, snapshotName: string) => {
+	    if (!window.confirm(`Reload snapshot "${snapshotName}"? This will replace the active BOM tree.`)) return;
+	    loadSnapshot(snapshotId);
+	    setSelectedNode(null);
+	    setSaveStatus(`Reloaded snapshot ${snapshotName}.`);
+	  };
 
   const handleExportCSV = () => {
     const csvContent = exportBOMToCSV(bomData);
@@ -193,71 +234,123 @@ export const BOMEditor: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const openAddModal = () => {
-    setNewBomItem((value) => ({
-      ...value,
-      parentId: activeNode?.type === ComponentType.Assembly ? activeNode.id : 'root',
-    }));
-    setIsAddModalOpen(true);
-  };
+	  const openAddModal = () => {
+	    setNewBomItem((value) => ({
+	      ...value,
+	      parentId: activeNode?.type === ComponentType.Assembly ? activeNode.id : 'root',
+	      partId: value.partId || libraryParts[0]?.id || '',
+	    }));
+	    setAddError('');
+	    setIsAddModalOpen(true);
+	  };
 
-  const handleCreateBOMItem = () => {
-    const partNumber = newBomItem.partNumber.trim();
-    const name = newBomItem.name.trim();
-    if (!partNumber || !name) return;
+	  const handleCreateBOMItem = () => {
+	    const libraryPart = addMode === 'library' ? selectedLibraryPart : undefined;
+	    const partNumber = libraryPart?.partNumber ?? newBomItem.partNumber.trim();
+	    const name = libraryPart?.description ?? newBomItem.name.trim();
+	    if (!partNumber || !name) return;
+	    const parentNode = findNodeById(bomData, newBomItem.parentId);
+	    if (parentNode?.children?.some((child) => child.partNumber === partNumber)) {
+	        setAddError(`${partNumber} is already used under the selected parent.`);
+	        return;
+	    }
 
-    const quantity = Number(newBomItem.quantity);
-    const cost = Number(newBomItem.cost);
-    const createdNode: BOMNode = {
-      id: `bom-${partNumber.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-      partNumber,
-      name,
-      revision: 'A',
-      state: LifecycleState.Draft,
-      type: newBomItem.type,
-      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
-      unit: newBomItem.unit.trim() || 'EA',
-      cost: Number.isFinite(cost) && cost >= 0 ? cost : 0,
-      currency: 'USD',
-      children: newBomItem.type === ComponentType.Assembly ? [] : undefined,
-    };
+	    const quantity = Number(newBomItem.quantity);
+	    const cost = libraryPart?.cost ?? Number(newBomItem.cost);
+	    const createdNode: BOMNode = {
+	      id: `bom-${partNumber.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
+	      partNumber,
+	      name,
+	      revision: 'A',
+	      state: libraryPart?.state ?? LifecycleState.Draft,
+	      type: libraryPart?.type ?? newBomItem.type,
+	      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+	      unit: newBomItem.unit.trim() || 'EA',
+	      cost: Number.isFinite(cost) && cost >= 0 ? cost : 0,
+	      currency: 'USD',
+	      manufacturer: libraryPart?.manufacturer,
+	      mpn: libraryPart?.mpn,
+	      leadTimeWeeks: libraryPart?.leadTimeWeeks,
+	      moq: libraryPart?.moq,
+	      spq: libraryPart?.spq,
+	      pricingTiers: libraryPart?.pricingTiers,
+	      weightG: libraryPart?.weightG,
+	      children: (libraryPart?.type ?? newBomItem.type) === ComponentType.Assembly ? [] : undefined,
+	    };
 
-    addBOMNode(newBomItem.parentId, createdNode);
-    setSelectedNode(createdNode);
-    setNewBomItem({
-      parentId: 'root',
-      partNumber: '',
-      name: '',
+	    addBOMNode(newBomItem.parentId, createdNode);
+	    setSaveStatus(`Saved ${partNumber} to the BOM.`);
+	    setSelectedNode(createdNode);
+	    setNewBomItem({
+	      parentId: 'root',
+	      partId: libraryParts[0]?.id || '',
+	      partNumber: '',
+	      name: '',
       type: ComponentType.Part,
       quantity: '1',
       unit: 'EA',
       cost: '0',
     });
-    setIsAddModalOpen(false);
-  };
+	    setIsAddModalOpen(false);
+	  };
+
+	  const handleDeleteActiveNode = () => {
+	    if (!activeNode || activeNode.id === bomData.id) return;
+	    if (!window.confirm(`Remove ${activeNode.partNumber} from the BOM?`)) return;
+	    deleteBOMNode(activeNode.id);
+	    setSelectedNode(null);
+	    setSaveStatus(`Removed ${activeNode.partNumber} from the BOM.`);
+	  };
+
+	  const validateImportedTree = (tree: BOMNode) => {
+	    const errors: string[] = [];
+	    let rowCount = 0;
+	    const visit = (node: BOMNode, path: string[]) => {
+	        rowCount += 1;
+	        const label = [...path, node.partNumber || '(missing part number)'].join(' > ');
+	        if (!node.partNumber?.trim()) errors.push(`${label}: part number is required.`);
+	        if (!node.name?.trim()) errors.push(`${label}: item name is required.`);
+	        if (!Number.isFinite(node.quantity) || node.quantity <= 0) errors.push(`${label}: quantity must be greater than zero.`);
+	        if (!node.unit?.trim()) errors.push(`${label}: unit is required.`);
+	        node.children?.forEach((child) => visit(child, [...path, node.partNumber]));
+	    };
+	    visit(tree, []);
+	    return { rowCount, errors };
+	  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
-        const text = evt.target?.result as string;
-        if (text) {
-            const newBOM = parseCSVToBOM(text);
-            if (newBOM) {
-                if (window.confirm(`Successfully parsed BOM: ${newBOM.partNumber}. Continue?`)) {
-                    setBOMData(newBOM);
-                    setSelectedNode(null);
-                }
-            } else {
-                alert("Failed to parse CSV.");
-            }
-        }
-    };
+	    reader.onload = (evt) => {
+	        const text = evt.target?.result as string;
+	        if (text) {
+	            const newBOM = parseCSVToBOM(text);
+	            if (newBOM) {
+	                const validation = validateImportedTree(newBOM);
+	                setImportPreview({
+	                    fileName: file.name,
+	                    tree: newBOM,
+	                    rowCount: validation.rowCount,
+	                    errors: validation.errors,
+	                });
+	            } else {
+	                alert("Failed to parse CSV.");
+	            }
+	        }
+	    };
     reader.readAsText(file);
     e.target.value = '';
-  };
+	  };
+
+	  const handleCommitImport = () => {
+	    if (!importPreview || importPreview.errors.length > 0) return;
+	    setBOMData(importPreview.tree);
+	    setSelectedNode(null);
+	    setSaveStatus(`Imported ${importPreview.fileName} with ${importPreview.rowCount} rows.`);
+	    setImportPreview(null);
+	  };
 
   return (
     <div className="flex flex-1 h-full overflow-hidden bg-slate-50 relative">
@@ -269,7 +362,8 @@ export const BOMEditor: React.FC = () => {
             <div className="flex items-center gap-4">
                  <div className="flex flex-col">
                     <h2 className="text-lg font-bold text-slate-800">BOM Editor</h2>
-                    <span className="text-xs font-medium text-slate-500">{bomData.revision}</span>
+	                    <span className="text-xs font-medium text-slate-500">{bomData.revision}</span>
+	                    {saveStatus && <span className="text-xs font-medium text-emerald-600">{saveStatus}</span>}
                  </div>
                  
                  <div className="flex items-center bg-white border border-slate-200 rounded-full p-1 shadow-sm">
@@ -398,7 +492,17 @@ export const BOMEditor: React.FC = () => {
                                 {activeNode.revision}
                             </span>
                         </div>
-                        <p className="text-sm text-slate-600 mt-1 line-clamp-2">{activeNode.name}</p>
+	                        <p className="text-sm text-slate-600 mt-1 line-clamp-2">{activeNode.name}</p>
+	                        {canEditStructure && activeNode.id !== bomData.id && (
+	                            <button
+	                                type="button"
+	                                onClick={handleDeleteActiveNode}
+	                                className="mt-3 inline-flex items-center gap-1 rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100"
+	                            >
+	                                <Trash2 className="h-3.5 w-3.5" />
+	                                Remove from BOM
+	                            </button>
+	                        )}
                     </div>
 
                     {/* Tabs */}
@@ -642,9 +746,58 @@ export const BOMEditor: React.FC = () => {
                                 </div>
                             </>
                         ) : (
-                             <div className="text-center py-10 text-slate-400">
-                                <History className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                                <p className="text-sm">History View</p>
+                            <div className="space-y-5">
+                                <div>
+                                    <h4 className="mb-2 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                        <History className="h-3.5 w-3.5" />
+                                        Audit Trail
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {activeNodeAuditEvents.length > 0 ? activeNodeAuditEvents.map((event) => (
+                                            <div key={event.id} className="rounded border border-slate-200 bg-slate-50 p-3">
+                                                <div className="text-xs font-bold text-slate-800">{event.summary}</div>
+                                                <div className="mt-1 text-[10px] text-slate-500">
+                                                    {event.sourceModule} · {event.actor.name} · {new Date(event.timestamp).toLocaleString()}
+                                                </div>
+                                            </div>
+                                        )) : (
+                                            <div className="rounded border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
+                                                No audit events recorded for this BOM context yet.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="mb-2 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                        <Camera className="h-3.5 w-3.5" />
+                                        Snapshots
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {snapshots.length > 0 ? snapshots.map((snapshot) => (
+                                            <div key={snapshot.id} className="rounded border border-slate-200 bg-white p-3">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div>
+                                                        <div className="text-xs font-bold text-slate-800">{snapshot.name}</div>
+                                                        <div className="mt-1 text-[10px] text-slate-500">{new Date(snapshot.timestamp).toLocaleString()}</div>
+                                                    </div>
+                                                    {canEditStructure && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleLoadSnapshot(snapshot.id, snapshot.name)}
+                                                            className="rounded border border-blue-200 px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-50"
+                                                        >
+                                                            Reload
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )) : (
+                                            <div className="rounded border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
+                                                No snapshots created yet.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -656,7 +809,7 @@ export const BOMEditor: React.FC = () => {
         </div>
       </div>
 
-      {isAttrModalOpen && (
+	      {isAttrModalOpen && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
               <div className="bg-white rounded-lg shadow-xl w-80 border border-slate-200 p-5">
                   <h3 className="font-bold text-slate-800 mb-4">Add Custom Column</h3>
@@ -690,17 +843,76 @@ export const BOMEditor: React.FC = () => {
                   </div>
               </div>
           </div>
-      )}
+	      )}
 
-      {isAddModalOpen && (
+	      {importPreview && (
+	        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+	          <section role="dialog" aria-modal="true" aria-labelledby="csv-import-preview-title" className="w-full max-w-xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
+	            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-4">
+	              <div>
+	                <h3 id="csv-import-preview-title" className="font-bold text-slate-900">CSV Import Preview</h3>
+	                <p className="text-xs text-slate-500">{importPreview.fileName} · {importPreview.rowCount} rows parsed</p>
+	              </div>
+	              <button type="button" aria-label="Close import preview" onClick={() => setImportPreview(null)}>
+	                <X className="h-5 w-5" />
+	              </button>
+	            </div>
+	            <div className="space-y-4 p-5">
+	              <div className="rounded border border-slate-200 bg-slate-50 p-3">
+	                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Root Assembly</div>
+	                <div className="mt-1 font-mono text-sm font-semibold text-slate-800">{importPreview.tree.partNumber}</div>
+	                <div className="text-sm text-slate-600">{importPreview.tree.name}</div>
+	              </div>
+	              {importPreview.errors.length > 0 ? (
+	                <div className="rounded border border-rose-200 bg-rose-50 p-3">
+	                  <div className="mb-2 text-sm font-bold text-rose-800">Fix these row errors before commit</div>
+	                  <ul className="max-h-44 list-disc space-y-1 overflow-auto pl-5 text-xs text-rose-700">
+	                    {importPreview.errors.map((error) => <li key={error}>{error}</li>)}
+	                  </ul>
+	                </div>
+	              ) : (
+	                <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
+	                  Validation passed. Commit will replace the active BOM tree and persist it through the core repository.
+	                </div>
+	              )}
+	              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+	                <button type="button" onClick={() => setImportPreview(null)} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+	                  Cancel
+	                </button>
+	                <button type="button" onClick={handleCommitImport} disabled={importPreview.errors.length > 0} className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300">
+	                  Commit Import
+	                </button>
+	              </div>
+	            </div>
+	          </section>
+	        </div>
+	      )}
+
+	      {isAddModalOpen && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
              <div className="bg-white rounded-lg shadow-xl w-[550px] border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
                  <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
                     <h3 className="font-bold text-slate-800">Add BOM Item</h3>
                     <button aria-label="Close add item" onClick={() => setIsAddModalOpen(false)}><X className="w-5 h-5"/></button>
                  </div>
-                 <div className="grid gap-4 p-6">
-                     <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-parent">
+	                 <div className="grid gap-4 p-6">
+	                     <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
+	                        <button
+	                            type="button"
+	                            onClick={() => { setAddMode('library'); setAddError(''); }}
+	                            className={`rounded-md px-3 py-2 text-sm font-semibold ${addMode === 'library' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+	                        >
+	                            Existing library part
+	                        </button>
+	                        <button
+	                            type="button"
+	                            onClick={() => { setAddMode('local'); setAddError(''); }}
+	                            className={`rounded-md px-3 py-2 text-sm font-semibold ${addMode === 'local' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+	                        >
+	                            Local/custom item
+	                        </button>
+	                     </div>
+	                     <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-parent">
                          Parent Assembly
                          <select
                             id="bom-add-parent"
@@ -713,35 +925,62 @@ export const BOMEditor: React.FC = () => {
                                     {assembly.partNumber} - {assembly.name}
                                 </option>
                             ))}
-                         </select>
-                     </label>
-                     <div className="grid gap-4 md:grid-cols-2">
-                         <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-part-number">
-                             Part Number
-                             <input
-                                id="bom-add-part-number"
-                                value={newBomItem.partNumber}
-                                onChange={(event) => setNewBomItem((value) => ({ ...value, partNumber: event.target.value }))}
-                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-                             />
-                         </label>
+	                         </select>
+	                     </label>
+	                     {addMode === 'library' && (
+	                        <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-library-part">
+	                            Library Part
+	                            <select
+	                                id="bom-add-library-part"
+	                                value={selectedLibraryPart?.id ?? ''}
+	                                onChange={(event) => setNewBomItem((value) => ({ ...value, partId: event.target.value }))}
+	                                className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+	                            >
+	                                {libraryParts.map((part) => (
+	                                    <option key={part.id} value={part.id}>
+	                                        {part.partNumber} - {part.description}
+	                                    </option>
+	                                ))}
+	                            </select>
+	                        </label>
+	                     )}
+	                     {addError && (
+	                        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+	                            {addError}
+	                        </div>
+	                     )}
+	                     <div className="grid gap-4 md:grid-cols-2">
+	                         <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-part-number">
+	                             Part Number
+	                             <input
+	                                id="bom-add-part-number"
+	                                value={newBomItem.partNumber}
+	                                onChange={(event) => setNewBomItem((value) => ({ ...value, partNumber: event.target.value }))}
+	                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+	                                disabled={addMode === 'library'}
+	                                placeholder={addMode === 'library' ? selectedLibraryPart?.partNumber : undefined}
+	                             />
+	                         </label>
                          <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-name">
                              Item Name
                              <input
                                 id="bom-add-name"
-                                value={newBomItem.name}
-                                onChange={(event) => setNewBomItem((value) => ({ ...value, name: event.target.value }))}
-                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-                             />
-                         </label>
+	                                value={newBomItem.name}
+	                                onChange={(event) => setNewBomItem((value) => ({ ...value, name: event.target.value }))}
+	                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+	                                disabled={addMode === 'library'}
+	                                placeholder={addMode === 'library' ? selectedLibraryPart?.description : undefined}
+	                             />
+	                         </label>
                          <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-type">
                              Type
                              <select
                                 id="bom-add-type"
-                                value={newBomItem.type}
-                                onChange={(event) => setNewBomItem((value) => ({ ...value, type: event.target.value as ComponentType }))}
-                                className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
-                             >
+	                                value={newBomItem.type}
+	                                onChange={(event) => setNewBomItem((value) => ({ ...value, type: event.target.value as ComponentType }))}
+	                                className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+	                                disabled={addMode === 'library'}
+	                             >
                                 <option value={ComponentType.Part}>Part</option>
                                 <option value={ComponentType.Assembly}>Assembly</option>
                                 <option value={ComponentType.Material}>Material</option>
@@ -772,10 +1011,12 @@ export const BOMEditor: React.FC = () => {
                              <input
                                 id="bom-add-cost"
                                 type="number"
-                                value={newBomItem.cost}
-                                onChange={(event) => setNewBomItem((value) => ({ ...value, cost: event.target.value }))}
-                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-                             />
+	                                value={newBomItem.cost}
+	                                onChange={(event) => setNewBomItem((value) => ({ ...value, cost: event.target.value }))}
+	                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+	                                disabled={addMode === 'library'}
+	                                placeholder={addMode === 'library' ? String(selectedLibraryPart?.cost ?? 0) : undefined}
+	                             />
                          </label>
                      </div>
                      <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
@@ -788,8 +1029,8 @@ export const BOMEditor: React.FC = () => {
                          </button>
                          <button
                             type="button"
-                            onClick={handleCreateBOMItem}
-                            disabled={!newBomItem.partNumber.trim() || !newBomItem.name.trim()}
+	                            onClick={handleCreateBOMItem}
+	                            disabled={addMode === 'library' ? !selectedLibraryPart : (!newBomItem.partNumber.trim() || !newBomItem.name.trim())}
                             className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                          >
                             Create Item

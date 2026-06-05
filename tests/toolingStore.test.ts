@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { mockDesignMasterParts, mockTooling } from '../data/mockTooling';
 import { useToolingStore } from '../stores/useToolingStore';
+import { coreRepository, toLegacyToolingState } from '../repositories/core/coreRepository';
 
 const multiPartDesignMasterPartId = 'dmp-zp-a-enclosure-cover';
 const actualDatesToolingId = 'tooling-zp-a-cover-injection';
@@ -50,6 +51,10 @@ describe('useToolingStore', () => {
         useToolingStore.getState().updateMilestone(actualDatesToolingId, 'dfm', {
             status: 'blocked',
             actualDate: '2026-01-25',
+            plannedDate: '2026-01-20',
+            owner: 'Tooling Owner',
+            notes: 'DFM blocked in fixture review',
+            blockerReason: 'Supplier DFM package missing',
         });
 
         const tooling = useToolingStore.getState().tooling.find((item) => item.id === actualDatesToolingId);
@@ -60,8 +65,31 @@ describe('useToolingStore', () => {
             key: 'dfm',
             status: 'blocked',
             actualDate: '2026-01-25',
+            plannedDate: '2026-01-20',
+            owner: 'Tooling Owner',
+            notes: 'DFM blocked in fixture review',
+            blockerReason: 'Supplier DFM package missing',
         });
         expect(quotation).toEqual(mockTooling[0]?.milestones[2]);
+    });
+
+    it('persists tooling owner fields through the core repository bridge', () => {
+        useToolingStore.getState().createTooling({
+            id: 'tooling-owner-preserved',
+            projectId: 'project-zphone-2026',
+            designMasterPartId: multiPartDesignMasterPartId,
+            name: 'Owner Preserved Tool',
+            supplier: 'Demo Toolmaker',
+            cavityCount: 2,
+            owner: 'Nina Tooling',
+            milestones: [{ key: 'kickoff', status: 'not-started', owner: 'Nina Tooling' }],
+        });
+
+        useToolingStore.setState(toLegacyToolingState(coreRepository.loadWorkspace()));
+
+        const created = useToolingStore.getState().tooling.find((item) => item.id === 'tooling-owner-preserved');
+        expect(created?.owner).toBe('Nina Tooling');
+        expect(created?.milestones[0].owner).toBe('Nina Tooling');
     });
 
     it('does not create unknown tooling records or unknown milestones', () => {

@@ -64,4 +64,22 @@ describe('useBOMStore', () => {
         expect(state.bomData.children?.[0].id).toBe('new1');
         expect(state.project.totalCost).toBe(10);
     });
+
+    it('should reload a saved BOM snapshot', () => {
+        const root = createNode('root', 0, 1, ComponentType.Assembly);
+        const baselineChild = createNode('baseline-child', 7, 2);
+        const laterChild = createNode('later-child', 5, 1);
+
+        useBOMStore.getState().setBOMData({ ...root, children: [baselineChild] });
+        useBOMStore.getState().createSnapshot('Baseline test snapshot');
+        const snapshotId = useBOMStore.getState().snapshots[0].id;
+
+        useBOMStore.getState().addBOMNode('root', laterChild);
+        expect(useBOMStore.getState().bomData.children?.map((child) => child.id)).toContain('later-child');
+
+        useBOMStore.getState().loadSnapshot(snapshotId);
+
+        expect(useBOMStore.getState().bomData.children?.map((child) => child.id)).toEqual(['baseline-child']);
+        expect(useBOMStore.getState().project.totalCost).toBe(14);
+    });
 });

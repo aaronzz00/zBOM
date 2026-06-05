@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from '../App';
 import { createInMemoryEBOMArchitectureRepository } from '../repositories/ebomArchitectureRepository';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -35,6 +35,22 @@ describe('App phase 1 navigation', () => {
     expect(await screen.findByText('Tooling Hub', { selector: 'div' }, { timeout: 5000 })).toBeInTheDocument();
   });
 
+  it('marks non-core modules as development preview while keeping core modules primary', async () => {
+    render(<App />);
+
+    expect(screen.getByText('Production Core')).toBeInTheDocument();
+    expect(screen.getByText('Development Preview')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Dashboard/i }));
+    expect(await screen.findByText(/Development Preview - not part of the production core test scope/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /BOM Editor/i }));
+    await screen.findByText('BOM Editor');
+    await waitFor(() => {
+      expect(screen.queryByText(/Development Preview - not part of the production core test scope/i)).not.toBeInTheDocument();
+    });
+  });
+
   it('keeps phase 1 BOM-facing modules visible to viewer role', () => {
     useAuthStore.getState().switchRole('VIEWER');
 
@@ -55,6 +71,18 @@ describe('App phase 1 navigation', () => {
     expect(screen.getByRole('button', { name: /EBOM Architecture/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /MBOM Delta/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Tooling Hub/i })).toBeInTheDocument();
+  });
+
+  it('navigates from Tooling Hub concrete parts into filtered Part Library context', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Tooling Hub/i }));
+    await screen.findByText('Tooling Records', {}, { timeout: 5000 });
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Open in Part Library/i })[0]);
+
+    expect(await screen.findByText('Library Filters', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('ZP-A-STD-COVER-BLK')).toBeInTheDocument();
   });
 
   it('keeps the operational shell constrained for narrow viewport layouts', async () => {
