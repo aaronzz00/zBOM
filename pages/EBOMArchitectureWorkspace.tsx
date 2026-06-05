@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { GitBranch, Layers3, Lock, ShieldCheck } from 'lucide-react';
 import { BOMTable } from '../components/BOMTable';
+import { useAuth } from '../context/AuthContext';
 import type { EBOMBase, EBOMEditableField, EBOMItem, InheritanceState } from '../domain/ebomArchitectureTypes';
 import { useEBOMArchitectureStore } from '../stores/useEBOMArchitectureStore';
 import { useProductConfigStore } from '../stores/useProductConfigStore';
-import type { BOMNode } from '../types';
+import { Permission, type BOMNode } from '../types';
 import { getInheritanceChain, resolveEBOMBase } from '../utils/ebomInheritance';
 import { toLegacyBOMNode } from '../utils/legacyBomAdapter';
 
@@ -51,6 +52,7 @@ const toEditValues = (item: EBOMItem | undefined): EditValues => ({
 });
 
 export const EBOMArchitectureWorkspace: React.FC = () => {
+  const { hasPermission } = useAuth();
   const {
     bases,
     items,
@@ -131,7 +133,16 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
   const selectedBase = getSelectedBase();
   const draftOperations = getDraftOperations();
   const dirty = isDirty();
-  const canEditSelectedBase = selectedBase?.status !== 'released';
+  const canEditSelectedBase = Boolean(
+    selectedBase
+    && selectedBase.status !== 'released'
+    && hasPermission(Permission.EDIT_EBOM_ARCHITECTURE),
+  );
+  const editDisabledReason = !hasPermission(Permission.EDIT_EBOM_ARCHITECTURE)
+    ? 'Requires EBOM architecture edit permission'
+    : selectedBase?.status === 'released'
+      ? 'Released EBOM bases cannot be edited'
+      : 'Select an editable EBOM base';
   const draftError = draftInputError ?? error;
 
   const {
@@ -451,6 +462,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                         type="button"
                         aria-label={`Edit ${item.partNumber}`}
                         disabled={!canEditSelectedBase}
+                        title={canEditSelectedBase ? `Edit ${item.partNumber}` : editDisabledReason}
                         onClick={() => setSelectedEditItemId(item.id)}
                         className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
                       >
@@ -476,6 +488,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
               <button
                 type="button"
                 disabled={!canEditSelectedBase}
+                title={canEditSelectedBase ? 'Add Local Item' : editDisabledReason}
                 onClick={() => setShowLocalItemForm((value) => !value)}
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
@@ -544,6 +557,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                   <button
                     type="button"
                     disabled={!canEditSelectedBase}
+                    title={canEditSelectedBase ? 'Apply Override' : editDisabledReason}
                     onClick={() => void handleApplyOverride()}
                     className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
@@ -552,6 +566,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                   <button
                     type="button"
                     disabled={!canEditSelectedBase}
+                    title={canEditSelectedBase ? 'Lock Quantity' : editDisabledReason}
                     onClick={() => void lockField(selectedEditItem.id, 'quantity')}
                     className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
                   >
@@ -560,6 +575,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                   <button
                     type="button"
                     disabled={!canEditSelectedBase}
+                    title={canEditSelectedBase ? 'Unlock Quantity' : editDisabledReason}
                     onClick={() => void unlockField(selectedEditItem.id, 'quantity')}
                     className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
                   >
@@ -568,6 +584,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                   <button
                     type="button"
                     disabled={!canEditSelectedBase}
+                    title={canEditSelectedBase ? 'Revert Item Draft' : editDisabledReason}
                     onClick={() => void revertItemDraft(selectedEditItem.id)}
                     className="rounded-lg border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-300"
                   >
@@ -657,6 +674,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
                   <button
                     type="button"
                     disabled={!canEditSelectedBase}
+                    title={canEditSelectedBase ? 'Create Local Item' : editDisabledReason}
                     onClick={() => void handleCreateLocalItem()}
                     className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
@@ -689,6 +707,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
               <button
                 type="button"
                 disabled={!selectedBase || selectedBase.status === 'released' || draftOperations.length === 0 || status === 'publishing'}
+                title={!selectedBase ? 'Select an EBOM base before publishing' : selectedBase.status === 'released' ? 'Released EBOM bases cannot be published from draft' : draftOperations.length === 0 ? 'No draft operations to publish' : status === 'publishing' ? 'Publishing is already in progress' : 'Publish Change Package'}
                 onClick={() => selectedBase && void publishChangePackage(`${selectedBase.id} draft update`)}
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
@@ -697,6 +716,7 @@ export const EBOMArchitectureWorkspace: React.FC = () => {
               <button
                 type="button"
                 disabled={draftOperations.length === 0}
+                title={draftOperations.length === 0 ? 'No draft operations to reset' : 'Reset Draft'}
                 onClick={() => void resetDraft()}
                 className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
               >

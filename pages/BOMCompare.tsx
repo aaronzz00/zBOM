@@ -1,17 +1,22 @@
 import React, { useMemo, useState } from 'react';
 import { useAppStore } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { compareBOMs, DiffStatus } from '../utils/bomCompare';
 import { ArrowRight, GitCompare, Download, PlusCircle, MinusCircle, AlertCircle, TrendingUp, TrendingDown, ChevronDown, Package } from 'lucide-react';
-import { BOMNode } from '../types';
+import { BOMNode, Permission } from '../types';
+import { FeatureDialog } from '../components/FeatureDialog';
 
 export const BOMCompare: React.FC = () => {
   const { bomData, snapshots } = useAppStore();
+  const { hasPermission } = useAuth();
+  const canViewCommercial = hasPermission(Permission.VIEW_COMMERCIAL_FIELDS) || hasPermission(Permission.VIEW_COST);
   
   // State for selectors
   // Default: Left = Latest Snapshot (or null), Right = Current Working Copy
   const [leftId, setLeftId] = useState<string>(snapshots.length > 0 ? snapshots[0].id : '');
   const [rightId, setRightId] = useState<string>('current');
   const [showUnchanged, setShowUnchanged] = useState(false);
+  const [showExportSummary, setShowExportSummary] = useState(false);
 
   // Helper to get BOM Object from ID
   const getBOMById = (id: string): BOMNode | null => {
@@ -63,6 +68,10 @@ export const BOMCompare: React.FC = () => {
   };
 
   const renderDiffCell = (oldVal: any, newVal: any, type: 'text' | 'number' | 'currency' | 'partnumber') => {
+    if (type === 'currency' && !canViewCommercial) {
+      return <span className="font-semibold text-slate-400">Restricted</span>;
+    }
+
     if (oldVal === undefined && newVal !== undefined) {
         // Added
         const format = (v: any) => type === 'currency' ? `$${v.toFixed(2)}` : v;
@@ -152,7 +161,11 @@ export const BOMCompare: React.FC = () => {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-             <button className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
+             <button
+                type="button"
+                onClick={() => setShowExportSummary(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition-colors"
+             >
                 <Download className="w-4 h-4" />
                 Export Report
              </button>
@@ -294,6 +307,21 @@ export const BOMCompare: React.FC = () => {
           </table>
         </div>
       </div>
+      {showExportSummary && (
+        <FeatureDialog title="Export Report Ready" closeLabel="Close preview" onClose={() => setShowExportSummary(false)}>
+          <p className="font-semibold text-slate-900">Comparison report preview is ready for review.</p>
+          <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex justify-between"><span>Added rows</span><span className="font-bold text-emerald-700">{stats.added}</span></div>
+            <div className="flex justify-between"><span>Removed rows</span><span className="font-bold text-rose-700">{stats.removed}</span></div>
+            <div className="flex justify-between"><span>Changed rows</span><span className="font-bold text-amber-700">{stats.modified}</span></div>
+          </div>
+          {!canViewCommercial && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+              Commercial values are restricted for this role and will be omitted from the export preview.
+            </p>
+          )}
+        </FeatureDialog>
+      )}
     </div>
   );
 };

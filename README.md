@@ -1,249 +1,66 @@
-# zBOM 系统功能介绍
+# zBOM 前端原型
 
-zBOM 是一个面向高复杂度消费电子产品的智能 BOM 管理前端系统原型。当前仓库已经具备完整的单页应用工作台、核心业务模块界面、角色权限演示、BOM 结构编辑、版本对比、料库管理、供应链看板和 ECO 变更流程展示能力，但仍以前端本地状态和模拟数据为主，尚未接入真实后端与持久化服务。
+zBOM 是一个面向复杂消费电子产品的智能 BOM 管理前端原型。当前仓库提供一个可运行、可演示、可测试的 React 单页工作台，用于验证工程、采购、管理员和只读查看者在 BOM、料库、供应链、ECO、SKU 矩阵与 EBOM/MBOM 协同流程中的核心路径。
 
-## 当前系统状况
+当前实现以本地 mock 数据和 Zustand 内存状态为主，尚未接入真实后端、数据库、登录系统或 ERP 写回链路。
 
-当前代码库状态可以概括为“可运行、可演示、可测试的前端原型系统”。
+## 当前状态
 
-| 维度 | 当前状态 |
+| 维度 | 状态 |
 | --- | --- |
-| 运行形态 | React + Vite 单页应用 |
-| 数据来源 | 本地 mock 数据 + Zustand 内存状态 |
-| 权限模型 | 已实现角色切换和字段级权限控制 |
-| 核心 BOM 功能 | 已实现树形、矩阵、平铺采购视图及基础编辑 |
-| 版本管理 | 已实现快照创建与版本差异比对 |
-| AI 能力 | 已接入 Gemini 调用代码，但依赖外部密钥和环境配置 |
-| 后端/API | 仅定义接口，未完成真实联调 |
-| 自动化验证 | 构建通过，Vitest 测试通过 |
+| 运行形态 | React 18 + TypeScript + Vite 单页应用 |
+| 数据来源 | `data/` mock 数据 + Zustand 内存状态 |
+| 权限模型 | 已实现角色、字段级权限、商业字段可见性与关键操作 gating |
+| 角色覆盖 | `ADMIN`、`ENG_LEAD`、`SOURCING`、`VIEWER` |
+| 核心模块 | Dashboard、BOM Editor、Product Matrix、EBOM Architecture、MBOM Delta、Tooling Hub、ECO、Compare、Part Library、Supply Chain、Settings、ERP Setup |
+| 前端测试 | Vitest + Testing Library |
+| 构建优化 | 页面级 lazy loading + vendor chunk 拆分 |
+| 后端/API | 接口抽象存在，真实服务未接入 |
+| AI 能力 | Gemini 调用代码存在，需要 `GEMINI_API_KEY`，当前适合演示/预研 |
 
-### 已验证结果
+## 最近验证状态
 
-- `npm run build` 通过
-- `npx vitest run` 通过，`6` 个测试文件、`16` 个测试用例全部通过
-- 生产构建存在一个前端体积告警：主 bundle 约 `791 kB`，后续可通过代码分割继续优化
+最后一次完整验证日期：2026-06-05
 
-### 当前边界
+- `./node_modules/.bin/vitest run --reporter=verbose`
+  - 18 个测试文件通过
+  - 131 个测试用例通过
+  - Recharts 测试环境宽高警告已消除
+- `pnpm build`
+  - 构建通过
+  - 主入口 chunk 约 21 kB
+  - 无 Vite 500 kB chunk warning
+  - 无 Recharts circular chunk warning
+- 浏览器 use-case smoke 已完成，最终证据位于：
+  - `docs/user-tests/20260604-role-usecase-hardening-final/final-pass-fail-report.md`
+  - `docs/user-tests/20260604-role-usecase-hardening-final/dashboard.png`
+  - `docs/user-tests/20260604-role-usecase-hardening-final/supply-chain.png`
 
-- 系统目前不是完整的企业级交付版本，而是偏“高保真业务原型”
-- 业务数据、供应商、料库、ECO 内容主要来自 `data/` 下的模拟数据
-- `services/ApiInterface.ts` 仍处于接口抽象/占位阶段，未形成真实 API 通路
-- AI 分析能力依赖外部 Gemini 服务，当前仅适合演示，不适合作为稳定生产能力说明
-- 侧边栏中的 `ERP Connect` 属于预留入口，当前未实现实际功能页
-
-## 系统功能总览
-
-### 1. Dashboard 总览看板
-
-系统首页提供项目级运行视图，聚合展示：
-
-- BOM 总成本
-- 最长交期
-- 风险料件数量
-- 发布就绪度
-- 成本 Pareto 图
-- 组件分布图
-- 最近工程变更记录
-
-成本卡片与成本图表受权限控制，未授权角色只能看到受限状态，不会暴露敏感商业数据。
-
-### 2. BOM Editor 主编辑工作区
-
-这是系统的核心模块，围绕单个项目 BOM 进行结构化维护与分析。
-
-已实现能力包括：
-
-- `EBOM / MBOM` 双视图切换
-- `Tree / Matrix / Flat` 三种查看模式
-- 树形 BOM 虚拟滚动展示
-- 节点选中后的属性侧栏
-- 自定义属性定义与写入
-- 附件上传与删除
-- CSV 导入
-- CSV 导出
-- 快照创建
-- “Where Used” 查询入口
-- 列显示开关，并通过本地存储保留用户偏好
-
-其中三种视图分别承担不同角色：
-
-- `Tree View`：适合工程结构维护和层级浏览
-- `Matrix View`：适合做变体覆盖关系确认
-- `Flat View`：适合采购侧进行总量、MOQ、SPQ、采购花费和超采成本分析
-
-### 3. BOM 公式与汇总引擎
-
-系统在状态层内置 `FormulaEngine`，用于支持 BOM 的基础滚算逻辑：
-
-- 自底向上回卷装配件成本
-- 自底向上回卷装配件重量
-- 项目总成本计算
-- 项目总重量计算
-- Where Used 父项查找
-
-这意味着当前原型已经不只是静态表格，而是具备真实业务规则的前端计算能力。
-
-### 4. Compare Revisions 版本比对
-
-系统支持将当前工作副本与历史快照进行差异分析，识别：
-
-- 新增件
-- 删除件
-- 修改件
-- 疑似替代件
-
-差异比对覆盖以下字段：
-
-- 料号
-- 版本号
-- 数量
-- 单价
-
-比对结果提供统计汇总，并支持“显示未变更项”切换，适合工程、采购或 NPI 团队进行版本审查。
-
-### 5. Part Library 料库管理
-
-料库模块用于展示和维护标准件/采购件主数据。
-
-已实现能力：
-
-- 关键词检索
-- 按类别筛选
-- 按库存区域筛选
-- 列表/网格视图切换
-- 料件详情侧板编辑
-- 价格阶梯维护
-- 当前 BOM 中的引用位置分析
-
-料库信息覆盖工程和采购关心的核心字段，例如：
-
-- Part Number
-- MPN
-- Manufacturer
-- Lifecycle
-- 库存数量
-- 最低库存
-- 所属供应商
-- MOQ / SPQ / Pricing Tiers
-
-### 6. Supply Chain Intelligence 供应链情报
-
-供应链模块聚焦 AVL 与供应商风险概览，已实现：
-
-- 平均风险分数
-- 高风险供应商数
-- 平均交期
-- 单一来源件统计
-- 风险分布图
-- 区域采购分布图
-- 供应商列表与状态筛选
-- 供应商展开明细视图
-
-同时界面中加入了 AI 风险提示卡，用于演示系统如何把外部市场/地缘信息映射成备货建议。
-
-### 7. ECO Manager 工程变更管理
-
-系统提供基础的工程变更单管理界面，支持：
-
-- ECO 列表浏览
-- ECO 详情查看
-- 影响料件清单展示
-- 审批流程历史展示
-- 审批/驳回动作演示
-
-当前实现仍基于前端 mock 数据，但已经具备标准 ECO 工作流界面的基本形态。
-
-### 8. AI Assistant 智能分析助手
-
-在 BOM 编辑页中，系统提供与选中节点相关的 AI 面板，支持三类分析入口：
-
-- 成本优化建议
-- 供应风险识别
-- 替代料建议
-
-同时支持对当前节点上下文进行问答式交互。AI 服务实现位于 `services/gemini.ts`，当前更适合作为能力预研与交互演示。
-
-## 角色与权限模型
-
-系统内置四种演示角色：
-
-- `ADMIN`
-- `ENG_LEAD`
-- `SOURCING`
-- `VIEWER`
-
-权限控制范围包括：
-
-- 页面可见性
-- 成本字段可见性
-- BOM 结构编辑权限
-- 元数据编辑权限
-- 价格编辑权限
-- ECO 创建与审批权限
-- 供应链与 AVL 管理权限
-
-这部分逻辑由 `stores/useAuthStore.ts` 实现，侧边栏提供角色切换器用于演示不同职责用户看到的系统差异。
-
-## 技术架构
-
-### 前端技术栈
-
-- `React 18`
-- `TypeScript`
-- `Vite`
-- `Zustand`
-- `Zod`
-- `Recharts`
-- `lucide-react`
-
-### 状态与数据层
-
-- `stores/useBOMStore.ts`
-  - 系统主业务状态中心
-  - 管理项目、BOM、料库、供应商、快照、自定义属性、附件
-- `stores/useAuthStore.ts`
-  - 管理当前用户角色与权限
-- `stores/useViewStore.ts`
-  - 管理列表列显示偏好，并持久化到本地存储
-
-### 兼容层
-
-`context/AppContext.tsx` 与 `context/AuthContext.tsx` 当前只是对 Zustand store 的兼容封装，说明系统已经从传统 React Context 逐步迁移到 Zustand。
-
-### 服务层
-
-- `services/FormulaEngine.ts`：BOM 成本/重量回卷与 Where Used 计算
-- `services/gemini.ts`：Gemini AI 对话与分析能力
-- `services/ApiInterface.ts`：后端接口抽象，当前仍为占位/过渡实现
-
-## 目录说明
-
-```text
-.
-├── App.tsx                 # 应用主入口与页面切换
-├── pages/                  # 业务页面
-├── components/             # 复用组件
-├── stores/                 # Zustand 状态管理
-├── services/               # 业务服务与接口抽象
-├── data/                   # 模拟业务数据
-├── utils/                  # CSV、BOM flatten、版本比对等工具
-├── tests/                  # 单元测试与组件测试
-├── schemas.ts              # Zod 数据校验
-└── types.ts                # 系统核心类型定义
-```
+详细测试指引见 [docs/testing-guide.md](docs/testing-guide.md)。
 
 ## 本地运行
 
 ### 环境要求
 
 - Node.js
-- npm
+- npm 或 pnpm
 
-### 启动方式
+### 安装依赖
 
 ```bash
 npm install
+```
+
+### 启动开发服务器
+
+```bash
 npm run dev
+```
+
+默认 Vite 端口为 `3000`，本地访问：
+
+```text
+http://localhost:3000/
 ```
 
 ### 构建
@@ -252,31 +69,148 @@ npm run dev
 npm run build
 ```
 
-### 测试
+### 自动化测试
 
-仓库当前没有在 `package.json` 中预置 `test` script，建议直接使用：
+仓库当前未在 `package.json` 中定义 `test` script，请直接运行 Vitest：
 
 ```bash
-npx vitest run
+./node_modules/.bin/vitest run --reporter=verbose
 ```
+
+常用聚焦回归：
+
+```bash
+./node_modules/.bin/vitest run tests/RoleUseCases.test.tsx tests/AppNavigation.test.tsx tests/BOMTable.test.tsx --reporter=verbose
+```
+
+## 环境变量
+
+默认情况下，系统以生产式角色测试状态运行：隐藏 demo 角色切换器和 QA 标注浮层。
+
+| 变量 | 用途 |
+| --- | --- |
+| `VITE_ENABLE_DEMO_ROLE_SWITCHER=true` | 在侧边栏显示角色切换器，用于人工 walkthrough |
+| `VITE_ENABLE_FEEDBACK_OVERLAY=true` | 显示 QA/UI 标注浮层 |
+| `GEMINI_API_KEY=...` | 启用 Gemini AI 分析调用 |
+
+示例：
+
+```bash
+VITE_ENABLE_DEMO_ROLE_SWITCHER=true npm run dev
+```
+
+## 业务模块
+
+### Dashboard
+
+项目级运行视图，展示 BOM 成本、最长交期、风险料件、发布就绪度、组件分布、成本 Pareto 和近期 ECO 活动。成本类内容受商业字段权限控制，Viewer 不会看到受保护成本。
+
+### BOM Editor
+
+核心 BOM 工作区，支持：
+
+- `EBOM / MBOM` 视图切换
+- `Tree / Matrix / Flat` 三种查看模式
+- 虚拟滚动 BOM 表格
+- BOM 节点属性侧栏
+- 自定义属性维护
+- 附件添加与移除
+- CSV 导入/导出
+- 快照创建
+- Where Used 查询
+- 管理员本地 Add Item 表单
+
+Flat 视图面向采购审查，展示 MOQ、SPQ、采购数量、采购花费和超采成本等指标。
+
+### Product Matrix
+
+SKU 矩阵与产品配置中心，支持项目/系列/SKU 选择、候选 SKU 激活、冻结、抑制以及工作流上下文选择。生命周期类操作需要 `MANAGE_SKU_LIFECYCLE` 权限，Viewer 只能只读查看。
+
+### EBOM Architecture
+
+面向平台、系列和 PRO 结构的 EBOM 继承工作区，支持查看继承链、局部覆盖、锁定/解锁字段、添加本地子项、发布/重置 draft。修改类操作需要 `EDIT_EBOM_ARCHITECTURE` 权限，Viewer 只能只读查看。
+
+### MBOM Delta
+
+展示 SKU-first 的 MBOM delta，覆盖新增、删除、替换、数量变更、制造项和包装项，便于验证 EBOM 到 MBOM 的试制/量产差异。
+
+### Tooling Hub
+
+以设计主件为中心展示 tooling 记录、里程碑、Kickoff 到 T1 的 lead time，以及一对多 concrete part 映射。
+
+### Compare Revisions
+
+对当前 BOM 与历史快照做差异分析，识别新增、删除、修改和替代关系。Export Report 当前提供确定性的前端报告预览；Viewer 视角会屏蔽受保护成本。
+
+### Part Library
+
+料库模块支持搜索、分类筛选、列表/网格切换、详情侧栏编辑、价格阶梯维护和 BOM 引用位置查看。工程字段和商业字段分开授权，Sourcing 可以维护成本、交期、供应商、MOQ、SPQ、pricing tiers 等商业字段。
+
+### Supply Chain
+
+供应链模块展示供应商风险、区域分布、平均交期、高风险供应商和单一来源件等指标。搜索已支持供应商名称、国家、区域、类别和状态文本；风险报告和供应商审计按钮提供确定性前端预览。AI 风险提示以 `Simulated insight` 标识，避免误导为实时新闻。
+
+### ECO Manager
+
+工程变更模块提供 ECO 列表、详情、影响料件、审批历史和确定性的 draft 创建动作。当前仍是前端本地 mock 行为。
+
+### Settings 和 ERP Connect
+
+这两个入口现在路由到确定性的 setup/checklist 页面，用于前端测试和流程澄清，不代表真实配置或 ERP 集成已经落地。
+
+## 角色与权限
+
+当前角色矩阵的测试标准：
+
+- `ADMIN`：拥有全部前端权限，可执行本地创建、报告预览和管理类路径。
+- `ENG_LEAD`：可进行工程技术审查、BOM/EBOM 编辑、ECO 创建和 SKU 生命周期管理，不默认拥有商业字段维护权限。
+- `SOURCING`：可查看供应链与商业字段，并维护采购/商业字段；不能编辑工程元数据。
+- `VIEWER`：可导航到只读业务视图，不能看到受保护成本，不能触发 Product Matrix、EBOM Architecture 或 BOM mutation 类操作。
+
+权限定义位于 `types.ts`，角色矩阵位于 `stores/useAuthStore.ts`。
+
+## 技术结构
+
+```text
+.
+├── App.tsx                 # 应用入口、页面路由和 lazy loading
+├── pages/                  # 业务页面
+├── components/             # 复用组件
+├── stores/                 # Zustand 状态管理
+├── repositories/           # 前端内存 repository 抽象
+├── services/               # 业务服务与外部接口占位
+├── data/                   # mock 业务数据
+├── domain/                 # EBOM/MBOM 等领域逻辑
+├── utils/                  # CSV、BOM flatten、版本比对等工具
+├── tests/                  # 单元、组件和角色 use-case 回归测试
+├── docs/                   # 测试证据、计划和交付说明
+├── schemas.ts              # Zod 数据校验
+└── types.ts                # 核心类型与权限定义
+```
+
+## 测试与证据入口
+
+- 当前测试指引：[docs/testing-guide.md](docs/testing-guide.md)
+- 第二轮前端 use-case 标准与原始结果：`docs/user-tests/20260604-frontend-usecase-round2/round2-usecase-frontend-check.md`
+- role/use-case hardening wave 计划：`docs/superpowers/plans/2026-06-04-zbom-role-usecase-hardening-subagent-plan.md`
+- 最终 pass/fail 报告：`docs/user-tests/20260604-role-usecase-hardening-final/final-pass-fail-report.md`
+
+## 当前边界
+
+- 这是高保真前端原型，不是生产可交付系统。
+- 数据不会持久化到后端或数据库，刷新后会回到 mock 初始状态。
+- Settings、ERP Connect、Risk Report、Supplier Audit、Compare Export 等路径提供确定性前端预览或 checklist，不代表真实外部系统联通。
+- AI 能力依赖外部 Gemini API key，缺少 key 时应视为演示能力不可用。
+- 权限控制仅为前端行为 hardening，不等同于后端授权或安全边界。
 
 ## 后续演进建议
 
-如果将该系统继续推进到可交付版本，优先级建议如下：
-
-1. 接通真实后端与数据库，替换 `mock` 数据源
-2. 完成 `ApiInterface` 落地，并将页面读写迁移为异步数据流
-3. 规范化 AI 配置方式，改为适配 Vite 的环境变量注入机制
-4. 增加登录、项目切换、保存、审计追踪和错误处理链路
-5. 对大体积 bundle 做代码分割和按页加载优化
+1. 接入真实认证、后端 API、数据库和审计日志。
+2. 将 Zustand mock 写入迁移为可恢复的异步数据流。
+3. 为 ERP、供应商审计、报告导出和 ECO 审批接入真实服务。
+4. 建立端到端浏览器测试，覆盖角色登录、真实 viewport 和跨页面流程。
+5. 补充后端级权限校验，确保前端权限和服务端授权一致。
 
 ## 结论
 
-当前 zBOM 已具备一个智能 BOM 管理系统原型应有的核心交互骨架和业务表达能力，尤其适合用于：
-
-- 产品方案演示
-- NPI / 工程 / 采购流程协同验证
-- BOM 管理平台需求澄清
-- 后续企业级系统实施前的交互验证与架构打样
-
-如果以“生产可交付系统”标准衡量，当前仓库还处于前端原型向真实业务系统过渡的阶段。
+当前 zBOM 适合用于产品方案演示、NPI/工程/采购协同流程验证、BOM 平台需求澄清和企业系统实施前的交互打样。如果以生产系统衡量，下一阶段重点应放在真实数据、权限后端化、持久化和外部系统集成。

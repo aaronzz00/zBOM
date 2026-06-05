@@ -44,6 +44,32 @@ export const ECOManager: React.FC = () => {
   const canApprove = hasPermission(Permission.APPROVE_CHANGE);
   const canCreate = hasPermission(Permission.CREATE_ECO);
 
+  const handleCreateDraft = () => {
+    const nextIndex = ecos.length + 1;
+    const draftEco: ECO = {
+      id: `eco-draft-${nextIndex}`,
+      ecoNumber: `ECO-2024-DRAFT-${String(nextIndex).padStart(3, '0')}`,
+      title: 'Draft BOM update request',
+      description: 'Draft change order created from current BOM context.',
+      status: 'Draft',
+      initiator: 'Alex Admin',
+      createdDate: '2026-06-04',
+      priority: 'Medium',
+      impacts: [
+        {
+          partNumber: '800-00234-A',
+          name: 'Top Level Assembly, zPhone Pro',
+          changeType: 'RevUp',
+          from: 'A.02',
+          to: 'Draft',
+        },
+      ],
+    };
+
+    setEcos((current) => [draftEco, ...current]);
+    setSelectedEco(draftEco);
+  };
+
   const handleStatusChange = (ecoId: string, newStatus: ECO['status']) => {
     setEcos(prev => prev.map(e => e.id === ecoId ? { ...e, status: newStatus } : e));
     if (selectedEco && selectedEco.id === ecoId) {
@@ -71,7 +97,12 @@ export const ECOManager: React.FC = () => {
                 Change Orders
             </h2>
             {canCreate && (
-                <button className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                <button
+                  type="button"
+                  aria-label="Create change order"
+                  onClick={handleCreateDraft}
+                  className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
                     <Plus className="w-4 h-4" />
                 </button>
             )}

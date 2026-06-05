@@ -22,6 +22,23 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       }
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/recharts')) {
+              return 'vendor-recharts';
+            }
+            if (id.includes('node_modules/@tanstack/react-virtual')) {
+              return 'vendor-virtual';
+            }
+            if (id.includes('node_modules')) {
+              return 'vendor';
+            }
+          },
+        },
+      },
     }
   };
 });

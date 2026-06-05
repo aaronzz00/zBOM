@@ -15,6 +15,7 @@ const costData = [
 ];
 
 const COLORS = ['#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#94a3b8'];
+const CHART_INITIAL_DIMENSION = { width: 640, height: 256 };
 
 export const Dashboard: React.FC = () => {
   const { project } = useAppStore();
@@ -23,7 +24,7 @@ export const Dashboard: React.FC = () => {
   const canViewCost = hasPermission(Permission.VIEW_COST);
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 bg-slate-50/50">
+    <div className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 xl:p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800 mb-2">Dashboard</h1>
         <p className="text-slate-500">Overview for project <span className="font-mono font-medium text-slate-700">{project.code}</span></p>
@@ -89,13 +90,13 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid min-w-0 grid-cols-1 gap-6 mb-8 lg:grid-cols-2">
         {/* Cost Chart - Protected */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center relative">
+        <div className="min-w-0 bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center relative">
           <h3 className="text-lg font-bold text-slate-800 mb-6">Cost Breakdown (Pareto)</h3>
           {canViewCost ? (
-            <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
+            <div className="h-64 min-w-0">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_DIMENSION}>
                 <BarChart data={costData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                     <XAxis type="number" stroke="#94a3b8" fontSize={12} tickFormatter={(value) => `$${value}`} />
@@ -116,10 +117,10 @@ export const Dashboard: React.FC = () => {
           )}
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="min-w-0 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-bold text-slate-800 mb-6">Component Distribution</h3>
-            <div className="h-64 flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
+            <div className="h-64 min-w-0 flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_DIMENSION}>
                     <PieChart>
                         <Pie
                             data={costData}

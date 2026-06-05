@@ -1,0 +1,2024 @@
+[
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubChange OrdersCompare RevisionsPart LibrarySupply ChainERP ConnectSimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Alex AdminActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACDashboardOverview for project ZPM-14Total BOM Cost$142.50 2.4% vs prev revLongest Lead Time12 WeeksPart: OLED DisplayRisk Items3Single source componentsRelease Readiness85%12 parts in 'Draft' stateCost Breakdown (Pareto)$0$15$30$45$60DisplaySoCMemoryHousingBatteryOthersComponent DistributionRecent Engineering Changes (ECOs)ECO #DescriptionInitiatorDateStatusECO-2024-112Replace M1.2 screws with M1.4 for durabilityJ. DoeOct 12, 2024ApprovedECO-2024-115Update FW Bootloader version to 1.2.0M. SmithOct 14, 2024Pending开启 UI 标注模式 Display",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Change Orders",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Supply Chain",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "ERP Connect",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": true,
+    "enabledEbomEditButtons": [],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": false,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-A1 Admin dashboard review",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Change Orders",
+      "Compare Revisions",
+      "Part Library",
+      "Supply Chain",
+      "ERP Connect"
+    ],
+    "restrictedVisible": false,
+    "role": "Admin (Superuser)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubChange OrdersCompare RevisionsPart LibrarySupply ChainERP ConnectSimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Alex AdminActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACBOM EditorA.02EBOMMBOMTreeMatrixFlatAIAddVirtual Tree View (11 items)Collapse AllColumnsimageUrlnamerefDesstatequantityweightGmaterialfinishtorquecompliancetargetCostcostPart NumberImgDescriptionRefDesStateQtyWgt(g)MaterialFinishTorque SpecComplianceTargetActual800-00234-ATop Level Assembly, zPhone Pro Prototype1-----$135.00$0.00-135.00700-00112-BPackaging Assy, Retail Draft1120CardboardMatte--$5.00$4.50-0.50600-99821-ABox, Rigid, Magnetic Closure Released185GreyboardSoft Touch---$2.20600-99822-USInsert, Molded Pulp (US Type) Released135-----$0.85700-01000-CMain Device Assembly In Review1-----$120.00$0.00-120.00400-00551-ADisplay Module, OLED 6.7\" Released145-----$45.00300-11200-BBattery Pack, 4500mAh Released169---UN38.3-$12.50200-88123-DPCBA, Main Logic Board Prototype1-----$60.00$65.00+5.00100-55512-ASoC, Snapdragon 8 Gen 3U100 Released11-----$35.00R-0402-10K-1Resistor, 10k, 5%, 0402R12, R14, R55, R89, R90 Released50-----$0.00500-22101-AScrew, M1.2x3, Torx Released141Stainless Steel-0.15 Nm--$0.01开启 UI 标注模式 Display",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Change Orders",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Supply Chain",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "ERP Connect",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tree",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Flat",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "AI",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Add",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Collapse All",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Columns",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": true,
+    "enabledEbomEditButtons": [],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": false,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-A2 Admin BOM workspace entry",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Change Orders",
+      "Compare Revisions",
+      "Part Library",
+      "Supply Chain",
+      "ERP Connect"
+    ],
+    "restrictedVisible": false,
+    "role": "Admin (Superuser)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubChange OrdersCompare RevisionsPart LibrarySupply ChainERP ConnectSimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Alex AdminActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACBOM EditorA.02EBOMMBOMTreeMatrixFlatAIAddVirtual Tree View (11 items)Collapse AllColumnsimageUrlnamerefDesstatequantityweightGmaterialfinishtorquecompliancetargetCostcostPart NumberImgDescriptionRefDesStateQtyWgt(g)MaterialFinishTorque SpecComplianceTargetActual800-00234-ATop Level Assembly, zPhone Pro Prototype1-----$135.00$0.00-135.00700-00112-BPackaging Assy, Retail Draft1120CardboardMatte--$5.00$4.50-0.50600-99821-ABox, Rigid, Magnetic Closure Released185GreyboardSoft Touch---$2.20600-99822-USInsert, Molded Pulp (US Type) Released135-----$0.85700-01000-CMain Device Assembly In Review1-----$120.00$0.00-120.00400-00551-ADisplay Module, OLED 6.7\" Released145-----$45.00300-11200-BBattery Pack, 4500mAh Released169---UN38.3-$12.50200-88123-DPCBA, Main Logic Board Prototype1-----$60.00$65.00+5.00100-55512-ASoC, Snapdragon 8 Gen 3U100 Released11-----$35.00R-0402-10K-1Resistor, 10k, 5%, 0402R12, R14, R55, R89, R90 Released50-----$0.00500-22101-AScrew, M1.2x3, Torx Released141Stainless Steel-0.15 Nm--$0.01Add Item (Simulated)Use existing logic to add items to tree...开启 UI 标注模式 Display",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Change Orders",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Supply Chain",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "ERP Connect",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tree",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Flat",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "AI",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Add",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Collapse All",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Columns",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": true,
+    "enabledEbomEditButtons": [],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": false,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-A3 Admin add item modal",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Change Orders",
+      "Compare Revisions",
+      "Part Library",
+      "Supply Chain",
+      "ERP Connect"
+    ],
+    "restrictedVisible": false,
+    "role": "Admin (Superuser)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubChange OrdersCompare RevisionsPart LibrarySimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Sarah EngineerActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACChange OrdersECO-2024-112ApprovedReplace M1.2 screws with M1.4Alex Chen•2024-10-12ECO-2024-115Pending ApprovalUpdate FW BootloaderMike Smith•2024-10-14ECO-2024-115Pending ApprovalUpdate FW BootloaderReason for ChangeSecurity patch for bootloader. Required for PVT builds.Impact AnalysisPart NumberDescriptionActionRevision ChangeSW-10001Firmware, BootloaderRevUpv1.2v1.3Workflow HistoryChange Request Created2024-10-14 by Mike Smith开启 UI 标注模式 Display",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Change Orders",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": false,
+    "enabledEbomEditButtons": [],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": false,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-E1 Engineer pending ECO review",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Change Orders",
+      "Compare Revisions",
+      "Part Library"
+    ],
+    "restrictedVisible": false,
+    "role": "Engineer (Tech Only)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubChange OrdersCompare RevisionsPart LibrarySimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Sarah EngineerActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACEBOM Architecture WorkspaceInheritance-first EBOM ReviewInspect platform, series, and structure bases without editing the legacy BOM tree.EBOM Baseebom-platform-zp26ebom-series-zp-aebom-structure-zp-a-stdebom-structure-zp-a-proProjectZP26 · zPhone 2026 PlatformSeriesZP-AStructureStandard Structure · STDSKUZP-A-STD-BLK-US-RTL · activeEBOM Baseebom-structure-zp-a-stdScopestructureRevisionA.01StatusdraftResolved Items5Draft StatusCleanInheritance ChainLevel 1 · platformebom-platform-zp26Rev A.00releasedLevel 2 · seriesebom-series-zp-aRev A.01reviewLevel 3 · structureebom-structure-zp-a-stdRev A.01draftResolved EBOM ItemsItems are resolved through inheritance and shown read-only with their architecture state.Part NumberNameQtyRevisionStateSourceActionsZP-A-STD-0000zPhone A Standard Structure Assembly1 EAAoverriddenebom-series-zp-aEditZP26-4100Display Module, Common OLED1 EAAinheritedebom-series-zp-aEditZP26-3200Battery Pack, 4500mAh2 EAAlockedebom-series-zp-aEditPKG-LABEL-BASE-001Packaging Label, Base Retail1 EAAlocalLocal baseEditSCR-M1.4-BLK-002Chassis Screw, M1.4 Black4 EAAlocalLocal baseEditEBOM Draft EditorEdit the selected resolved item or add local child items to the current base.Add Local ItemPart NumberNameQuantityUnitRevisionDesign Master PartApply OverrideLock QuantityUnlock QuantityRevert Item DraftChange PackageCleanPublish Change PackageReset DraftLegacy BOM PreviewRead-only projection through the legacy BOM table. This does not write back to EBOM architecture state.Virtual Tree View (5 items)Collapse AllPart NumberImgDescriptionRefDesStateQtyWgt(g)MaterialFinishTorque SpecComplianceTargetActualZP-A-STD-0000zPhone A Standard Structure Assembly Draft1-----ZP26-4100Display Module, Common OLED Draft1-----ZP26-3200Battery Pack, 4500mAh Draft2-----PKG-LABEL-BASE-001Packaging Label, Base Retail Draft1-----SCR-M1.4-BLK-002Chassis Screw, M1.4 Black Draft4-----开启 UI 标注模式 Display",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Change Orders",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "Edit ZP-A-STD-0000",
+        "disabled": false,
+        "text": "Edit",
+        "title": ""
+      },
+      {
+        "aria": "Edit ZP26-4100",
+        "disabled": false,
+        "text": "Edit",
+        "title": ""
+      },
+      {
+        "aria": "Edit ZP26-3200",
+        "disabled": false,
+        "text": "Edit",
+        "title": ""
+      },
+      {
+        "aria": "Edit PKG-LABEL-BASE-001",
+        "disabled": false,
+        "text": "Edit",
+        "title": ""
+      },
+      {
+        "aria": "Edit SCR-M1.4-BLK-002",
+        "disabled": false,
+        "text": "Edit",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Add Local Item",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Apply Override",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Lock Quantity",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Unlock Quantity",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Revert Item Draft",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Publish Change Package",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Reset Draft",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Collapse All",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": false,
+    "enabledEbomEditButtons": [
+      "Edit ZP-A-STD-0000",
+      "Edit ZP26-4100",
+      "Edit ZP26-3200",
+      "Edit PKG-LABEL-BASE-001",
+      "Edit SCR-M1.4-BLK-002",
+      "Add Local Item",
+      "Apply Override"
+    ],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": false,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-E2 Engineer EBOM draft edit entry",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Change Orders",
+      "Compare Revisions",
+      "Part Library"
+    ],
+    "restrictedVisible": false,
+    "role": "Engineer (Tech Only)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubCompare RevisionsPart LibrarySupply ChainERP ConnectSimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Mike ProcurementActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACSupply Chain IntelligenceMonitoring 10 active suppliers across 3 regionsRisk ReportSupplier AuditAI Detected Potential DisruptionBased on recent news, there is a potential logistics delay in the South China Sea region affecting shipments from Shenzhen FastPCB. Recommend increasing buffer stock for PCB assemblies by 2 weeks.Avg Risk Score29.5Out of 100 (Lower is better)High Risk Entities1Requires immediate attentionAvg Lead Time8.6 wks Improved 1.2 wksSingle Source14 parts5 SuppliersSupplier Risk DistributionLow Risk5Medium Risk2High Risk1Sourcing by RegionAPACNAMEMEAApproved Vendor List (AVL)All StatusApprovedWatchlistHigh Risk OnlySupplier NameRegionCategoryRisk ScoreLead TimeActive PartsStatusQualcommUSA(NAM)SemiconductorsLow (12)16 wks2ApprovedSamsung DisplaySouth Korea(APAC)DisplayLow (25)12 wks0ApprovedMurata MfgJapan(APAC)PassivesLow (5)8 wks2ApprovedFoxconnTaiwan(APAC)MechanicalMed (35)6 wks1ApprovedShenzhen FastPCBChina(APAC)PCBHigh (78)5 wks0WatchlistMicron TechnologyUSA(NAM)MemoryLow (15)10 wks1ApprovedSTMicroelectronicsSwitzerland(EMEA)SemiconductorsLow (22)14 wks0ApprovedLocal Metals IncVietnam(APAC)MechanicalMed (65)4 wks0ProbationYageoTaiwan(APAC)PassivesLow (10)6 wks1ApprovedLuxshareChina(APAC)ElectromechanicalLow (28)5 wks1Approved开启 UI 标注模式 APAC",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Supply Chain",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "ERP Connect",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Risk Report",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Supplier Audit",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": false,
+    "enabledEbomEditButtons": [],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": false,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-S1 Sourcing supplier search no-match",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Compare Revisions",
+      "Part Library",
+      "Supply Chain",
+      "ERP Connect"
+    ],
+    "restrictedVisible": false,
+    "role": "Sourcing (Comm Only)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubCompare RevisionsPart LibrarySupply ChainERP ConnectSimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Mike ProcurementActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACLibrary FiltersCategoriesAll9SemiconductorsPassivesMechanicalElectromechanicalSoftwareInventory LocationsWH-A ZoneWH-B ZoneWH-C ZonePart NumberMPNDescriptionSupplierCategoryCostInventoryStateR-0402-10K-1RC0402JR-0710KLResistor 10k, 5%, 0402YageoYageoPassives$0.00250,000/ 10000WH-B-12ReleasedEdit PartR-0402-10K-1DetailsWhere Used 1General InfoDescriptionResistor, 10k, 5%, 0402CategorySemiconductorsPassivesMechanicalElectromechanicalSoftwareStateDraftIn ReviewReleasedObsoletePrototypePhysical AttributesWeightgCommercial & SupplyUnit Cost ($)Lead Time (Wks)Supplier-- Select Supplier --Qualcomm (USA)Samsung Display (South Korea)Murata Mfg (Japan)Foxconn (Taiwan)Shenzhen FastPCB (China)Micron Technology (USA)STMicroelectronics (Switzerland)Local Metals Inc (Vietnam)Yageo (Taiwan)Luxshare (China)MOQSPQ Tiered Pricing+ Add TierQty ≥@ $InventoryCurrent StockMin. StockYou do not have permission to edit part metadata.开启 UI 标注模式 APAC",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Supply Chain",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "ERP Connect",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "All9",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Semiconductors",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Passives",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Mechanical",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Electromechanical",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Software",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Details",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Where Used 1",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "+ Add Tier",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": true,
+    "enabledEbomEditButtons": [],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": true,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-S2 Sourcing part commercial edit attempt",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Compare Revisions",
+      "Part Library",
+      "Supply Chain",
+      "ERP Connect"
+    ],
+    "restrictedVisible": true,
+    "role": "Sourcing (Comm Only)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubCompare RevisionsPart LibrarySupply ChainERP ConnectSimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Mike ProcurementActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACBOM EditorA.02EBOMMBOMTreeMatrixFlatAIAddStandard Cost$165.29Procurement Spend (w/ MOQ)$7888.10Excess Inventory$7712.80Part NumberMOQ/SPQRequiredBuy QtyUnit PriceSpendExcess $200-88123-DPCBA, Main Logic Board1/111$65.000$65.00-400-00551-ADisplay Module, OLED 6.7\"100/11100$55.000$5500.00$5445.00100-55512-ASoC, Snapdragon 8 Gen 31/111$35.000$35.00-300-11200-BBattery Pack, 4500mAh1/111$12.500$12.50-700-00112-BPackaging Assy, Retail1/111$4.500$4.50-600-99821-ABox, Rigid, Magnetic Closure1000/5011000$2.200$2200.00$2197.80600-99822-USInsert, Molded Pulp (US Type)1/111$0.850$0.85-500-22101-AScrew, M1.2x3, Torx5000/1000145000$0.010$50.00$49.86M-SOLDER-05Solder Paste, SAC3051/10.51$0.150$0.15$0.07M-TAPE-001Seal Tape, Tamper Evident1/10.21$0.100$0.10$0.08R-0402-10K-1Resistor, 10k, 5%, 040210000/5000510000$0.002$20.00$19.99700-01000-CMain Device Assembly1/111$0.000$0.00-开启 UI 标注模式 APAC",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Supply Chain",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "ERP Connect",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tree",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Flat",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "AI",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Add",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": true,
+    "enabledEbomEditButtons": [],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": false,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-S3 Sourcing BOM flat procurement view",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Compare Revisions",
+      "Part Library",
+      "Supply Chain",
+      "ERP Connect"
+    ],
+    "restrictedVisible": false,
+    "role": "Sourcing (Comm Only)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubChange OrdersCompare RevisionsPart LibrarySimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Guest ViewerActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACDashboardOverview for project ZPM-14Total BOM CostRestrictedLongest Lead Time12 WeeksPart: OLED DisplayRisk Items3Single source componentsRelease Readiness85%12 parts in 'Draft' stateCost Breakdown (Pareto)You do not have permission to view cost analytics.Component DistributionRecent Engineering Changes (ECOs)ECO #DescriptionInitiatorDateStatusECO-2024-112Replace M1.2 screws with M1.4 for durabilityJ. DoeOct 12, 2024ApprovedECO-2024-115Update FW Bootloader version to 1.2.0M. SmithOct 14, 2024Pending开启 UI 标注模式 APAC",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Change Orders",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": false,
+    "enabledEbomEditButtons": [],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": true,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-V1 Viewer dashboard read-only",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Change Orders",
+      "Compare Revisions",
+      "Part Library"
+    ],
+    "restrictedVisible": true,
+    "role": "Viewer (Read Only)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubChange OrdersCompare RevisionsPart LibrarySimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Guest ViewerActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACBOM EditorA.02EBOMMBOMTreeMatrixFlatAIAddVirtual Tree View (11 items)Collapse AllColumnsimageUrlnamerefDesstatequantityweightGmaterialfinishtorquecompliancetargetCostcostPart NumberImgDescriptionRefDesStateQtyWgt(g)MaterialFinishTorque SpecComplianceTargetActual800-00234-ATop Level Assembly, zPhone Pro Prototype1-----700-00112-BPackaging Assy, Retail Draft1120CardboardMatte--600-99821-ABox, Rigid, Magnetic Closure Released185GreyboardSoft Touch--600-99822-USInsert, Molded Pulp (US Type) Released135----700-01000-CMain Device Assembly In Review1-----400-00551-ADisplay Module, OLED 6.7\" Released145----300-11200-BBattery Pack, 4500mAh Released169---UN38.3200-88123-DPCBA, Main Logic Board Prototype1-----100-55512-ASoC, Snapdragon 8 Gen 3U100 Released11----R-0402-10K-1Resistor, 10k, 5%, 0402R12, R14, R55, R89, R90 Released50----500-22101-AScrew, M1.2x3, Torx Released141Stainless Steel-0.15 Nm-开启 UI 标注模式 APAC",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Change Orders",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tree",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Flat",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "AI",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Add",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Collapse All",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Columns",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "",
+        "title": "Where Used"
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": false,
+    "enabledEbomEditButtons": [],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": false,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-V2 Viewer BOM read-only controls",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Change Orders",
+      "Compare Revisions",
+      "Part Library"
+    ],
+    "restrictedVisible": false,
+    "role": "Viewer (Read Only)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubChange OrdersCompare RevisionsPart LibrarySimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Guest ViewerActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACProduct Matrix CenterzPhone 2026 PlatformGovern product series, structures, variation axes, and SKU lifecycle status from the product configuration store.ZP26ProgramDVTPhase5SKUsSerieszPhone A SeriesZP-APrimaryzPhone B SeriesZP-BStructuresStandard StructureSTDZP-APro StructurePROZP-AVariation AxesColorCOLORBLKSLVRegionREGIONUSEUPackagingPKGRTLBLKSKU MatrixSKU codes resolve against their configured structure and variation option codes.SKU CodeStructureOption CodesStatusActionsZP-A-STD-BLK-US-RTLSTDBLKUSRTLactiveSelectedSelect for WorkflowActivateFreezeSuppressZP-A-STD-SLV-EU-RTLSTDSLVEURTLfrozenSelect for WorkflowActivateFreezeSuppressZP-A-PRO-BLK-US-RTLPROBLKUSRTLcandidateSelect for WorkflowActivateFreezeSuppressZP-A-PRO-BLK-US-RTL-ACTIVEPROBLKUSRTLactiveSelect for WorkflowActivateFreezeSuppressZP-A-PRO-SLV-EU-BLKPROSLVEUBLKsuppressedSelect for WorkflowActivateFreezeSuppress开启 UI 标注模式 APAC",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Change Orders",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Select for Workflow",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Activate",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Freeze",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Suppress",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Select for Workflow",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Activate",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Freeze",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Suppress",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Select for Workflow",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Activate",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Freeze",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Suppress",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Select for Workflow",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Activate",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Freeze",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Suppress",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Select for Workflow",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Activate",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Freeze",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Suppress",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": false,
+    "enabledEbomEditButtons": [],
+    "enabledLifecycleButtons": [
+      "Select for Workflow",
+      "Freeze",
+      "Suppress",
+      "Select for Workflow",
+      "Select for Workflow",
+      "Activate",
+      "Freeze",
+      "Suppress",
+      "Select for Workflow",
+      "Freeze",
+      "Suppress",
+      "Select for Workflow",
+      "Suppress"
+    ],
+    "hasNoPermissionText": false,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-V3 Viewer product matrix mutation guard",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Change Orders",
+      "Compare Revisions",
+      "Part Library"
+    ],
+    "restrictedVisible": false,
+    "role": "Viewer (Read Only)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubChange OrdersCompare RevisionsPart LibrarySimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Guest ViewerActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACEBOM Architecture WorkspaceInheritance-first EBOM ReviewInspect platform, series, and structure bases without editing the legacy BOM tree.EBOM Baseebom-platform-zp26ebom-series-zp-aebom-structure-zp-a-stdebom-structure-zp-a-proProjectZP26 · zPhone 2026 PlatformSeriesZP-AStructureStandard Structure · STDSKUZP-A-STD-BLK-US-RTL · activeEBOM Baseebom-structure-zp-a-stdScopestructureRevisionA.01StatusdraftResolved Items5Draft StatusCleanInheritance ChainLevel 1 · platformebom-platform-zp26Rev A.00releasedLevel 2 · seriesebom-series-zp-aRev A.01reviewLevel 3 · structureebom-structure-zp-a-stdRev A.01draftResolved EBOM ItemsItems are resolved through inheritance and shown read-only with their architecture state.Part NumberNameQtyRevisionStateSourceActionsZP-A-STD-0000zPhone A Standard Structure Assembly1 EAAoverriddenebom-series-zp-aEditZP26-4100Display Module, Common OLED1 EAAinheritedebom-series-zp-aEditZP26-3200Battery Pack, 4500mAh2 EAAlockedebom-series-zp-aEditPKG-LABEL-BASE-001Packaging Label, Base Retail1 EAAlocalLocal baseEditSCR-M1.4-BLK-002Chassis Screw, M1.4 Black4 EAAlocalLocal baseEditEBOM Draft EditorEdit the selected resolved item or add local child items to the current base.Add Local ItemSelect an item from the resolved table to edit it.Change PackageCleanPublish Change PackageReset DraftLegacy BOM PreviewRead-only projection through the legacy BOM table. This does not write back to EBOM architecture state.Virtual Tree View (5 items)Collapse AllPart NumberImgDescriptionRefDesStateQtyWgt(g)MaterialFinishTorque SpecComplianceTargetActualZP-A-STD-0000zPhone A Standard Structure Assembly Draft1-----ZP26-4100Display Module, Common OLED Draft1-----ZP26-3200Battery Pack, 4500mAh Draft2-----PKG-LABEL-BASE-001Packaging Label, Base Retail Draft1-----SCR-M1.4-BLK-002Chassis Screw, M1.4 Black Draft4-----开启 UI 标注模式 APAC",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Change Orders",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "Edit ZP-A-STD-0000",
+        "disabled": false,
+        "text": "Edit",
+        "title": ""
+      },
+      {
+        "aria": "Edit ZP26-4100",
+        "disabled": false,
+        "text": "Edit",
+        "title": ""
+      },
+      {
+        "aria": "Edit ZP26-3200",
+        "disabled": false,
+        "text": "Edit",
+        "title": ""
+      },
+      {
+        "aria": "Edit PKG-LABEL-BASE-001",
+        "disabled": false,
+        "text": "Edit",
+        "title": ""
+      },
+      {
+        "aria": "Edit SCR-M1.4-BLK-002",
+        "disabled": false,
+        "text": "Edit",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Add Local Item",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Publish Change Package",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": true,
+        "text": "Reset Draft",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Collapse All",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": false,
+    "enabledEbomEditButtons": [
+      "Edit ZP-A-STD-0000",
+      "Edit ZP26-4100",
+      "Edit ZP26-3200",
+      "Edit PKG-LABEL-BASE-001",
+      "Edit SCR-M1.4-BLK-002",
+      "Add Local Item"
+    ],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": false,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-V4 Viewer EBOM mutation guard",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Change Orders",
+      "Compare Revisions",
+      "Part Library"
+    ],
+    "restrictedVisible": false,
+    "role": "Viewer (Read Only)",
+    "visibleFeedbackOverlay": true
+  },
+  {
+    "bodySample": "zBOMDashboardBOM EditorProduct MatrixEBOM ArchitectureMBOM DeltaTooling HubChange OrdersCompare RevisionsPart LibrarySupply ChainERP ConnectSimulate RoleAdmin (Superuser)Engineer (Tech Only)Sourcing (Comm Only)Viewer (Read Only)Settingsv2.5.0 (Build 9924)Logged in as: Alex AdminActive ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerACDashboardOverview for project ZPM-14Total BOM Cost$142.50 2.4% vs prev revLongest Lead Time12 WeeksPart: OLED DisplayRisk Items3Single source componentsRelease Readiness85%12 parts in 'Draft' stateCost Breakdown (Pareto)DisplaySoCMemoryHousingBatteryOthersComponent DistributionRecent Engineering Changes (ECOs)ECO #DescriptionInitiatorDateStatusECO-2024-112Replace M1.2 screws with M1.4 for durabilityJ. DoeOct 12, 2024ApprovedECO-2024-115Update FW Bootloader version to 1.2.0M. SmithOct 14, 2024Pending开启 UI 标注模式 Display",
+    "buttonSummary": [
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Dashboard",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "BOM Editor",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Product Matrix",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "EBOM Architecture",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "MBOM Delta",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Tooling Hub",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Change Orders",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Compare Revisions",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Part Library",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Supply Chain",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "ERP Connect",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "Settings",
+        "title": ""
+      },
+      {
+        "aria": "",
+        "disabled": false,
+        "text": "开启 UI 标注模式",
+        "title": ""
+      }
+    ],
+    "costVisible": true,
+    "enabledEbomEditButtons": [],
+    "enabledLifecycleButtons": [],
+    "hasNoPermissionText": false,
+    "hasWip": false,
+    "header": "Active ProjectZPM-14: zPhone Pro MaxDVTMulti-SKU Config245.5 gAlex ChenSr. Product EngineerAC",
+    "label": "UC-C1 Narrow viewport dashboard",
+    "nav": [
+      "Dashboard",
+      "BOM Editor",
+      "Product Matrix",
+      "EBOM Architecture",
+      "MBOM Delta",
+      "Tooling Hub",
+      "Change Orders",
+      "Compare Revisions",
+      "Part Library",
+      "Supply Chain",
+      "ERP Connect"
+    ],
+    "restrictedVisible": false,
+    "role": "Admin (Superuser)",
+    "visibleFeedbackOverlay": true
+  }
+]

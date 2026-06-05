@@ -1,0 +1,56 @@
+<h2>C2 Workflow Draft</h2>
+<p class="subtitle">A compact editing workflow layered onto the existing EBOM Architecture page.</p>
+
+<div class="mockup">
+  <div class="mockup-header">EBOM Architecture Workspace - Editable Draft</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:220px 1fr 280px;gap:14px;min-height:420px">
+      <div class="mock-sidebar">
+        <strong>Base Selector</strong><br><br>
+        ebom-platform-zp26<br>
+        ebom-series-zp-a<br>
+        <strong>ebom-structure-zp-a-std</strong><br>
+        ebom-structure-zp-a-pro<br><br>
+        <span class="label">Status</span><br>
+        Draft with 3 pending changes
+      </div>
+      <div class="mock-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <strong>Resolved EBOM Items</strong>
+          <div>
+            <button class="mock-button">Add Local Item</button>
+            <button class="mock-button">Reset Draft</button>
+          </div>
+        </div>
+        <div class="placeholder">row: root assembly - overridden - edit</div>
+        <div class="placeholder">row: display module - inherited - override</div>
+        <div class="placeholder">row: battery pack - locked quantity - unlock</div>
+        <div class="placeholder">row: camera module - local - edit/remove</div>
+        <div style="height:16px"></div>
+        <strong>Legacy BOM Preview</strong>
+        <div class="placeholder">readonly tree projection updates from draft state</div>
+      </div>
+      <div class="mock-sidebar">
+        <strong>Edit Drawer</strong><br><br>
+        Selected: Battery Pack<br>
+        Source: ebom-series-zp-a<br><br>
+        <span class="label">Editable Fields</span><br>
+        quantity: 2<br>
+        unit: EA<br>
+        revision: A<br><br>
+        <button class="mock-button">Lock Quantity</button><br><br>
+        <strong>Change Package</strong><br>
+        override quantity<br>
+        lock quantity<br>
+        add local item<br><br>
+        <button class="mock-button">Publish</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Workflow Rules</h3>
+  <p>Editing starts from the resolved item list. Inherited rows can be overridden into local draft rows. Locked fields stay explicitly tracked in <code>lockedFields</code>. Local rows can be added under the selected parent. The right-side change package summarizes draft operations before publish.</p>
+  <p>Publish does not call a real backend in this phase. It sends the draft through the repository interface, records a local change package, clears dirty state, and updates local status/revision metadata so tests can assert the workflow contract.</p>
+</div>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { BOMTable } from '../components/BOMTable';
 import { BOMMatrix } from '../components/BOMMatrix';
 import { BOMFlatView } from '../components/BOMFlatView';
@@ -23,6 +23,15 @@ export const BOMEditor: React.FC = () => {
   const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newBomItem, setNewBomItem] = useState({
+    parentId: 'root',
+    partNumber: '',
+    name: '',
+    type: ComponentType.Part,
+    quantity: '1',
+    unit: 'EA',
+    cost: '0',
+  });
   
   // Custom Attribute Modal State
   const [isAttrModalOpen, setIsAttrModalOpen] = useState(false);
@@ -131,6 +140,30 @@ export const BOMEditor: React.FC = () => {
       return findNode(bomData) || selectedNode;
   })() : null;
 
+  const assemblyOptions = useMemo(() => {
+      const options: Array<{ id: string; partNumber: string; name: string }> = [];
+      const collect = (node: BOMNode) => {
+          if (node.type === ComponentType.Assembly) {
+              options.push({ id: node.id, partNumber: node.partNumber, name: node.name });
+          }
+          node.children?.forEach(collect);
+      };
+      collect(bomData);
+      return options;
+  }, [bomData]);
+
+  useEffect(() => {
+      const handleKeyDown = (event: KeyboardEvent) => {
+          if (event.key === 'Escape') {
+              setIsAddModalOpen(false);
+              setIsAttrModalOpen(false);
+          }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
 
   const handleCreateSnapshot = () => {
     const name = prompt("Enter a name for this snapshot:", `Snapshot ${new Date().toLocaleTimeString()}`);
@@ -158,6 +191,49 @@ export const BOMEditor: React.FC = () => {
         return;
     }
     fileInputRef.current?.click();
+  };
+
+  const openAddModal = () => {
+    setNewBomItem((value) => ({
+      ...value,
+      parentId: activeNode?.type === ComponentType.Assembly ? activeNode.id : 'root',
+    }));
+    setIsAddModalOpen(true);
+  };
+
+  const handleCreateBOMItem = () => {
+    const partNumber = newBomItem.partNumber.trim();
+    const name = newBomItem.name.trim();
+    if (!partNumber || !name) return;
+
+    const quantity = Number(newBomItem.quantity);
+    const cost = Number(newBomItem.cost);
+    const createdNode: BOMNode = {
+      id: `bom-${partNumber.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      partNumber,
+      name,
+      revision: 'A',
+      state: LifecycleState.Draft,
+      type: newBomItem.type,
+      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+      unit: newBomItem.unit.trim() || 'EA',
+      cost: Number.isFinite(cost) && cost >= 0 ? cost : 0,
+      currency: 'USD',
+      children: newBomItem.type === ComponentType.Assembly ? [] : undefined,
+    };
+
+    addBOMNode(newBomItem.parentId, createdNode);
+    setSelectedNode(createdNode);
+    setNewBomItem({
+      parentId: 'root',
+      partNumber: '',
+      name: '',
+      type: ComponentType.Part,
+      quantity: '1',
+      unit: 'EA',
+      cost: '0',
+    });
+    setIsAddModalOpen(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -237,9 +313,34 @@ export const BOMEditor: React.FC = () => {
                     </button>
                 </div>
                 
-                <button onClick={handleCreateSnapshot} className="p-2 bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50"><Camera className="w-4 h-4" /></button>
-                <button onClick={handleImportClick} disabled={!canEditStructure} className="p-2 bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-50"><Upload className="w-4 h-4" /></button>
-                <button onClick={handleExportCSV} className="p-2 bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50"><Download className="w-4 h-4" /></button>
+                <button
+                    type="button"
+                    aria-label="Create snapshot"
+                    title="Create snapshot"
+                    onClick={handleCreateSnapshot}
+                    className="p-2 bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                >
+                    <Camera className="w-4 h-4" />
+                </button>
+                <button
+                    type="button"
+                    aria-label="Import BOM CSV"
+                    title={canEditStructure ? 'Import BOM CSV' : 'Requires BOM structure edit permission'}
+                    onClick={handleImportClick}
+                    disabled={!canEditStructure}
+                    className="p-2 bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                >
+                    <Upload className="w-4 h-4" />
+                </button>
+                <button
+                    type="button"
+                    aria-label="Export BOM CSV"
+                    title="Export BOM CSV"
+                    onClick={handleExportCSV}
+                    className="p-2 bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                >
+                    <Download className="w-4 h-4" />
+                </button>
                 
                 <div className="h-6 w-px bg-slate-300 mx-1"></div>
                  <button 
@@ -250,7 +351,9 @@ export const BOMEditor: React.FC = () => {
                     AI
                 </button>
                 <button 
-                    onClick={() => setIsAddModalOpen(true)}
+                    onClick={openAddModal}
+                    aria-label="Add Item"
+                    title={canEditStructure ? 'Add Item' : 'Requires BOM structure edit permission'}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium shadow-sm transition-colors ${!canEditStructure ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                     disabled={!canEditStructure}
                 >
@@ -457,6 +560,7 @@ export const BOMEditor: React.FC = () => {
                                                     <button 
                                                         onClick={() => window.open(att.url, '_blank')}
                                                         className="p-1 hover:bg-slate-200 rounded text-blue-600"
+                                                        aria-label={`View attachment ${att.name}`}
                                                         title="View"
                                                     >
                                                         <Download className="w-3.5 h-3.5" />
@@ -465,6 +569,7 @@ export const BOMEditor: React.FC = () => {
                                                         <button 
                                                             onClick={() => deleteAttachment(activeNode.id, att.id)}
                                                             className="p-1 hover:bg-rose-100 rounded text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            aria-label={`Remove attachment ${att.name}`}
                                                             title="Remove"
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
@@ -591,11 +696,105 @@ export const BOMEditor: React.FC = () => {
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
              <div className="bg-white rounded-lg shadow-xl w-[550px] border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
                  <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
-                    <h3 className="font-bold text-slate-800">Add Item (Simulated)</h3>
-                    <button onClick={() => setIsAddModalOpen(false)}><X className="w-5 h-5"/></button>
+                    <h3 className="font-bold text-slate-800">Add BOM Item</h3>
+                    <button aria-label="Close add item" onClick={() => setIsAddModalOpen(false)}><X className="w-5 h-5"/></button>
                  </div>
-                 <div className="p-6">
-                     <p className="text-sm text-slate-500">Use existing logic to add items to tree...</p>
+                 <div className="grid gap-4 p-6">
+                     <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-parent">
+                         Parent Assembly
+                         <select
+                            id="bom-add-parent"
+                            value={newBomItem.parentId}
+                            onChange={(event) => setNewBomItem((value) => ({ ...value, parentId: event.target.value }))}
+                            className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+                         >
+                            {assemblyOptions.map((assembly) => (
+                                <option key={assembly.id} value={assembly.id}>
+                                    {assembly.partNumber} - {assembly.name}
+                                </option>
+                            ))}
+                         </select>
+                     </label>
+                     <div className="grid gap-4 md:grid-cols-2">
+                         <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-part-number">
+                             Part Number
+                             <input
+                                id="bom-add-part-number"
+                                value={newBomItem.partNumber}
+                                onChange={(event) => setNewBomItem((value) => ({ ...value, partNumber: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                             />
+                         </label>
+                         <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-name">
+                             Item Name
+                             <input
+                                id="bom-add-name"
+                                value={newBomItem.name}
+                                onChange={(event) => setNewBomItem((value) => ({ ...value, name: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                             />
+                         </label>
+                         <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-type">
+                             Type
+                             <select
+                                id="bom-add-type"
+                                value={newBomItem.type}
+                                onChange={(event) => setNewBomItem((value) => ({ ...value, type: event.target.value as ComponentType }))}
+                                className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+                             >
+                                <option value={ComponentType.Part}>Part</option>
+                                <option value={ComponentType.Assembly}>Assembly</option>
+                                <option value={ComponentType.Material}>Material</option>
+                                <option value={ComponentType.Software}>Software</option>
+                             </select>
+                         </label>
+                         <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-quantity">
+                             Quantity
+                             <input
+                                id="bom-add-quantity"
+                                type="number"
+                                value={newBomItem.quantity}
+                                onChange={(event) => setNewBomItem((value) => ({ ...value, quantity: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                             />
+                         </label>
+                         <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-unit">
+                             Unit
+                             <input
+                                id="bom-add-unit"
+                                value={newBomItem.unit}
+                                onChange={(event) => setNewBomItem((value) => ({ ...value, unit: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                             />
+                         </label>
+                         <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-cost">
+                             Unit Cost
+                             <input
+                                id="bom-add-cost"
+                                type="number"
+                                value={newBomItem.cost}
+                                onChange={(event) => setNewBomItem((value) => ({ ...value, cost: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                             />
+                         </label>
+                     </div>
+                     <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                         <button
+                            type="button"
+                            onClick={() => setIsAddModalOpen(false)}
+                            className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                         >
+                            Cancel
+                         </button>
+                         <button
+                            type="button"
+                            onClick={handleCreateBOMItem}
+                            disabled={!newBomItem.partNumber.trim() || !newBomItem.name.trim()}
+                            className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                         >
+                            Create Item
+                         </button>
+                     </div>
                  </div>
              </div>
         </div>

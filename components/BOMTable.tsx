@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BOMNode, LifecycleState, ComponentType, Permission } from '../types';
 import { ChevronRight, ChevronDown, FileText, Component, Package, Database, AlertTriangle, Lock, Image } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -81,8 +81,24 @@ export const BOMTable: React.FC<BOMTableProps> = ({
     );
     const parentRef = useRef<HTMLDivElement>(null);
     const [whereUsedPart, setWhereUsedPart] = useState<string | null>(null);
+    const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
 
     const canViewCost = hasPermission(Permission.VIEW_COST);
+
+    useEffect(() => {
+        if (!isColumnMenuOpen) {
+            return undefined;
+        }
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsColumnMenuOpen(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isColumnMenuOpen]);
 
     const toggleExpand = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -158,14 +174,29 @@ export const BOMTable: React.FC<BOMTableProps> = ({
                     {isMBOMView && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-200">MBOM</span>}
                 </div>
                 <div className="flex gap-2 text-xs">
-                    <button onClick={() => setExpandedIds(new Set(collapseExpandedIds))} className="px-2 py-1 text-slate-600 hover:bg-slate-200 rounded">Collapse All</button>
+                    <button
+                        type="button"
+                        onClick={() => setExpandedIds(new Set(collapseExpandedIds))}
+                        className="px-2 py-1 text-slate-600 hover:bg-slate-200 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                    >
+                        Collapse All
+                    </button>
 
                     {enableColumnControls && (
-                        <div className="relative group">
-                            <button className="px-2 py-1 bg-white border border-slate-300 rounded text-slate-600 hover:bg-slate-50 flex items-center gap-1">
+                        <div className="relative">
+                            <button
+                                type="button"
+                                aria-expanded={isColumnMenuOpen}
+                                aria-controls="bom-column-controls"
+                                onClick={() => setIsColumnMenuOpen((open) => !open)}
+                                className="px-2 py-1 bg-white border border-slate-300 rounded text-slate-600 hover:bg-slate-50 flex items-center gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                            >
                                 <span>Columns</span>
                             </button>
-                            <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 shadow-lg rounded-md p-2 w-48 z-50 hidden group-hover:block">
+                            <div
+                                id="bom-column-controls"
+                                className={`absolute right-0 top-full mt-1 bg-white border border-slate-200 shadow-lg rounded-md p-2 w-48 z-50 ${isColumnMenuOpen ? 'block' : 'hidden'}`}
+                            >
                                 <div className="flex flex-col gap-1 max-h-60 overflow-auto">
                                     {['imageUrl', 'name', 'refDes', 'state', 'quantity', 'weightG', ...attributeDefs.map(a => a.key), 'targetCost', 'cost'].map(key => (
                                         <label key={key} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 rounded cursor-pointer text-xs">
@@ -226,7 +257,12 @@ export const BOMTable: React.FC<BOMTableProps> = ({
                                 {/* Part Number Tree - Always Visible */}
                                 <div className="px-2 border-r border-slate-100 h-full flex items-center group/cell" style={{ paddingLeft: `${row.depth * 20 + 8}px` }}>
                                     {row.hasChildren ? (
-                                        <button onClick={(e) => toggleExpand(row.id, e)} className="p-0.5 hover:bg-slate-200 rounded mr-1">
+                                        <button
+                                            type="button"
+                                            aria-label={`${expandedIds.has(row.id) ? 'Collapse' : 'Expand'} ${row.partNumber}`}
+                                            onClick={(e) => toggleExpand(row.id, e)}
+                                            className="p-0.5 hover:bg-slate-200 rounded mr-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                                        >
                                             {expandedIds.has(row.id) ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                                         </button>
                                     ) : <span className="w-5 mr-1" />}
@@ -235,8 +271,10 @@ export const BOMTable: React.FC<BOMTableProps> = ({
 
                                     {enableWhereUsed && (
                                         <button
+                                            type="button"
+                                            aria-label={`Where used ${row.partNumber}`}
                                             onClick={(e) => { e.stopPropagation(); setWhereUsedPart(row.partNumber); }}
-                                            className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-slate-200 rounded text-slate-400 transition-opacity"
+                                            className="opacity-0 group-hover/cell:opacity-100 focus:opacity-100 p-1 hover:bg-slate-200 rounded text-slate-400 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                                             title="Where Used"
                                         >
                                             <Database className="w-3 h-3" />

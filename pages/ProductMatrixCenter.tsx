@@ -7,8 +7,10 @@ import {
   PauseCircle,
   Snowflake,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { SKUStatus } from '../domain/productTypes';
 import { useProductConfigStore } from '../stores/useProductConfigStore';
+import { Permission } from '../types';
 
 const statusStyles: Record<SKUStatus, string> = {
   candidate: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -18,6 +20,7 @@ const statusStyles: Record<SKUStatus, string> = {
 };
 
 export const ProductMatrixCenter: React.FC = () => {
+  const { hasPermission } = useAuth();
   const {
     projects,
     series,
@@ -40,6 +43,7 @@ export const ProductMatrixCenter: React.FC = () => {
   const optionLookup = new Map(projectAxes.flatMap((axis) => (
     axis.options.map((option) => [option.id, option])
   )));
+  const canManageSkuLifecycle = hasPermission(Permission.MANAGE_SKU_LIFECYCLE);
 
   if (!activeProject) {
     return (
@@ -224,8 +228,10 @@ export const ProductMatrixCenter: React.FC = () => {
                           <button
                             data-testid={`select-workflow-${sku.id}`}
                             type="button"
+                            disabled={!canManageSkuLifecycle}
+                            title={canManageSkuLifecycle ? 'Select this SKU for downstream workflow' : 'Requires SKU lifecycle permission'}
                             onClick={() => selectWorkflowSKU(sku.id)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <PackageCheck className="h-3.5 w-3.5" />
                             Select for Workflow
@@ -233,7 +239,8 @@ export const ProductMatrixCenter: React.FC = () => {
                           <button
                             data-testid={`activate-${sku.id}`}
                             type="button"
-                            disabled={sku.status !== 'candidate'}
+                            disabled={!canManageSkuLifecycle || sku.status !== 'candidate'}
+                            title={!canManageSkuLifecycle ? 'Requires SKU lifecycle permission' : sku.status !== 'candidate' ? 'Only candidate SKUs can be activated' : 'Activate this candidate SKU'}
                             onClick={() => activateSKU(sku.id)}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
                           >
@@ -242,7 +249,8 @@ export const ProductMatrixCenter: React.FC = () => {
                           </button>
                           <button
                             type="button"
-                            disabled={sku.status === 'suppressed' || sku.status === 'frozen'}
+                            disabled={!canManageSkuLifecycle || sku.status === 'suppressed' || sku.status === 'frozen'}
+                            title={!canManageSkuLifecycle ? 'Requires SKU lifecycle permission' : sku.status === 'suppressed' || sku.status === 'frozen' ? 'Suppressed or frozen SKUs cannot be frozen again' : 'Freeze this SKU'}
                             onClick={() => freezeSKU(sku.id)}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 px-3 py-1.5 text-xs font-semibold text-sky-700 disabled:cursor-not-allowed disabled:opacity-40"
                           >
@@ -251,7 +259,8 @@ export const ProductMatrixCenter: React.FC = () => {
                           </button>
                           <button
                             type="button"
-                            disabled={sku.status === 'frozen'}
+                            disabled={!canManageSkuLifecycle || sku.status === 'frozen'}
+                            title={!canManageSkuLifecycle ? 'Requires SKU lifecycle permission' : sku.status === 'frozen' ? 'Frozen SKUs cannot be suppressed' : 'Suppress this SKU'}
                             onClick={() => suppressSKU(sku.id)}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
                           >

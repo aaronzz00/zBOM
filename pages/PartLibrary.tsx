@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Search, Filter, Plus, Package, Cpu, Zap, Activity, Grid, List, MoreHorizontal, X, Edit, Save, Network, ArrowRight, MapPin, Scale, Coins, Trash2 } from 'lucide-react';
 import { LifecycleState, LibraryPart, ComponentType, BOMNode, Permission, PricingTier } from '../types';
 import { useAppStore } from '../context/AppContext';
@@ -8,7 +8,7 @@ const CATEGORIES = ['All', 'Semiconductors', 'Passives', 'Mechanical', 'Electrom
 const INVENTORY_LOCATIONS = ['WH-A', 'WH-B', 'WH-C']; 
 
 export const PartLibrary: React.FC = () => {
-  const { libraryParts, suppliers, updateLibraryPart, bomData } = useAppStore();
+  const { libraryParts, suppliers, updateLibraryPart, addLibraryPart, bomData } = useAppStore();
   const { hasPermission } = useAuth();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,10 +19,34 @@ export const PartLibrary: React.FC = () => {
   // Edit State
   const [selectedPart, setSelectedPart] = useState<LibraryPart | null>(null);
   const [isEditPanelOpen, setIsEditPanelOpen] = useState(false);
+  const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
   const [editForm, setEditForm] = useState<Partial<LibraryPart>>({});
+  const [createForm, setCreateForm] = useState({
+    partNumber: '',
+    mpn: '',
+    manufacturer: '',
+    description: '',
+    category: 'Mechanical',
+    cost: '0',
+  });
   const [panelTab, setPanelTab] = useState<'details' | 'usage'>('details');
 
-  const canEdit = hasPermission(Permission.EDIT_BOM_METADATA);
+  const canEditMetadata = hasPermission(Permission.EDIT_BOM_METADATA);
+  const canViewCommercial = hasPermission(Permission.VIEW_COMMERCIAL_FIELDS) || hasPermission(Permission.VIEW_COST);
+  const canEditCommercial = hasPermission(Permission.EDIT_COMMERCIAL_FIELDS) || hasPermission(Permission.EDIT_COST);
+  const canSave = canEditMetadata || canEditCommercial;
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsCreatePanelOpen(false);
+        setIsEditPanelOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Where Used Calculation
   const whereUsedList = useMemo(() => {
@@ -161,6 +185,40 @@ export const PartLibrary: React.FC = () => {
     setEditForm({ ...editForm, pricingTiers: currentTiers });
   };
 
+  const handleCreatePart = () => {
+    const partNumber = createForm.partNumber.trim();
+    const mpn = createForm.mpn.trim();
+    const description = createForm.description.trim();
+    if (!partNumber || !mpn || !description) return;
+
+    const cost = Number(createForm.cost);
+    addLibraryPart({
+      id: `lib-${partNumber.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      partNumber,
+      mpn,
+      manufacturer: createForm.manufacturer.trim() || 'Unassigned',
+      description,
+      category: createForm.category,
+      cost: Number.isFinite(cost) && cost >= 0 ? cost : 0,
+      stock: 0,
+      minStock: 0,
+      state: LifecycleState.Draft,
+      location: createForm.category === 'Software' ? 'Git/Repo' : 'WH-A-NEW',
+      type: createForm.category === 'Software' ? ComponentType.Software : ComponentType.Part,
+    });
+    setSelectedCategory('All');
+    setSearchQuery(partNumber);
+    setCreateForm({
+      partNumber: '',
+      mpn: '',
+      manufacturer: '',
+      description: '',
+      category: 'Mechanical',
+      cost: '0',
+    });
+    setIsCreatePanelOpen(false);
+  };
+
   return (
     <div className="flex h-full bg-slate-50 overflow-hidden relative">
       {/* Sidebar Filters */}
@@ -229,20 +287,30 @@ export const PartLibrary: React.FC = () => {
              <div className="flex items-center gap-3">
                 <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
                     <button 
+                        type="button"
+                        aria-label="Show list view"
+                        title="Show list view"
                         onClick={() => setViewMode('list')}
-                        className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`p-1.5 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         <List className="w-4 h-4" />
                     </button>
                     <button 
+                        type="button"
+                        aria-label="Show grid view"
+                        title="Show grid view"
                         onClick={() => setViewMode('grid')}
-                        className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`p-1.5 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         <Grid className="w-4 h-4" />
                     </button>
                 </div>
-                {canEdit && (
-                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
+                {canEditMetadata && (
+                    <button
+                        type="button"
+                        onClick={() => setIsCreatePanelOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                    >
                         <Plus className="w-4 h-4" />
                         Create Part
                     </button>
@@ -299,7 +367,7 @@ export const PartLibrary: React.FC = () => {
                                     </span>
                                 </td>
                                 <td className="px-6 py-3 text-right font-mono text-slate-700">
-                                    ${part.cost.toFixed(3)}
+                                    {canViewCommercial ? `$${part.cost.toFixed(3)}` : <span className="text-slate-400 italic">Restricted</span>}
                                 </td>
                                 <td className="px-6 py-3">
                                     {getStockStatus(part)}
@@ -309,6 +377,9 @@ export const PartLibrary: React.FC = () => {
                                 </td>
                                 <td className="px-6 py-3 text-right">
                                     <button 
+                                        type="button"
+                                        aria-label={`Edit ${part.partNumber}`}
+                                        title={`Edit ${part.partNumber}`}
                                         className="text-slate-400 hover:text-blue-600 transition-colors"
                                         onClick={(e) => { e.stopPropagation(); handleEditClick(part); }}
                                     >
@@ -340,6 +411,110 @@ export const PartLibrary: React.FC = () => {
         </div>
       </div>
 
+      {isCreatePanelOpen && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+              <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-library-part-title"
+                className="w-full max-w-lg overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl"
+              >
+                  <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-5">
+                      <h3 id="create-library-part-title" className="text-lg font-bold text-slate-900">Create Library Part</h3>
+                      <button
+                        type="button"
+                        aria-label="Close create part"
+                        onClick={() => setIsCreatePanelOpen(false)}
+                        className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      >
+                          <X className="h-5 w-5" />
+                      </button>
+                  </div>
+                  <div className="grid gap-4 p-5">
+                      <div className="grid gap-4 md:grid-cols-2">
+                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-part-number">
+                              Part Number
+                              <input
+                                id="create-part-number"
+                                value={createForm.partNumber}
+                                onChange={(event) => setCreateForm((value) => ({ ...value, partNumber: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                              />
+                          </label>
+                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-mpn">
+                              MPN
+                              <input
+                                id="create-mpn"
+                                value={createForm.mpn}
+                                onChange={(event) => setCreateForm((value) => ({ ...value, mpn: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                              />
+                          </label>
+                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-manufacturer">
+                              Manufacturer
+                              <input
+                                id="create-manufacturer"
+                                value={createForm.manufacturer}
+                                onChange={(event) => setCreateForm((value) => ({ ...value, manufacturer: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                              />
+                          </label>
+                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-category">
+                              Category
+                              <select
+                                id="create-category"
+                                value={createForm.category}
+                                onChange={(event) => setCreateForm((value) => ({ ...value, category: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+                              >
+                                  {CATEGORIES.filter((category) => category !== 'All').map((category) => (
+                                      <option key={category} value={category}>{category}</option>
+                                  ))}
+                              </select>
+                          </label>
+                      </div>
+                      <label className="block text-sm font-semibold text-slate-700" htmlFor="create-description">
+                          Description
+                          <textarea
+                            id="create-description"
+                            rows={2}
+                            value={createForm.description}
+                            onChange={(event) => setCreateForm((value) => ({ ...value, description: event.target.value }))}
+                            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                          />
+                      </label>
+                      <label className="block text-sm font-semibold text-slate-700" htmlFor="create-cost">
+                          Initial Unit Cost
+                          <input
+                            id="create-cost"
+                            type="number"
+                            value={createForm.cost}
+                            onChange={(event) => setCreateForm((value) => ({ ...value, cost: event.target.value }))}
+                            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                          />
+                      </label>
+                      <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                          <button
+                            type="button"
+                            onClick={() => setIsCreatePanelOpen(false)}
+                            className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                              Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!createForm.partNumber.trim() || !createForm.mpn.trim() || !createForm.description.trim()}
+                            onClick={handleCreatePart}
+                            className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                          >
+                              Create Library Part
+                          </button>
+                      </div>
+                  </div>
+              </section>
+          </div>
+      )}
+
       {/* Edit/Usage Slide-over Panel */}
       {isEditPanelOpen && selectedPart && (
           <div className="absolute right-0 top-0 h-full w-[400px] bg-white border-l border-slate-200 shadow-2xl z-20 flex flex-col animate-in slide-in-from-right duration-300">
@@ -348,7 +523,12 @@ export const PartLibrary: React.FC = () => {
                       <h3 className="font-bold text-slate-800 text-lg">Edit Part</h3>
                       <p className="text-xs text-slate-500 font-mono">{selectedPart.partNumber}</p>
                   </div>
-                  <button onClick={() => setIsEditPanelOpen(false)} className="text-slate-400 hover:text-slate-700">
+                  <button
+                    type="button"
+                    aria-label="Close edit panel"
+                    onClick={() => setIsEditPanelOpen(false)}
+                    className="text-slate-400 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                  >
                       <X className="w-5 h-5" />
                   </button>
               </div>
@@ -382,12 +562,13 @@ export const PartLibrary: React.FC = () => {
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                   {panelTab === 'details' ? (
                       <>
-                        <div className={!canEdit ? 'opacity-50 pointer-events-none' : ''}>
+                        <div className={!canEditMetadata ? 'opacity-50' : ''}>
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">General Info</label>
                             <div className="space-y-3">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
                                     <textarea 
+                                        disabled={!canEditMetadata}
                                         rows={2}
                                         value={editForm.description}
                                         onChange={(e) => setEditForm({...editForm, description: e.target.value})}
@@ -398,6 +579,7 @@ export const PartLibrary: React.FC = () => {
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
                                         <select 
+                                            disabled={!canEditMetadata}
                                             value={editForm.category}
                                             onChange={(e) => setEditForm({...editForm, category: e.target.value})}
                                             className="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white"
@@ -408,6 +590,7 @@ export const PartLibrary: React.FC = () => {
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">State</label>
                                         <select 
+                                            disabled={!canEditMetadata}
                                             value={editForm.state}
                                             onChange={(e) => setEditForm({...editForm, state: e.target.value as LifecycleState})}
                                             className="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white"
@@ -422,6 +605,7 @@ export const PartLibrary: React.FC = () => {
                                          <Scale className="w-4 h-4 text-slate-400" />
                                          <span className="text-sm text-slate-600">Weight</span>
                                          <input 
+                                            disabled={!canEditMetadata}
                                             type="number"
                                             value={editForm.weightG || ''}
                                             onChange={(e) => setEditForm({...editForm, weightG: parseFloat(e.target.value)})}
@@ -434,36 +618,42 @@ export const PartLibrary: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className={`pt-4 border-t border-slate-100 ${!canEdit ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <div className={`pt-4 border-t border-slate-100 ${!canViewCommercial ? 'hidden' : !canEditCommercial ? 'opacity-50' : ''}`}>
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Commercial & Supply</label>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">Unit Cost ($)</label>
+                                            <label htmlFor="part-unit-cost" className="block text-sm font-medium text-slate-700 mb-1">Unit Cost ($)</label>
                                             <input 
+                                                id="part-unit-cost"
                                                 type="number"
                                                 step="0.001"
                                                 value={editForm.cost}
                                                 onChange={(e) => setEditForm({...editForm, cost: parseFloat(e.target.value)})}
                                                 className="w-full px-3 py-2 border border-slate-300 rounded text-sm"
+                                                disabled={!canEditCommercial}
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">Lead Time (Wks)</label>
+                                            <label htmlFor="part-lead-time" className="block text-sm font-medium text-slate-700 mb-1">Lead Time (Wks)</label>
                                             <input 
+                                                id="part-lead-time"
                                                 type="number"
                                                 value={editForm.leadTimeWeeks || ''}
                                                 onChange={(e) => setEditForm({...editForm, leadTimeWeeks: parseFloat(e.target.value)})}
                                                 className="w-full px-3 py-2 border border-slate-300 rounded text-sm"
+                                                disabled={!canEditCommercial}
                                             />
                                         </div>
                                 </div>
                                 <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Supplier</label>
+                                        <label htmlFor="part-supplier" className="block text-sm font-medium text-slate-700 mb-1">Supplier</label>
                                         <select 
+                                            id="part-supplier"
                                             value={editForm.supplierId || ''}
                                             onChange={(e) => setEditForm({...editForm, supplierId: e.target.value})}
                                             className="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white"
+                                            disabled={!canEditCommercial}
                                         >
                                             <option value="">-- Select Supplier --</option>
                                             {suppliers.map(s => (
@@ -474,21 +664,25 @@ export const PartLibrary: React.FC = () => {
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">MOQ</label>
+                                        <label htmlFor="part-moq" className="block text-sm font-medium text-slate-700 mb-1">MOQ</label>
                                         <input 
+                                            id="part-moq"
                                             type="number"
                                             value={editForm.moq || ''}
                                             onChange={(e) => setEditForm({...editForm, moq: parseFloat(e.target.value)})}
                                             className="w-full px-3 py-2 border border-slate-300 rounded text-sm"
+                                            disabled={!canEditCommercial}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">SPQ</label>
+                                        <label htmlFor="part-spq" className="block text-sm font-medium text-slate-700 mb-1">SPQ</label>
                                         <input 
+                                            id="part-spq"
                                             type="number"
                                             value={editForm.spq || ''}
                                             onChange={(e) => setEditForm({...editForm, spq: parseFloat(e.target.value)})}
                                             className="w-full px-3 py-2 border border-slate-300 rounded text-sm"
+                                            disabled={!canEditCommercial}
                                         />
                                     </div>
                                 </div>
@@ -499,7 +693,7 @@ export const PartLibrary: React.FC = () => {
                                         <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
                                             <Coins className="w-3 h-3" /> Tiered Pricing
                                         </label>
-                                        <button onClick={handleAddTier} className="text-[10px] text-blue-600 font-bold hover:underline">+ Add Tier</button>
+                                        <button onClick={handleAddTier} disabled={!canEditCommercial} className="text-[10px] text-blue-600 font-bold hover:underline disabled:text-slate-400 disabled:no-underline">+ Add Tier</button>
                                     </div>
                                     <div className="space-y-2">
                                         {(!editForm.pricingTiers || editForm.pricingTiers.length === 0) && (
@@ -513,6 +707,7 @@ export const PartLibrary: React.FC = () => {
                                                     value={tier.minQty}
                                                     onChange={(e) => handleUpdateTier(idx, 'minQty', parseInt(e.target.value))}
                                                     className="w-16 px-1 py-0.5 text-xs border border-slate-300 rounded"
+                                                    disabled={!canEditCommercial}
                                                 />
                                                 <span className="text-xs text-slate-500">@ $</span>
                                                 <input 
@@ -520,8 +715,9 @@ export const PartLibrary: React.FC = () => {
                                                     value={tier.price}
                                                     onChange={(e) => handleUpdateTier(idx, 'price', parseFloat(e.target.value))}
                                                     className="flex-1 px-1 py-0.5 text-xs border border-slate-300 rounded"
+                                                    disabled={!canEditCommercial}
                                                 />
-                                                <button onClick={() => handleRemoveTier(idx)} className="text-slate-400 hover:text-red-500">
+                                                <button onClick={() => handleRemoveTier(idx)} disabled={!canEditCommercial} className="text-slate-400 hover:text-red-500 disabled:hover:text-slate-400">
                                                     <Trash2 className="w-3 h-3" />
                                                 </button>
                                             </div>
@@ -531,12 +727,13 @@ export const PartLibrary: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className={`pt-4 border-t border-slate-100 ${!canEdit ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <div className={`pt-4 border-t border-slate-100 ${!canEditCommercial ? 'opacity-50' : ''}`}>
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Inventory</label>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Current Stock</label>
                                     <input 
+                                        disabled={!canEditCommercial}
                                         type="number"
                                         value={editForm.stock}
                                         onChange={(e) => setEditForm({...editForm, stock: parseFloat(e.target.value)})}
@@ -546,6 +743,7 @@ export const PartLibrary: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Min. Stock</label>
                                     <input 
+                                        disabled={!canEditCommercial}
                                         type="number"
                                         value={editForm.minStock}
                                         onChange={(e) => setEditForm({...editForm, minStock: parseFloat(e.target.value)})}
@@ -554,10 +752,10 @@ export const PartLibrary: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        {!canEdit && (
+                        {!canSave && (
                             <div className="bg-amber-50 text-amber-700 p-3 rounded text-sm mt-4 border border-amber-200 flex items-center gap-2">
                                 <Activity className="w-4 h-4" />
-                                You do not have permission to edit part metadata.
+                                You do not have permission to edit this part.
                             </div>
                         )}
                       </>
@@ -582,7 +780,12 @@ export const PartLibrary: React.FC = () => {
                                               <span className="font-mono">{usage.path.join(' > ')}</span>
                                           </div>
                                       </div>
-                                      <button className="p-1 hover:bg-slate-200 rounded text-slate-400">
+                                      <button
+                                        type="button"
+                                        aria-label={`Open usage path ${usage.parent}`}
+                                        title={`Open usage path ${usage.parent}`}
+                                        className="p-1 hover:bg-slate-200 rounded text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                                      >
                                           <ArrowRight className="w-4 h-4" />
                                       </button>
                                   </div>
@@ -596,7 +799,7 @@ export const PartLibrary: React.FC = () => {
                   )}
               </div>
 
-              {panelTab === 'details' && canEdit && (
+              {panelTab === 'details' && canSave && (
                 <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
                     <button 
                         onClick={() => setIsEditPanelOpen(false)}

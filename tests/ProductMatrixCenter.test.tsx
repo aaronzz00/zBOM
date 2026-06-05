@@ -2,10 +2,12 @@ import React from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ProductMatrixCenter } from '../pages/ProductMatrixCenter';
+import { useAuthStore } from '../stores/useAuthStore';
 import { useProductConfigStore } from '../stores/useProductConfigStore';
 
 describe('ProductMatrixCenter', () => {
   beforeEach(() => {
+    useAuthStore.getState().switchRole('ADMIN');
     useProductConfigStore.getState().reset();
   });
 

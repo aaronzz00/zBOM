@@ -1,17 +1,26 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
-import { Dashboard } from './pages/Dashboard';
-import { BOMEditor } from './pages/BOMEditor';
-import { BOMCompare } from './pages/BOMCompare';
-import { PartLibrary } from './pages/PartLibrary';
-import { SupplyChain } from './pages/SupplyChain';
-import { ECOManager } from './pages/ECOManager';
-import { ProductMatrixCenter } from './pages/ProductMatrixCenter';
-import { EBOMArchitectureWorkspace } from './pages/EBOMArchitectureWorkspace';
-import { MBOMDeltaConsole } from './pages/MBOMDeltaConsole';
-import { ToolingHub } from './pages/ToolingHub';
+import { SetupPage } from './pages/SetupPage';
 import { mockProject } from './data/mockBOM';
+import { FeedbackOverlay } from './components/FeedbackOverlay';
+
+const Dashboard = lazy(() => import('./pages/Dashboard').then(({ Dashboard }) => ({ default: Dashboard })));
+const BOMEditor = lazy(() => import('./pages/BOMEditor').then(({ BOMEditor }) => ({ default: BOMEditor })));
+const ProductMatrixCenter = lazy(() => import('./pages/ProductMatrixCenter').then(({ ProductMatrixCenter }) => ({ default: ProductMatrixCenter })));
+const EBOMArchitectureWorkspace = lazy(() => import('./pages/EBOMArchitectureWorkspace').then(({ EBOMArchitectureWorkspace }) => ({ default: EBOMArchitectureWorkspace })));
+const MBOMDeltaConsole = lazy(() => import('./pages/MBOMDeltaConsole').then(({ MBOMDeltaConsole }) => ({ default: MBOMDeltaConsole })));
+const ToolingHub = lazy(() => import('./pages/ToolingHub').then(({ ToolingHub }) => ({ default: ToolingHub })));
+const ECOManager = lazy(() => import('./pages/ECOManager').then(({ ECOManager }) => ({ default: ECOManager })));
+const BOMCompare = lazy(() => import('./pages/BOMCompare').then(({ BOMCompare }) => ({ default: BOMCompare })));
+const PartLibrary = lazy(() => import('./pages/PartLibrary').then(({ PartLibrary }) => ({ default: PartLibrary })));
+const SupplyChain = lazy(() => import('./pages/SupplyChain').then(({ SupplyChain }) => ({ default: SupplyChain })));
+
+const PageFallback = () => (
+  <div className="flex flex-1 items-center justify-center bg-slate-50 text-sm font-medium text-slate-400" role="status">
+    Loading module...
+  </div>
+);
 
 // Simple Error Boundary Component
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -47,6 +56,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
+  const showFeedbackOverlay = import.meta.env.VITE_ENABLE_FEEDBACK_OVERLAY === 'true';
 
   const renderContent = () => {
     switch (activePage) {
@@ -70,6 +80,36 @@ function App() {
         return <PartLibrary />;
       case 'suppliers':
         return <SupplyChain />;
+      case 'erp':
+        return (
+          <SetupPage
+            eyebrow="ERP Connect"
+            title="ERP Connector Setup"
+            description="Mock integration checklist for mapping zBOM part, cost, AVL, and lifecycle fields before connecting a production ERP endpoint."
+            checklistTitle="Mock integration checklist"
+            items={[
+              'Map part number, revision, lifecycle state, and unit of measure fields.',
+              'Confirm supplier IDs, manufacturer part numbers, MOQ, SPQ, and lead-time ownership.',
+              'Review export payload rules with commercial-field permissions applied.',
+              'Run a dry-run sync report before enabling any writeback path.',
+            ]}
+          />
+        );
+      case 'settings':
+        return (
+          <SetupPage
+            eyebrow="Admin Console"
+            title="System Settings"
+            description="Role access and application preferences are collected here as a deterministic setup surface for frontend testing."
+            checklistTitle="Configuration areas"
+            items={[
+              'Role access matrix and QA/demo chrome flags.',
+              'Commercial field visibility defaults by role.',
+              'BOM import, export, snapshot, and approval workflow preferences.',
+              'Integration readiness checks for ERP and supplier audit modules.',
+            ]}
+          />
+        );
       default:
         return (
           <div className="flex-1 flex items-center justify-center bg-slate-50 text-slate-400">
@@ -88,16 +128,19 @@ function App() {
         <ErrorBoundary>
           <Sidebar activePage={activePage} onNavigate={setActivePage} />
         </ErrorBoundary>
-        <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <div className="min-w-0 flex-1 flex flex-col h-full overflow-hidden">
           <ErrorBoundary>
             <Header project={mockProject} />
           </ErrorBoundary>
           <main className="flex-1 overflow-hidden flex flex-col relative">
             <ErrorBoundary>
-              {renderContent()}
+              <Suspense fallback={<PageFallback />}>
+                {renderContent()}
+              </Suspense>
             </ErrorBoundary>
           </main>
         </div>
+        {showFeedbackOverlay && <FeedbackOverlay activePage={activePage} />}
       </div>
     </ErrorBoundary>
   );

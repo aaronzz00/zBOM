@@ -6,6 +6,7 @@ import { MBOMDeltaConsole } from '../pages/MBOMDeltaConsole';
 import { ProductMatrixCenter } from '../pages/ProductMatrixCenter';
 import { ToolingHub } from '../pages/ToolingHub';
 import { createInMemoryEBOMArchitectureRepository } from '../repositories/ebomArchitectureRepository';
+import { useAuthStore } from '../stores/useAuthStore';
 import { useEBOMArchitectureStore } from '../stores/useEBOMArchitectureStore';
 import { useMBOMDeltaStore } from '../stores/useMBOMDeltaStore';
 import { useProductConfigStore } from '../stores/useProductConfigStore';
@@ -27,6 +28,7 @@ vi.mock('@tanstack/react-virtual', () => ({
 
 describe('Phase 1 workflow pages', () => {
   beforeEach(() => {
+    useAuthStore.getState().switchRole('ADMIN');
     useProductConfigStore.getState().reset();
     useMBOMDeltaStore.getState().reset();
     useToolingStore.getState().reset();

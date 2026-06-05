@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { X, ArrowRight, Package } from 'lucide-react';
 import { useAppStore } from '../context/AppContext';
 import { FormulaEngine } from '../services/FormulaEngine';
@@ -17,17 +17,38 @@ export const WhereUsedModal: React.FC<WhereUsedModalProps> = ({ partNumber, onCl
         return FormulaEngine.findWhereUsed(partNumber, bomData);
     }, [partNumber, bomData]);
 
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
     if (!partNumber) return null;
 
     return (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
-            <div className="bg-white rounded-lg shadow-xl w-[600px] max-h-[80vh] flex flex-col">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="where-used-title"
+                className="bg-white rounded-lg shadow-xl w-[600px] max-h-[80vh] flex flex-col"
+            >
                 <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-lg">
-                    <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                    <h3 id="where-used-title" className="font-semibold text-slate-800 flex items-center gap-2">
                         <span>Where Used:</span>
                         <span className="font-mono bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-sm">{partNumber}</span>
                     </h3>
-                    <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded text-slate-500">
+                    <button
+                        type="button"
+                        aria-label="Close where used"
+                        onClick={onClose}
+                        className="p-1 hover:bg-slate-200 rounded text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                    >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -55,7 +76,11 @@ export const WhereUsedModal: React.FC<WhereUsedModalProps> = ({ partNumber, onCl
                 </div>
 
                 <div className="p-4 border-t border-slate-200 bg-slate-50 rounded-b-lg flex justify-end">
-                    <button onClick={onClose} className="px-4 py-2 bg-white border border-slate-300 rounded text-slate-700 hover:bg-slate-50 text-sm font-medium">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 bg-white border border-slate-300 rounded text-slate-700 hover:bg-slate-50 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                    >
                         Close
                     </button>
                 </div>

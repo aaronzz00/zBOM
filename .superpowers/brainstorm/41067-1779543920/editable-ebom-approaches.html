@@ -1,0 +1,72 @@
+<h2>Editable EBOM Architecture: Scope C Options</h2>
+<p class="subtitle">Choose the first implementation boundary for drafts, publishing semantics, and change history.</p>
+
+<div class="cards">
+  <div class="card" data-choice="c1" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">C1: Local Draft Ledger</div>
+        <div class="mockup-body">
+          <div style="display:grid;gap:10px">
+            <div class="placeholder">mock EBOM bases + items</div>
+            <div class="placeholder">useEBOMArchitectureStore</div>
+            <div class="placeholder">draft actions: override, lock, unlock, reset</div>
+            <div class="placeholder">change log generated from draft deltas</div>
+            <div class="placeholder">publish marks draft as review/released locally</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C1 - Local Draft Ledger</h3>
+      <p>Fastest path. Models the right business concepts in frontend state without pretending persistence exists.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c2" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">C2: Repository Port</div>
+        <div class="mockup-body">
+          <div style="display:grid;gap:10px">
+            <div class="placeholder">EBOM store</div>
+            <div class="placeholder">EBOM repository interface</div>
+            <div class="placeholder">in-memory adapter now</div>
+            <div class="placeholder">HTTP adapter later</div>
+            <div class="placeholder">publish creates persisted change record shape</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C2 - Repository Port</h3>
+      <p>Recommended. Keeps implementation local, but defines the backend seam, payloads, and failure handling now.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c3" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">C3: Workflow Engine Shape</div>
+        <div class="mockup-body">
+          <div style="display:grid;gap:10px">
+            <div class="placeholder">draft revision graph</div>
+            <div class="placeholder">approval state machine</div>
+            <div class="placeholder">change package review</div>
+            <div class="placeholder">role-gated transition actions</div>
+            <div class="placeholder">future backend workflow API</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C3 - Workflow Engine Shape</h3>
+      <p>Most complete, but heavier than Phase 1 needs. Good if approval routing is the main thing to validate next.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>My Recommendation</h3>
+  <p>C2: add an EBOM architecture store with a repository interface and an in-memory adapter. The UI can support draft edits and publish semantics now, while backend persistence remains a replaceable adapter later.</p>
+</div>

@@ -36,15 +36,21 @@ export enum Permission {
   // Data Visibility (Field Level)
   VIEW_COST = 'VIEW_COST', // Can see price data
   VIEW_SUPPLIER_RISK = 'VIEW_SUPPLIER_RISK',
+  VIEW_COMMERCIAL_FIELDS = 'VIEW_COMMERCIAL_FIELDS',
   
   // Actions
   EDIT_BOM_STRUCTURE = 'EDIT_BOM_STRUCTURE', // Add/Remove nodes
   EDIT_BOM_METADATA = 'EDIT_BOM_METADATA', // Edit description, refdes
   EDIT_COST = 'EDIT_COST', // Edit target cost or unit cost
+  EDIT_COMMERCIAL_FIELDS = 'EDIT_COMMERCIAL_FIELDS',
   MANAGE_AVL = 'MANAGE_AVL', // Add/Remove suppliers
   APPROVE_CHANGE = 'APPROVE_CHANGE', // Approve ECOs
   CREATE_ECO = 'CREATE_ECO',
   MANAGE_ATTRIBUTES = 'MANAGE_ATTRIBUTES', // Create/Delete custom columns
+  MANAGE_SKU_LIFECYCLE = 'MANAGE_SKU_LIFECYCLE',
+  EDIT_EBOM_ARCHITECTURE = 'EDIT_EBOM_ARCHITECTURE',
+  MANAGE_TOOLING = 'MANAGE_TOOLING',
+  VIEW_DEMO_ROLE_SWITCHER = 'VIEW_DEMO_ROLE_SWITCHER',
 }
 
 export interface PricingTier {

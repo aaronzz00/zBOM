@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { BOMTable } from '../components/BOMTable';
 import { BOMNode, ComponentType, LifecycleState } from '../types';
 import { useBOMStore } from '../stores/useBOMStore';
@@ -75,5 +75,30 @@ describe('BOMTable', () => {
         // JSDOM doesn't do layout, so clientHeight is 0. 
         // TanStack Virtual might render 0 items if container size is 0.
         // We might need to mock HTMLElement.prototype.getBoundingClientRect or offsetHeight.
+    });
+
+    it('opens column controls with an explicit button state', () => {
+        render(
+            <div style={{ height: '500px', width: '800px' }}>
+                <BOMTable
+                    data={mockData}
+                    onSelect={() => { }}
+                    selectedId={null}
+                    isMBOMView={false}
+                />
+            </div>
+        );
+
+        const columnsButton = screen.getByRole('button', { name: /Columns/i });
+        expect(columnsButton).toHaveAttribute('aria-expanded', 'false');
+
+        fireEvent.click(columnsButton);
+
+        expect(columnsButton).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByLabelText('cost')).toBeInTheDocument();
+
+        fireEvent.keyDown(window, { key: 'Escape' });
+
+        expect(columnsButton).toHaveAttribute('aria-expanded', 'false');
     });
 });

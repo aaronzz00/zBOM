@@ -1,0 +1,65 @@
+<h2>C2 Architecture Draft</h2>
+<p class="subtitle">Repository Port keeps the next workflow editable without coupling it to legacy BOM state.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Data Flow</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:stretch">
+      <div class="placeholder">
+        <strong>Repository Interface</strong><br>
+        load bases/items<br>
+        save draft changes<br>
+        publish change package
+      </div>
+      <div class="placeholder">
+        <strong>Zustand Store</strong><br>
+        selected base<br>
+        draft mutations<br>
+        dirty state<br>
+        change log
+      </div>
+      <div class="placeholder">
+        <strong>EBOM Page</strong><br>
+        resolved table<br>
+        edit drawer/row controls<br>
+        publish panel
+      </div>
+    </div>
+    <div style="height:14px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="placeholder">
+        <strong>Resolver</strong><br>
+        pure inheritance resolution from current store state
+      </div>
+      <div class="placeholder">
+        <strong>Legacy Preview Adapter</strong><br>
+        one-way readonly projection to BOMTable
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Core Design</h3>
+  <p>The first editable version introduces an EBOM architecture domain store and a repository interface. The default repository is in-memory and seeded from <code>mockEBOMArchitecture</code>, but the store talks to the interface shape a backend adapter can later implement.</p>
+  <p>Edits happen as draft mutations against EBOM items: override field values, lock or unlock fields, add local child items, and reset/revert draft changes. Publishing creates a structured change package and advances local base status/revision semantics without touching <code>useBOMStore</code>.</p>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Preserves</h4>
+    <ul>
+      <li>New EBOM domain separate from legacy BOMNode</li>
+      <li>Resolver remains pure and testable</li>
+      <li>Backend persistence can replace only the repository</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>Defers</h4>
+    <ul>
+      <li>Real authentication and approval routing</li>
+      <li>Server conflict resolution</li>
+      <li>Full release/change-control workflow</li>
+    </ul>
+  </div>
+</div>

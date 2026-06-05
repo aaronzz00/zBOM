@@ -1,29 +1,39 @@
 import React from 'react';
 import { Search, Bell, User, ChevronDown, Scale } from 'lucide-react';
 import { Project } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   project: Project;
 }
 
 export const Header: React.FC<HeaderProps> = ({ project }) => {
+  const { currentUser } = useAuth();
+
+  const roleTitles = {
+    ADMIN: 'System Administrator',
+    ENG_LEAD: 'Engineering Lead',
+    SOURCING: 'Procurement Lead',
+    VIEWER: 'Read-only Reviewer',
+  } as const;
+
   return (
-    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0 z-10">
+    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-3 sm:px-4 lg:px-6 flex-shrink-0 z-10">
       {/* Left: Breadcrumbs / Project Selector */}
-      <div className="flex items-center gap-4">
-        <div className="flex flex-col">
+      <div className="flex min-w-0 items-center gap-3 lg:gap-4">
+        <div className="min-w-0 flex flex-col">
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Project</span>
           <div className="flex items-center gap-2 cursor-pointer group">
-            <h2 className="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+            <h2 className="truncate text-base font-bold text-slate-800 group-hover:text-blue-600 transition-colors lg:text-lg">
               {project.code}: {project.name}
             </h2>
-            <ChevronDown className="w-4 h-4 text-slate-400" />
+            <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />
           </div>
         </div>
         
-        <div className="h-8 w-px bg-slate-200 mx-2"></div>
+        <div className="hidden h-8 w-px bg-slate-200 mx-2 md:block"></div>
 
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 md:flex">
             <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold border border-blue-200">
                 {project.phase}
             </span>
@@ -42,8 +52,8 @@ export const Header: React.FC<HeaderProps> = ({ project }) => {
       </div>
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-4">
-        <div className="relative">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+        <div className="relative hidden xl:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input 
             type="text" 
@@ -52,18 +62,23 @@ export const Header: React.FC<HeaderProps> = ({ project }) => {
           />
         </div>
         
-        <button className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
+        <button
+          type="button"
+          aria-label="Notifications"
+          title="Notifications"
+          className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+        >
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
         </button>
         
-        <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
+        <div className="flex items-center gap-3 border-l border-slate-200 pl-3 sm:pl-4">
           <div className="text-right hidden sm:block">
-            <div className="text-sm font-medium text-slate-900">Alex Chen</div>
-            <div className="text-xs text-slate-500">Sr. Product Engineer</div>
+            <div className="text-sm font-medium text-slate-900">{currentUser.name}</div>
+            <div className="text-xs text-slate-500">{roleTitles[currentUser.role]}</div>
           </div>
           <div className="w-9 h-9 bg-slate-200 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-300">
-            AC
+            {currentUser.avatarInitials}
           </div>
         </div>
       </div>
