@@ -5,9 +5,11 @@ import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   project: Project;
+  projects: Project[];
+  onProjectChange: (projectId: string) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ project }) => {
+export const Header: React.FC<HeaderProps> = ({ project, projects, onProjectChange }) => {
   const { currentUser } = useAuth();
 
   const roleTitles = {
@@ -22,11 +24,21 @@ export const Header: React.FC<HeaderProps> = ({ project }) => {
       {/* Left: Breadcrumbs / Project Selector */}
       <div className="flex min-w-0 items-center gap-3 lg:gap-4">
         <div className="min-w-0 flex flex-col">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Project</span>
-          <div className="flex items-center gap-2 cursor-pointer group">
-            <h2 className="truncate text-base font-bold text-slate-800 group-hover:text-blue-600 transition-colors lg:text-lg">
-              {project.code}: {project.name}
-            </h2>
+          <label htmlFor="active-project-select" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Project</label>
+          <div className="flex items-center gap-2">
+            <select
+              id="active-project-select"
+              aria-label="Active Project"
+              value={project.id}
+              onChange={(event) => onProjectChange(event.target.value)}
+              className="max-w-[210px] truncate rounded-md border border-transparent bg-transparent py-0.5 pr-7 text-base font-bold text-slate-800 transition-colors hover:border-slate-200 hover:bg-slate-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 lg:max-w-[360px] lg:text-lg"
+            >
+              {projects.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.code}: {item.name}
+                </option>
+              ))}
+            </select>
             <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />
           </div>
         </div>

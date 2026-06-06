@@ -132,6 +132,16 @@ export interface CoreBOMSnapshot {
   nodes: CoreBOMNode[];
 }
 
+export interface CoreProject {
+  id: string;
+  code: string;
+  name: string;
+  sku: string;
+  phase: 'EVT' | 'DVT' | 'PVT' | 'MP';
+  status: 'active' | 'paused' | 'archived';
+  updatedAt: string;
+}
+
 export interface CoreDesignMasterPart {
   id: string;
   projectId: string;
@@ -193,6 +203,8 @@ export interface AuditEvent {
 export interface CoreWorkspace {
   version: 1;
   projectId: string;
+  activeProjectId: string;
+  projects: CoreProject[];
   parts: CorePart[];
   partRevisions: PartRevision[];
   suppliers: Supplier[];

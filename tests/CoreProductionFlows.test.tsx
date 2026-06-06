@@ -25,6 +25,8 @@ vi.mock('@tanstack/react-virtual', () => ({
 }));
 
 const resetCoreStores = () => {
+  window.localStorage.clear();
+  window.sessionStorage.clear();
   coreRepository.resetToSeed();
   useAuthStore.getState().switchRole('ADMIN');
   useBOMStore.setState({
@@ -134,6 +136,32 @@ describe('production core flows', () => {
     expect(screen.getByText(/Enclosure Cover Injection Mold/i)).toBeInTheDocument();
   });
 
+  it('edits tooling design-master links from Part Library', () => {
+    render(<PartLibrary />);
+
+    fireEvent.change(screen.getByPlaceholderText('Search by Part Number, MPN, Description...'), {
+      target: { value: '100-55512-A' },
+    });
+    fireEvent.click(screen.getByText('100-55512-A'));
+    fireEvent.click(screen.getByRole('button', { name: /Tooling/i }));
+
+    expect(screen.getByText('Tooling Link Editor')).toBeInTheDocument();
+    expect(screen.getByText(/No tooling links for this part/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Design master to link'), {
+      target: { value: 'dmp-zp-a-enclosure-cover' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.getByText(/Enclosure Cover Injection Mold/i)).toBeInTheDocument();
+    expect(screen.getByText('DMP-ZPA-ENC-COVER')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unlink' }));
+
+    expect(screen.queryByText(/Enclosure Cover Injection Mold/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/No tooling links for this part/i)).toBeInTheDocument();
+  });
+
   it('searches Part Library by supplier, sorts results, and shows AVL status', () => {
     render(<PartLibrary />);
 
@@ -153,6 +181,8 @@ describe('production core flows', () => {
   it('updates tooling milestone status from Tooling Hub', () => {
     render(<ToolingHub />);
 
+    fireEvent.click(screen.getAllByRole('button', { name: 'Details' })[0]);
+
     fireEvent.change(screen.getByLabelText('Enclosure Cover Injection Mold toolmaker'), {
       target: { value: 'Updated Precision Mold Co.' },
     });
@@ -162,6 +192,10 @@ describe('production core flows', () => {
     fireEvent.change(screen.getByLabelText('Enclosure Cover Injection Mold owner'), {
       target: { value: 'Nina Tooling' },
     });
+
+    expect(screen.getByDisplayValue('Updated Precision Mold Co.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /milestones/i }));
 
     fireEvent.change(screen.getAllByLabelText('DFM status')[0], {
       target: { value: 'blocked' },
@@ -177,7 +211,6 @@ describe('production core flows', () => {
     });
 
     expect(screen.getAllByText('blocked').length).toBeGreaterThan(0);
-    expect(screen.getByDisplayValue('Updated Precision Mold Co.')).toBeInTheDocument();
     expect(screen.getByText(/Updated DFM blocker reason/i)).toBeInTheDocument();
   });
 });

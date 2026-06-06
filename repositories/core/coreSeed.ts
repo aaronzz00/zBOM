@@ -7,6 +7,7 @@ import type {
   CoreBOMNode,
   CoreBOMSnapshot,
   CorePart,
+  CoreProject,
   CoreWorkspace,
   PartRevision,
 } from '../../domain/coreTypes';
@@ -15,6 +16,9 @@ import { ComponentType, LifecycleState } from '../../types';
 
 const SEED_TIMESTAMP = '2026-06-05T00:00:00.000Z';
 const DEFAULT_BOM_ID = 'bom-zphone-pro';
+const PRIMARY_PROJECT_ID = 'project-zphone-2026';
+const ALT_PROJECT_ID = 'project-zphone-lite-2026';
+const ALT_BOM_ID = 'bom-zphone-lite';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
@@ -105,6 +109,15 @@ const collectBOMNodes = (
   ];
 };
 
+const cloneBOMForProject = (node: BOMNode, prefix: string): BOMNode => ({
+  ...clone(node),
+  id: `${prefix}-${node.id}`,
+  partNumber: node.id === 'root' ? '800-00234-LITE' : node.partNumber,
+  name: node.id === 'root' ? 'Top Level Assembly, zPhone Lite' : node.name,
+  targetCost: node.id === 'root' ? 98 : node.targetCost,
+  children: node.children?.map((child) => cloneBOMForProject(child, prefix)),
+});
+
 const ensureSyntheticPart = (
   partsByNumber: Map<string, CorePart>,
   partNumber: string,
@@ -152,6 +165,8 @@ export function createSeedCoreWorkspace(): CoreWorkspace {
   const parts = Array.from(partsByNumber.values());
   const partRevisions = parts.map((part) => createRevisionForPart(part));
   const bomNodes = collectBOMNodes(complexBOM, DEFAULT_BOM_ID, partsByNumber);
+  const alternateBOM = cloneBOMForProject(complexBOM, 'lite');
+  const alternateBOMNodes = collectBOMNodes(alternateBOM, ALT_BOM_ID, partsByNumber);
 
   for (const node of bomNodes) {
     if (node.partId && !partRevisions.some((revision) => revision.id === node.partRevisionId)) {
@@ -180,21 +195,51 @@ export function createSeedCoreWorkspace(): CoreWorkspace {
     nodes: collectBOMNodes(previousBOM, DEFAULT_BOM_ID, partsByNumber),
   }];
 
+  const projects: CoreProject[] = [
+    {
+      id: PRIMARY_PROJECT_ID,
+      code: mockProject.code,
+      name: mockProject.name,
+      sku: mockProject.sku,
+      phase: mockProject.phase,
+      status: 'active',
+      updatedAt: SEED_TIMESTAMP,
+    },
+    {
+      id: ALT_PROJECT_ID,
+      code: 'ZPL-12',
+      name: 'zPhone Lite Pilot',
+      sku: 'Lite Pilot Config',
+      phase: 'EVT',
+      status: 'active',
+      updatedAt: SEED_TIMESTAMP,
+    },
+  ];
+
   return {
     version: 1,
-    projectId: mockProject.id,
+    projectId: PRIMARY_PROJECT_ID,
+    activeProjectId: PRIMARY_PROJECT_ID,
+    projects,
     parts,
     partRevisions,
     suppliers: clone(mockSuppliers),
     boms: [{
       id: DEFAULT_BOM_ID,
-      projectId: mockProject.id,
+      projectId: PRIMARY_PROJECT_ID,
       name: complexBOM.name,
       revision: complexBOM.revision,
       rootNodeId: complexBOM.id,
       updatedAt: SEED_TIMESTAMP,
+    }, {
+      id: ALT_BOM_ID,
+      projectId: ALT_PROJECT_ID,
+      name: alternateBOM.name,
+      revision: alternateBOM.revision,
+      rootNodeId: alternateBOM.id,
+      updatedAt: SEED_TIMESTAMP,
     }],
-    bomNodes,
+    bomNodes: [...bomNodes, ...alternateBOMNodes],
     bomSnapshots,
     designMasterParts: clone(mockDesignMasterParts.map(({ concretePartNumbers, ...part }) => part)),
     concretePartMappings,

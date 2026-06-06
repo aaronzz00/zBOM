@@ -10,7 +10,7 @@ const INVENTORY_LOCATIONS = ['WH-A', 'WH-B', 'WH-C'];
 
 export const PartLibrary: React.FC = () => {
   const { libraryParts, suppliers, updateLibraryPart, addLibraryPart, bomData } = useAppStore();
-  const { hasPermission } = useAuth();
+  const { currentUser, hasPermission } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -43,10 +43,13 @@ export const PartLibrary: React.FC = () => {
 	  const [createError, setCreateError] = useState('');
 	  const [editError, setEditError] = useState('');
 	  const [saveStatus, setSaveStatus] = useState('');
+    const [toolingLinkRevision, setToolingLinkRevision] = useState(0);
+    const [designMasterLinkId, setDesignMasterLinkId] = useState('');
 
   const canEditMetadata = hasPermission(Permission.EDIT_BOM_METADATA);
   const canViewCommercial = hasPermission(Permission.VIEW_COMMERCIAL_FIELDS) || hasPermission(Permission.VIEW_COST);
   const canEditCommercial = hasPermission(Permission.EDIT_COMMERCIAL_FIELDS) || hasPermission(Permission.EDIT_COST);
+  const canManageTooling = hasPermission(Permission.MANAGE_TOOLING);
   const canSave = canEditMetadata || canEditCommercial;
 
   useEffect(() => {
@@ -103,7 +106,35 @@ export const PartLibrary: React.FC = () => {
 	    } catch {
 	      return [];
 	    }
-	  }, [selectedPart, libraryParts]);
+	  }, [selectedPart, libraryParts, toolingLinkRevision]);
+
+    const toolingLinkWorkspace = useMemo(() => {
+      try {
+        return coreRepository.loadWorkspace();
+      } catch {
+        return null;
+      }
+    }, [selectedPart, libraryParts, toolingLinkRevision]);
+
+    const activeDesignMasters = useMemo(() => {
+      if (!toolingLinkWorkspace) return [];
+      return toolingLinkWorkspace.designMasterParts.filter((part) => part.projectId === toolingLinkWorkspace.activeProjectId);
+    }, [toolingLinkWorkspace]);
+
+    const linkedDesignMasters = useMemo(() => {
+      if (!selectedPart || !toolingLinkWorkspace) return [];
+      const linkedIds = new Set(toolingLinkWorkspace.concretePartMappings
+        .filter((mapping) => mapping.partId === selectedPart.id)
+        .map((mapping) => mapping.designMasterPartId));
+      return activeDesignMasters.filter((part) => linkedIds.has(part.id));
+    }, [activeDesignMasters, selectedPart, toolingLinkWorkspace]);
+
+    const linkableDesignMasters = useMemo(() => {
+      const linkedIds = new Set(linkedDesignMasters.map((part) => part.id));
+      return activeDesignMasters.filter((part) => !linkedIds.has(part.id));
+    }, [activeDesignMasters, linkedDesignMasters]);
+
+    const selectedDesignMasterForLink = designMasterLinkId || linkableDesignMasters[0]?.id || '';
 
 	  const auditEvents = useMemo(() => {
 	    if (!selectedPart) return [];
@@ -122,6 +153,12 @@ export const PartLibrary: React.FC = () => {
 	      return [];
 	    }
 	  }, [selectedPart, libraryParts]);
+
+    const getActor = () => ({
+      userId: currentUser.id,
+      name: currentUser.name,
+      role: currentUser.role,
+    });
 
   const getSupplierLabel = (supplierId?: string) => {
     if (!supplierId) return 'Unassigned';
@@ -260,6 +297,39 @@ export const PartLibrary: React.FC = () => {
 	      setSaveStatus(`Archived ${selectedPart.partNumber}.`);
 	      setIsEditPanelOpen(false);
 	  };
+
+    const handleLinkDesignMaster = () => {
+      if (!selectedPart || !selectedDesignMasterForLink) return;
+      const designMaster = activeDesignMasters.find((part) => part.id === selectedDesignMasterForLink);
+      try {
+        coreRepository.mapConcretePart(selectedDesignMasterForLink, selectedPart.id, getActor());
+        setToolingLinkRevision((value) => value + 1);
+        setDesignMasterLinkId('');
+        setSaveStatus(`Linked ${selectedPart.partNumber} to ${designMaster?.code ?? 'design master'}.`);
+        setEditError('');
+      } catch (error) {
+        setEditError(error instanceof Error ? error.message : 'Unable to link design master.');
+      }
+    };
+
+    const handleUnlinkDesignMaster = (designMasterId: string) => {
+      if (!selectedPart) return;
+      const designMaster = activeDesignMasters.find((part) => part.id === designMasterId);
+      try {
+        coreRepository.unmapConcretePart(designMasterId, selectedPart.id, getActor());
+        setToolingLinkRevision((value) => value + 1);
+        setSaveStatus(`Unlinked ${selectedPart.partNumber} from ${designMaster?.code ?? 'design master'}.`);
+        setEditError('');
+      } catch (error) {
+        setEditError(error instanceof Error ? error.message : 'Unable to unlink design master.');
+      }
+    };
+
+    const openToolingHubForTooling = (toolingId: string) => {
+      window.sessionStorage.setItem('zbom.toolingHub.toolingId', toolingId);
+      window.sessionStorage.setItem('zbom.toolingHub.tab', 'overview');
+      window.dispatchEvent(new CustomEvent('zbom:navigate', { detail: { page: 'tooling' } }));
+    };
 
   const toggleLocation = (loc: string) => {
       if (selectedLocations.includes(loc)) {
@@ -1074,11 +1144,88 @@ export const PartLibrary: React.FC = () => {
 	                          <div className="bg-emerald-50 border border-emerald-100 rounded p-3 text-xs text-emerald-700">
 	                              Tooling links are resolved through design-master to concrete part mappings in the durable core repository.
 	                          </div>
+                            <div className="rounded border border-slate-200 bg-white p-3">
+                                <div className="mb-3 flex items-center justify-between gap-3">
+                                    <div>
+                                        <div className="text-sm font-bold text-slate-800">Tooling Link Editor</div>
+                                        <div className="text-xs text-slate-500">Map this concrete part to active-project design masters.</div>
+                                    </div>
+                                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
+                                        {linkedDesignMasters.length} linked
+                                    </span>
+                                </div>
+
+                                {linkedDesignMasters.length > 0 && (
+                                    <div className="mb-3 space-y-2">
+                                        {linkedDesignMasters.map((designMaster) => (
+                                            <div key={designMaster.id} className="flex items-center justify-between gap-3 rounded bg-slate-50 px-3 py-2 text-xs">
+                                                <div>
+                                                    <div className="font-bold text-slate-700">{designMaster.code}</div>
+                                                    <div className="text-slate-500">{designMaster.name}</div>
+                                                </div>
+                                                {canManageTooling && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleUnlinkDesignMaster(designMaster.id)}
+                                                        className="rounded border border-rose-200 bg-white px-2 py-1 font-bold text-rose-700 hover:bg-rose-50"
+                                                    >
+                                                        Unlink
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {canManageTooling ? (
+                                    <div className="flex gap-2">
+                                        <select
+                                            aria-label="Design master to link"
+                                            value={selectedDesignMasterForLink}
+                                            onChange={(event) => setDesignMasterLinkId(event.target.value)}
+                                            disabled={linkableDesignMasters.length === 0}
+                                            className="min-w-0 flex-1 rounded border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
+                                        >
+                                            {linkableDesignMasters.length === 0 ? (
+                                                <option value="">No available design masters</option>
+                                            ) : linkableDesignMasters.map((designMaster) => (
+                                                <option key={designMaster.id} value={designMaster.id}>
+                                                    {designMaster.code} - {designMaster.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            onClick={handleLinkDesignMaster}
+                                            disabled={!selectedDesignMasterForLink}
+                                            className="rounded bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                        >
+                                            Link
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="rounded bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                        You can inspect tooling links, but you do not have permission to edit them.
+                                    </div>
+                                )}
+                            </div>
 	                          {toolingLinks.length > 0 ? toolingLinks.map((tooling) => (
 	                              <div key={tooling.id} className="rounded border border-slate-200 bg-slate-50 p-3">
-	                                  <div className="text-sm font-bold text-slate-800">{tooling.name}</div>
-	                                  <div className="mt-1 text-xs text-slate-500">
-	                                      {tooling.supplier ?? 'Supplier TBD'} · {tooling.cavityCount ? `${tooling.cavityCount} cavities` : 'Cavity TBD'}
+	                                  <div className="flex items-start justify-between gap-3">
+                                        <div>
+	                                        <div className="text-sm font-bold text-slate-800">{tooling.name}</div>
+	                                        <div className="mt-1 text-xs text-slate-500">
+	                                            {tooling.supplier ?? 'Supplier TBD'} · {tooling.cavityCount ? `${tooling.cavityCount} cavities` : 'Cavity TBD'}
+	                                        </div>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => openToolingHubForTooling(tooling.id)}
+                                          className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50"
+                                        >
+                                          <Hammer className="h-3.5 w-3.5" />
+                                          Open in Tooling Hub
+                                        </button>
 	                                  </div>
 	                              </div>
 	                          )) : (

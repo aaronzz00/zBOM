@@ -6,6 +6,7 @@ import type {
   CoreBOMSnapshot,
   CoreDesignMasterPart,
   CorePart,
+  CoreProject,
   CoreWorkspace,
   CoreWorkspaceSnapshot,
   CreateBOMNodeInput,
@@ -38,6 +39,8 @@ export interface CoreStorage {
 
 export interface CoreRepository {
   loadWorkspace: () => CoreWorkspaceSnapshot;
+  getProjects: () => CoreProject[];
+  setActiveProject: (projectId: string) => CoreProject;
   searchParts: (input?: PartSearchInput) => PartSearchResult;
   getPart: (partId: string) => CorePart;
   createPart: (input: CreatePartInput, actor: CoreActor) => CorePart;
@@ -50,6 +53,7 @@ export interface CoreRepository {
   createBOMSnapshot: (bomId: string, name: string, actor: CoreActor) => CoreBOMSnapshot;
   createDesignMasterPart: (input: CreateDesignMasterPartInput, actor: CoreActor) => CoreDesignMasterPart;
   mapConcretePart: (designMasterPartId: string, partId: string, actor: CoreActor) => ConcretePartMapping;
+  unmapConcretePart: (designMasterPartId: string, partId: string, actor: CoreActor) => void;
   createToolingRecord: (input: CreateToolingRecordInput, actor: CoreActor) => ToolingRecord;
   updateToolingRecord: (toolingId: string, updates: Partial<ToolingRecord>, actor: CoreActor) => ToolingRecord;
   updateToolingMilestone: (
@@ -179,8 +183,17 @@ export const toLegacyLibraryParts = (workspace: CoreWorkspace): LibraryPart[] =>
   workspace.parts.map(toLegacyLibraryPart)
 );
 
+const getActiveProjectId = (workspace: CoreWorkspace) => (
+  workspace.activeProjectId ?? workspace.projectId ?? workspace.projects[0]?.id
+);
+
+const getActiveBOM = (workspace: CoreWorkspace) => {
+  const activeProjectId = getActiveProjectId(workspace);
+  return workspace.boms.find((item) => item.projectId === activeProjectId) ?? workspace.boms[0];
+};
+
 const buildBOMTree = (workspace: CoreWorkspace): BOMNode => {
-  const bom = workspace.boms[0];
+  const bom = getActiveBOM(workspace);
   if (!bom) {
     throw new CoreRepositoryError('NOT_FOUND', 'No core BOM exists.');
   }
@@ -304,19 +317,23 @@ const legacyPartToCore = (part: LibraryPart, existing?: CorePart): CorePart => (
   updatedAt: now(),
 });
 
-const toLegacyDesignMasterParts = (workspace: CoreWorkspace): DesignMasterPart[] => (
-  workspace.designMasterParts.map((part) => ({
+const toLegacyDesignMasterParts = (workspace: CoreWorkspace): DesignMasterPart[] => {
+  const activeProjectId = getActiveProjectId(workspace);
+  return workspace.designMasterParts.filter((part) => part.projectId === activeProjectId).map((part) => ({
     ...part,
     concretePartNumbers: workspace.concretePartMappings
       .filter((mapping) => mapping.designMasterPartId === part.id)
       .map((mapping) => workspace.parts.find((item) => item.id === mapping.partId)?.partNumber)
       .filter((partNumber): partNumber is string => Boolean(partNumber)),
-  }))
-);
+  }));
+};
 
-const toLegacyTooling = (workspace: CoreWorkspace): Tooling[] => (
-  workspace.toolingRecords.map(({ updatedAt, ...tooling }) => tooling)
-);
+const toLegacyTooling = (workspace: CoreWorkspace): Tooling[] => {
+  const activeProjectId = getActiveProjectId(workspace);
+  return workspace.toolingRecords
+    .filter((tooling) => tooling.projectId === activeProjectId)
+    .map(({ updatedAt, ...tooling }) => tooling);
+};
 
 export const toLegacyToolingState = (workspace: CoreWorkspace) => ({
   designMasterParts: toLegacyDesignMasterParts(workspace),
@@ -339,7 +356,24 @@ export function calculateLeadTimeDays(tooling: ToolingRecord | Tooling) {
 }
 
 export function createCoreRepository(storage: CoreStorage = createLocalStorageCoreStorage()): CoreRepository {
-  let workspace = storage.read() ?? createSeedCoreWorkspace();
+  const normalizeWorkspace = (value: CoreWorkspace | null): CoreWorkspace => {
+    const seed = createSeedCoreWorkspace();
+    const source = value ?? seed;
+    const projects = source.projects?.length ? source.projects : seed.projects;
+    const requestedActiveProjectId = source.activeProjectId ?? source.projectId ?? projects[0]?.id;
+    const activeProjectId = projects.some((project) => project.id === requestedActiveProjectId)
+      ? requestedActiveProjectId
+      : projects[0]?.id ?? seed.activeProjectId;
+
+    return {
+      ...source,
+      projectId: activeProjectId,
+      activeProjectId,
+      projects,
+    };
+  };
+
+  let workspace = normalizeWorkspace(storage.read());
   const persist = () => {
     storage.write(workspace);
   };
@@ -354,6 +388,20 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
 
   return {
     loadWorkspace,
+
+    getProjects() {
+      return clone(workspace.projects);
+    },
+
+    setActiveProject(projectId) {
+      const project = workspace.projects.find((item) => item.id === projectId);
+      if (!project) {
+        throw new CoreRepositoryError('NOT_FOUND', 'Project was not found.', { projectId });
+      }
+      workspace = { ...workspace, projectId, activeProjectId: projectId };
+      persist();
+      return clone(project);
+    },
 
     searchParts(input = {}) {
       const query = input.query?.trim().toLowerCase() ?? '';
@@ -470,7 +518,7 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
     createBOMNode(input, actor) {
       requireCorePermission(actor, Permission.EDIT_BOM_STRUCTURE, 'create BOM nodes');
       validateCreateBOMNodeInput(workspace, input);
-      const bom = workspace.boms.find((item) => item.id === (input.bomId ?? workspace.boms[0]?.id));
+      const bom = workspace.boms.find((item) => item.id === (input.bomId ?? getActiveBOM(workspace)?.id));
       if (!bom) {
         throw new CoreRepositoryError('NOT_FOUND', 'BOM was not found.', { bomId: input.bomId });
       }
@@ -630,6 +678,22 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
       return clone(mapping);
     },
 
+    unmapConcretePart(designMasterPartId, partId, actor) {
+      requireCorePermission(actor, Permission.MANAGE_TOOLING, 'unmap concrete parts');
+      const existing = workspace.concretePartMappings.find((mapping) => (
+        mapping.designMasterPartId === designMasterPartId && mapping.partId === partId
+      ));
+      if (!existing) {
+        throw new CoreRepositoryError('NOT_FOUND', 'Concrete part mapping was not found.', { designMasterPartId, partId });
+      }
+      workspace = {
+        ...workspace,
+        concretePartMappings: workspace.concretePartMappings.filter((mapping) => mapping.id !== existing.id),
+      };
+      recordAudit(createAuditEvent('concrete-part-mapping', existing.id, 'delete', actor, 'Removed concrete part from design master.', 'Tooling Hub'));
+      persist();
+    },
+
     createToolingRecord(input, actor) {
       requireCorePermission(actor, Permission.MANAGE_TOOLING, 'create tooling records');
       if (!workspace.designMasterParts.some((part) => part.id === input.designMasterPartId)) {
@@ -710,10 +774,13 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
     },
 
     getToolingLinksForPart(partId) {
+      const activeProjectId = getActiveProjectId(workspace);
       const designMasterIds = workspace.concretePartMappings
         .filter((mapping) => mapping.partId === partId)
         .map((mapping) => mapping.designMasterPartId);
-      return clone(workspace.toolingRecords.filter((tooling) => designMasterIds.includes(tooling.designMasterPartId)));
+      return clone(workspace.toolingRecords.filter((tooling) => (
+        tooling.projectId === activeProjectId && designMasterIds.includes(tooling.designMasterPartId)
+      )));
     },
 
     getAuditEvents(entityType, entityId) {
@@ -724,7 +791,7 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
     },
 
     replaceLegacyBOMTree(tree, actor = SYSTEM_ACTOR) {
-      const bom = workspace.boms[0];
+      const bom = getActiveBOM(workspace);
       if (!bom) {
         throw new CoreRepositoryError('NOT_FOUND', 'No core BOM exists.');
       }
@@ -762,8 +829,13 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
     },
 
     replaceLegacyTooling(designMasterParts, tooling, actor = SYSTEM_ACTOR) {
-      const partsByNumber = new Map(workspace.parts.map((part) => [part.partNumber, part]));
-      const designMasters = designMasterParts.map(({ concretePartNumbers, ...part }) => part);
+      const activeProjectId = getActiveProjectId(workspace);
+      let nextParts = workspace.parts;
+      const partsByNumber = new Map(nextParts.map((part) => [part.partNumber, part]));
+      const designMasters = designMasterParts.map(({ concretePartNumbers, ...part }) => ({
+        ...part,
+        projectId: activeProjectId,
+      }));
       const mappings = designMasterParts.flatMap((designMasterPart) => (
         designMasterPart.concretePartNumbers.map((partNumber) => {
           let part = partsByNumber.get(partNumber);
@@ -786,7 +858,7 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
               createdAt: now(),
               updatedAt: now(),
             };
-            workspace.parts.push(part);
+            nextParts = [...nextParts, part];
             partsByNumber.set(partNumber, part);
           }
           return {
@@ -797,11 +869,22 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
           };
         })
       ));
+      const activeDesignMasterIds = new Set(designMasters.map((part) => part.id));
       workspace = {
         ...workspace,
-        designMasterParts: designMasters,
-        concretePartMappings: mappings,
-        toolingRecords: tooling.map((item) => ({ ...item, updatedAt: now() })),
+        parts: nextParts,
+        designMasterParts: [
+          ...workspace.designMasterParts.filter((part) => part.projectId !== activeProjectId),
+          ...designMasters,
+        ],
+        concretePartMappings: [
+          ...workspace.concretePartMappings.filter((mapping) => !activeDesignMasterIds.has(mapping.designMasterPartId)),
+          ...mappings,
+        ],
+        toolingRecords: [
+          ...workspace.toolingRecords.filter((item) => item.projectId !== activeProjectId),
+          ...tooling.map((item) => ({ ...item, projectId: activeProjectId, updatedAt: now() })),
+        ],
       };
       recordAudit(createAuditEvent('tooling-record', 'bulk-tooling', 'replace-tooling', actor, 'Replaced tooling records from legacy Tooling Hub flow.', 'Tooling Hub'));
       persist();

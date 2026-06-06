@@ -2,8 +2,9 @@ import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { SetupPage } from './pages/SetupPage';
-import { mockProject } from './data/mockBOM';
 import { FeedbackOverlay } from './components/FeedbackOverlay';
+import { useBOMStore } from './stores/useBOMStore';
+import { useToolingStore } from './stores/useToolingStore';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then(({ Dashboard }) => ({ default: Dashboard })));
 const BOMEditor = lazy(() => import('./pages/BOMEditor').then(({ BOMEditor }) => ({ default: BOMEditor })));
@@ -68,6 +69,13 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const showFeedbackOverlay = import.meta.env.VITE_ENABLE_FEEDBACK_OVERLAY === 'true';
+  const { project, projects, setActiveProject } = useBOMStore();
+  const refreshToolingFromRepository = useToolingStore((state) => state.loadFromRepository);
+
+  const handleProjectChange = (projectId: string) => {
+    setActiveProject(projectId);
+    refreshToolingFromRepository();
+  };
 
   useEffect(() => {
     const handleNavigate = (event: Event) => {
@@ -153,7 +161,7 @@ function App() {
         </ErrorBoundary>
         <div className="min-w-0 flex-1 flex flex-col h-full overflow-hidden">
           <ErrorBoundary>
-            <Header project={mockProject} />
+            <Header project={project} projects={projects} onProjectChange={handleProjectChange} />
           </ErrorBoundary>
           <main className="flex-1 overflow-hidden flex flex-col relative">
             <ErrorBoundary>

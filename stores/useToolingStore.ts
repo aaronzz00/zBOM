@@ -13,6 +13,7 @@ export interface ToolingState {
     designMasterParts: DesignMasterPart[];
     tooling: Tooling[];
     reset: () => void;
+    loadFromRepository: () => void;
     getToolingByDesignMasterPart: (designMasterPartId: string) => Tooling[];
     createDesignMasterPart: (part: DesignMasterPart) => void;
     createTooling: (tooling: Tooling) => void;
@@ -61,6 +62,10 @@ export const useToolingStore = create<ToolingState>((set, get) => ({
 
     reset: () => {
         coreRepository.replaceLegacyTooling(clone(mockDesignMasterParts), clone(mockTooling));
+        set(createInitialState());
+    },
+
+    loadFromRepository: () => {
         set(createInitialState());
     },
 

@@ -6,6 +6,7 @@ import { MBOMDeltaConsole } from '../pages/MBOMDeltaConsole';
 import { ProductMatrixCenter } from '../pages/ProductMatrixCenter';
 import { ToolingHub } from '../pages/ToolingHub';
 import { createInMemoryEBOMArchitectureRepository } from '../repositories/ebomArchitectureRepository';
+import { coreRepository } from '../repositories/core/coreRepository';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useEBOMArchitectureStore } from '../stores/useEBOMArchitectureStore';
 import { useMBOMDeltaStore } from '../stores/useMBOMDeltaStore';
@@ -28,6 +29,9 @@ vi.mock('@tanstack/react-virtual', () => ({
 
 describe('Phase 1 workflow pages', () => {
   beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    coreRepository.resetToSeed();
     useAuthStore.getState().switchRole('ADMIN');
     useProductConfigStore.getState().reset();
     useMBOMDeltaStore.getState().reset();
@@ -470,20 +474,27 @@ describe('Phase 1 workflow pages', () => {
   it('renders tooling by design master part with milestones and kickoff-to-T1 lead time', () => {
     render(<ToolingHub />);
 
-    const designMasterPartSelect = screen.getByRole('combobox', { name: 'Design Master Part' }) as HTMLSelectElement;
-
     expect(screen.getByText('Tooling Hub')).toBeInTheDocument();
+    expect(screen.getByText('Tooling Records')).toBeInTheDocument();
     expect(screen.getAllByText('DMP-ZPA-ENC-COVER').length).toBeGreaterThan(0);
-    expect(screen.getByText('ZP-A-STD-COVER-BLK')).toBeInTheDocument();
     expect(screen.getByText('Enclosure Cover Injection Mold')).toBeInTheDocument();
-    expect(screen.getByText('Kickoff to T1: 21 days')).toBeInTheDocument();
+    expect(screen.getByText('21 days')).toBeInTheDocument();
     expect(screen.getAllByText('done').length).toBeGreaterThan(0);
 
-    fireEvent.change(designMasterPartSelect, { target: { value: 'dmp-zp-a-pro-camera-deco' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Details' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: /links/i }));
 
-    expect(designMasterPartSelect.value).toBe('dmp-zp-a-pro-camera-deco');
+    expect(screen.getByText('ZP-A-STD-COVER-BLK')).toBeInTheDocument();
+    expect(screen.getByText('ZP-A-STD-COVER-SLV')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /milestones/i }));
+    expect(screen.getByText('Kickoff')).toBeInTheDocument();
+    expect(screen.getByText('T1')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Close tooling details'));
+
     expect(screen.getByText('Pro Camera Decoration Ring Die')).toBeInTheDocument();
-    expect(screen.getByText('ZP-A-PRO-CAMERA-DECO-BLK')).toBeInTheDocument();
-    expect(screen.queryByText('Enclosure Cover Injection Mold')).not.toBeInTheDocument();
+    expect(screen.getByText('DMP-ZPA-PRO-CAMERA-DECO')).toBeInTheDocument();
+    expect(screen.getByText('30 days')).toBeInTheDocument();
   });
 });

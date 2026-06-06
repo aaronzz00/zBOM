@@ -4,10 +4,11 @@ import { mockProject, previousBOM } from '../data/mockBOM';
 import { FormulaEngine } from '../services/FormulaEngine';
 import { coreRepository, toLegacyLibraryParts } from '../repositories/core/coreRepository';
 import { useAuthStore } from './useAuthStore';
-import type { CoreBOMNode, CoreBOMSnapshot } from '../domain/coreTypes';
+import type { CoreBOMNode, CoreBOMSnapshot, CoreProject } from '../domain/coreTypes';
 
 interface BOMState {
     project: Project;
+    projects: Project[];
     bomData: BOMNode;
     libraryParts: LibraryPart[];
     suppliers: Supplier[];
@@ -15,6 +16,7 @@ interface BOMState {
     attributeDefs: AttributeDefinition[];
 
     // Actions
+    setActiveProject: (projectId: string) => void;
     updateBOMNode: (nodeId: string, updates: Partial<BOMNode>) => void;
     addBOMNode: (parentId: string, newNode: BOMNode) => void;
     deleteBOMNode: (nodeId: string) => void;
@@ -38,22 +40,39 @@ const getActor = () => {
     };
 };
 
+const coreProjectToProject = (project: CoreProject, totalCost = 0, totalWeight = 0): Project => ({
+    id: project.id,
+    code: project.code,
+    name: project.name,
+    sku: project.sku,
+    phase: project.phase,
+    lastModified: project.updatedAt,
+    totalCost,
+    totalWeight,
+});
+
 const getRepositoryState = () => {
     const snapshot = coreRepository.loadWorkspace();
     const recalculated = FormulaEngine.recalculate(snapshot.bomTree);
     const totals = FormulaEngine.calculateTotals(recalculated);
-    return {
-        project: {
+    const activeProject = snapshot.projects.find((item) => item.id === snapshot.activeProjectId) ?? snapshot.projects[0];
+    const activeBOM = snapshot.boms.find((item) => item.projectId === activeProject?.id) ?? snapshot.boms[0];
+    const project = activeProject
+        ? coreProjectToProject(activeProject, totals.totalCost, totals.totalWeight)
+        : {
             ...mockProject,
-            id: snapshot.projectId,
+            id: snapshot.activeProjectId,
             totalCost: totals.totalCost,
             totalWeight: totals.totalWeight,
-            lastModified: snapshot.boms[0]?.updatedAt ?? mockProject.lastModified,
-        } as Project,
+            lastModified: activeBOM?.updatedAt ?? mockProject.lastModified,
+        } as Project;
+    return {
+        project,
+        projects: snapshot.projects.map((item) => coreProjectToProject(item)),
         bomData: recalculated,
         libraryParts: toLegacyLibraryParts(snapshot),
         suppliers: snapshot.suppliers,
-        snapshots: snapshot.bomSnapshots.map((item) => ({
+        snapshots: snapshot.bomSnapshots.filter((item) => !activeBOM || item.bomId === activeBOM.id).map((item) => ({
             id: item.id,
             name: item.name,
             timestamp: item.timestamp,
@@ -158,6 +177,11 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         { id: 'attr-4', name: 'Compliance', key: 'compliance', type: 'select', options: ['RoHS', 'REACH', 'UN38.3'] }
     ],
 
+    setActiveProject: (projectId: string) => {
+        coreRepository.setActiveProject(projectId);
+        set(getRepositoryState());
+    },
+
     setBOMData: (data: BOMNode) => {
         const recalculated = FormulaEngine.recalculate(data);
         const totals = FormulaEngine.calculateTotals(recalculated);
@@ -239,7 +263,9 @@ export const useBOMStore = create<BOMState>((set, get) => ({
 
     createSnapshot: (name: string) => {
         set((state) => {
-            const snapshot = coreRepository.createBOMSnapshot(coreRepository.loadWorkspace().boms[0].id, name, getActor());
+            const workspace = coreRepository.loadWorkspace();
+            const activeBOM = workspace.boms.find((item) => item.projectId === workspace.activeProjectId) ?? workspace.boms[0];
+            const snapshot = coreRepository.createBOMSnapshot(activeBOM.id, name, getActor());
             return {
                 snapshots: [{
                     id: snapshot.id,
