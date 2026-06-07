@@ -326,4 +326,41 @@ describe('production core flows', () => {
     expect(useBOMStore.getState().sandboxECOId).toBe(eco2.id);
     expect(useBOMStore.getState().sandboxBOMData?.quantity).toBe(12);
   });
+
+  it('renders all tabs in BOMEditor and displays tooling links correctly', () => {
+    const workspace = coreRepository.loadWorkspace();
+    const part = workspace.parts.find(p => p.partNumber === '100-55512-A');
+    const dm = workspace.designMasterParts.find(d => d.id === 'dmp-zp-a-enclosure-cover');
+    expect(part).toBeDefined();
+    expect(dm).toBeDefined();
+
+    coreRepository.mapConcretePart(dm!.id, part!.id, {
+      userId: 'user-admin',
+      name: 'Alex Admin',
+      role: 'ADMIN' as const
+    });
+
+    render(<BOMEditor />);
+
+    const row = screen.getByText('100-55512-A');
+    expect(row).toBeInTheDocument();
+    fireEvent.click(row);
+
+    expect(screen.getByRole('button', { name: /Usage/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Attributes/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Files/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /AML\/AVL/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Tooling/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /History/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Attributes/i }));
+    expect(screen.getByText('Description', { selector: 'label' })).toBeInTheDocument();
+    expect(screen.getByText('Weight (g)')).toBeInTheDocument();
+    expect(screen.getByText('Unit Cost')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Tooling/i }));
+    expect(screen.getByText('Enclosure Cover Injection Mold')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Open in Tooling Hub/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Milestones').length).toBeGreaterThan(0);
+  });
 });

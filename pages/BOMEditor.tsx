@@ -6,7 +6,7 @@ import { AIAssistant } from '../components/AIAssistant';
 import { useAppStore } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { BOMNode, ComponentType, LifecycleState, LibraryPart, AVLEntry, Permission, PricingTier } from '../types';
-import { Filter, Download, Upload, Plus, Minus, Bot, History, RotateCcw, Info, X, Search, Database, Box, Camera, FileSpreadsheet, CircuitBoard, Tags, LayoutGrid, ListTree, Trash2, Check, Star, Table2, Target, Lock, ToggleLeft, ToggleRight, Scale, PackageCheck, Coins, Hash, Paperclip, FileText, Settings, FileBox } from 'lucide-react';
+import { Filter, Download, Upload, Plus, Minus, Bot, History, RotateCcw, Info, X, Search, Database, Box, Camera, FileSpreadsheet, CircuitBoard, Tags, LayoutGrid, ListTree, Trash2, Check, Star, Table2, Target, Lock, ToggleLeft, ToggleRight, Scale, PackageCheck, Coins, Hash, Paperclip, FileText, Settings, FileBox, Hammer } from 'lucide-react';
 import { exportBOMToCSV, parseCSVToBOM } from '../utils/csvHelper';
 import { coreRepository } from '../repositories/core/coreRepository';
 
@@ -23,7 +23,7 @@ export const BOMEditor: React.FC = () => {
   
   const [selectedNode, setSelectedNode] = useState<BOMNode | null>(null);
   const [showAI, setShowAI] = useState(false);
-  const [detailsTab, setDetailsTab] = useState<'info' | 'history'>('info');
+  const [detailsTab, setDetailsTab] = useState<'usage' | 'attributes' | 'attachments' | 'aml' | 'tooling' | 'history'>('usage');
   const [viewMode, setViewMode] = useState<'tree' | 'matrix' | 'flat'>('tree');
   const [isMBOMView, setIsMBOMView] = useState(false);
 
@@ -127,7 +127,7 @@ export const BOMEditor: React.FC = () => {
 
   const handleNodeSelect = (node: BOMNode) => {
     setSelectedNode(node);
-    setDetailsTab('info');
+    setDetailsTab('usage');
   };
 
   const handleUpdateField = (nodeId: string, field: keyof BOMNode, value: any) => {
@@ -633,306 +633,538 @@ export const BOMEditor: React.FC = () => {
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex border-b border-slate-200">
-                        <button onClick={() => setDetailsTab('info')} className={`flex-1 py-3 text-sm font-medium ${detailsTab==='info' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500'}`}>Attributes</button>
-                        <button onClick={() => setDetailsTab('history')} className={`flex-1 py-3 text-sm font-medium ${detailsTab==='history' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500'}`}>History</button>
+                    <div className="flex border-b border-slate-200 overflow-x-auto bg-slate-50/50 select-none scrollbar-none flex-shrink-0">
+                        <button 
+                            type="button"
+                            onClick={() => setDetailsTab('usage')} 
+                            className={`flex-shrink-0 px-4 py-2.5 text-xs font-bold flex items-center gap-1.5 border-b-2 transition-colors ${
+                                detailsTab === 'usage' 
+                                ? 'text-blue-600 border-blue-600 bg-white' 
+                                : 'text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
+                            }`}
+                        >
+                            <Hash className="w-3.5 h-3.5" />
+                            Usage
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => setDetailsTab('attributes')} 
+                            className={`flex-shrink-0 px-4 py-2.5 text-xs font-bold flex items-center gap-1.5 border-b-2 transition-colors ${
+                                detailsTab === 'attributes' 
+                                ? 'text-blue-600 border-blue-600 bg-white' 
+                                : 'text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
+                            }`}
+                        >
+                            <Scale className="w-3.5 h-3.5" />
+                            Attributes
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => setDetailsTab('attachments')} 
+                            className={`flex-shrink-0 px-4 py-2.5 text-xs font-bold flex items-center gap-1.5 border-b-2 transition-colors ${
+                                detailsTab === 'attachments' 
+                                ? 'text-blue-600 border-blue-600 bg-white' 
+                                : 'text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
+                            }`}
+                        >
+                            <Paperclip className="w-3.5 h-3.5" />
+                            Files {(activeNode.attachments || []).length > 0 && <span className="px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full text-[9px]">{(activeNode.attachments || []).length}</span>}
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => setDetailsTab('aml')} 
+                            className={`flex-shrink-0 px-4 py-2.5 text-xs font-bold flex items-center gap-1.5 border-b-2 transition-colors ${
+                                detailsTab === 'aml' 
+                                ? 'text-blue-600 border-blue-600 bg-white' 
+                                : 'text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
+                            }`}
+                        >
+                            <Coins className="w-3.5 h-3.5" />
+                            AML/AVL {(() => {
+                                const matchingPart = libraryParts.find(p => p.partNumber === activeNode.partNumber);
+                                const amlCount = ((matchingPart?.customAttributes?.aml as any[]) || []).length;
+                                return amlCount > 0 ? <span className="px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full text-[9px]">{amlCount}</span> : null;
+                            })()}
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => setDetailsTab('tooling')} 
+                            className={`flex-shrink-0 px-4 py-2.5 text-xs font-bold flex items-center gap-1.5 border-b-2 transition-colors ${
+                                detailsTab === 'tooling' 
+                                ? 'text-blue-600 border-blue-600 bg-white' 
+                                : 'text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
+                            }`}
+                        >
+                            <Hammer className="w-3.5 h-3.5" />
+                            Tooling {(() => {
+                                const matchingPart = libraryParts.find(p => p.partNumber === activeNode.partNumber);
+                                if (!matchingPart) return null;
+                                const toolingCount = coreRepository.getToolingLinksForPart(matchingPart.id).length;
+                                return toolingCount > 0 ? <span className="px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full text-[9px]">{toolingCount}</span> : null;
+                            })()}
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => setDetailsTab('history')} 
+                            className={`flex-shrink-0 px-4 py-2.5 text-xs font-bold flex items-center gap-1.5 border-b-2 transition-colors ${
+                                detailsTab === 'history' 
+                                ? 'text-blue-600 border-blue-600 bg-white' 
+                                : 'text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
+                            }`}
+                        >
+                            <History className="w-3.5 h-3.5" />
+                            History
+                        </button>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                        {detailsTab === 'info' ? (
-                            <>
-                                {/* SECTION 1: BOM SPECIFIC INFO (Instance Data) */}
-                                <div className="bg-blue-50/50 p-3 rounded border border-blue-100">
-                                    <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-3 flex items-center gap-1">
-                                        <Hash className="w-3 h-3" /> BOM Usage Settings
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-3 mb-3">
-                                        <div>
-                                            <label htmlFor="bom-quantity-input" className="text-[10px] font-bold text-slate-500 block mb-1">Quantity</label>
+                    {(() => {
+                        const matchingPart = libraryParts.find(p => p.partNumber === activeNode.partNumber);
+                        const handleOpenToolingHub = (toolingId: string) => {
+                            window.sessionStorage.setItem('zbom.toolingHub.toolingId', toolingId);
+                            window.sessionStorage.setItem('zbom.toolingHub.tab', 'overview');
+                            window.dispatchEvent(new CustomEvent('zbom:navigate', { detail: { page: 'tooling' } }));
+                        };
+                        return (
+                            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                                {detailsTab === 'usage' && (
+                                    <div className="bg-blue-50/50 p-3 rounded border border-blue-100">
+                                        <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-3 flex items-center gap-1">
+                                            <Hash className="w-3 h-3" /> BOM Usage Settings
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label htmlFor="bom-quantity-input" className="text-[10px] font-bold text-slate-500 block mb-1">Quantity</label>
+                                                <input 
+                                                    id="bom-quantity-input"
+                                                    type="number"
+                                                    value={activeNode.quantity}
+                                                    onChange={(e) => handleUpdateField(activeNode.id, 'quantity', parseFloat(e.target.value))}
+                                                    className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:border-blue-500"
+                                                    disabled={!canEditStructure}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-500 block mb-1">Unit</label>
+                                                <select 
+                                                    value={activeNode.unit}
+                                                    onChange={(e) => handleUpdateField(activeNode.id, 'unit', e.target.value)}
+                                                    className="w-full px-2 py-1 text-sm border border-slate-300 rounded bg-white"
+                                                    disabled={!canEditMetadata}
+                                                >
+                                                    <option value="EA">EA</option>
+                                                    <option value="M">M</option>
+                                                    <option value="KG">KG</option>
+                                                    <option value="L">L</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="mb-3">
+                                            <label className="text-[10px] font-bold text-slate-500 block mb-1">Ref Designators</label>
                                             <input 
-                                                id="bom-quantity-input"
-                                                type="number"
-                                                value={activeNode.quantity}
-                                                onChange={(e) => handleUpdateField(activeNode.id, 'quantity', parseFloat(e.target.value))}
-                                                className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:border-blue-500"
-                                                disabled={!canEditStructure}
+                                                type="text"
+                                                value={activeNode.refDes || ''}
+                                                onChange={(e) => handleUpdateField(activeNode.id, 'refDes', e.target.value)}
+                                                className="w-full px-2 py-1 text-sm border border-slate-300 rounded font-mono"
+                                                placeholder="U1, R2..."
+                                                disabled={!canEditMetadata}
                                             />
                                         </div>
+                                        <div className="flex items-center gap-2">
+                                            {canEditMetadata && (
+                                                <label className="flex items-center gap-2 cursor-pointer bg-white px-2.5 py-1.5 rounded border border-slate-200 shadow-sm w-full justify-between">
+                                                    <span className="text-[10px] font-bold text-amber-700">Auxiliary (MBOM Only)</span>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={activeNode.isAuxiliary || false} 
+                                                        onChange={(e) => handleUpdateField(activeNode.id, 'isAuxiliary', e.target.checked)}
+                                                        className="w-3.5 h-3.5 text-amber-600 rounded border-slate-300 focus:ring-amber-500"
+                                                    />
+                                                </label>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {detailsTab === 'attributes' && (
+                                    <div className="space-y-4">
+                                        {/* Description */}
                                         <div>
-                                            <label className="text-[10px] font-bold text-slate-500 block mb-1">Unit</label>
-                                            <select 
-                                                value={activeNode.unit}
-                                                onChange={(e) => handleUpdateField(activeNode.id, 'unit', e.target.value)}
-                                                className="w-full px-2 py-1 text-sm border border-slate-300 rounded bg-white"
+                                            <label className="text-[10px] font-bold text-slate-500 block mb-1">Description</label>
+                                            <textarea
+                                                rows={2}
+                                                value={activeNode.description !== undefined ? activeNode.description : (matchingPart?.description || '')}
+                                                onChange={(e) => handleUpdateField(activeNode.id, 'description', e.target.value)}
+                                                className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder={matchingPart?.description ? `Inherited: ${matchingPart.description}` : "Enter description..."}
                                                 disabled={!canEditMetadata}
-                                            >
-                                                <option value="EA">EA</option>
-                                                <option value="M">M</option>
-                                                <option value="KG">KG</option>
-                                                <option value="L">L</option>
-                                            </select>
+                                            />
                                         </div>
-                                    </div>
-                                    <div className="mb-3">
-                                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Ref Designators</label>
-                                        <input 
-                                            type="text"
-                                            value={activeNode.refDes || ''}
-                                            onChange={(e) => handleUpdateField(activeNode.id, 'refDes', e.target.value)}
-                                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded font-mono"
-                                            placeholder="U1, R2..."
-                                            disabled={!canEditMetadata}
-                                        />
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {canEditMetadata && (
-                                            <label className="flex items-center gap-2 cursor-pointer bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={activeNode.isAuxiliary || false} 
-                                                    onChange={(e) => handleUpdateField(activeNode.id, 'isAuxiliary', e.target.checked)}
-                                                    className="w-3 h-3 text-amber-600 rounded"
-                                                />
-                                                <span className="text-[10px] font-bold text-amber-700">Auxiliary (MBOM Only)</span>
-                                            </label>
-                                        )}
-                                    </div>
-                                </div>
 
-                                <div className="border-t border-slate-200 my-2"></div>
-
-                                {/* SECTION 2: CUSTOM ATTRIBUTES (P1 Feature) */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                            <Settings className="w-3 h-3" /> Custom Attributes
-                                        </h4>
-                                        {canManageAttributes && (
-                                            <button 
-                                                onClick={() => setIsAttrModalOpen(true)}
-                                                className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded hover:bg-blue-50 hover:text-blue-600 font-bold border border-slate-200"
-                                            >
-                                                + Add Column
-                                            </button>
-                                        )}
-                                    </div>
-                                    
-                                    <div className="space-y-3 bg-slate-50 p-3 rounded border border-slate-200">
-                                         {visibleAttributeDefs.length === 0 ? (
-                                             <p className="text-xs text-slate-400 italic text-center">No custom attributes defined.</p>
-                                         ) : (
-                                             visibleAttributeDefs.map(def => {
-                                                 const matchingPart = libraryParts.find(p => p.partNumber === activeNode.partNumber);
-                                                 const resolvedValue = activeNode.customAttributes?.[def.key] !== undefined ? activeNode.customAttributes[def.key] : (matchingPart?.customAttributes?.[def.key] || '');
-                                                 return (
-                                                     <div key={def.id}>
-                                                         <label className="text-[10px] font-bold text-slate-500 block mb-1">{def.name}</label>
-                                                         {def.type === 'select' ? (
-                                                             <select 
-                                                                 value={resolvedValue}
-                                                                 onChange={(e) => handleUpdateAttribute(activeNode.id, def.key, e.target.value)}
-                                                                 className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded bg-white"
-                                                                 disabled={!canEditMetadata}
-                                                             >
-                                                                 <option value="">- Select -</option>
-                                                                 {def.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                                             </select>
-                                                         ) : (
-                                                             <input 
-                                                                 type={def.type === 'number' ? 'number' : 'text'}
-                                                                 value={resolvedValue}
-                                                                 onChange={(e) => handleUpdateAttribute(activeNode.id, def.key, e.target.value)}
-                                                                 className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded"
-                                                                 placeholder={matchingPart?.customAttributes?.[def.key] ? `Inherited: ${matchingPart.customAttributes[def.key]}` : `Enter ${def.name.toLowerCase()}...`}
-                                                                 disabled={!canEditMetadata}
-                                                             />
-                                                         )}
-                                                     </div>
-                                                 );
-                                             })
-                                         )}
-                                    </div>
-                                </div>
-
-                                <div className="border-t border-slate-200 my-2"></div>
-
-                                {/* SECTION 3: ATTACHMENTS (P1 Feature) */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                            <Paperclip className="w-3 h-3" /> Attachments
-                                        </h4>
-                                        <input 
-                                            type="file" 
-                                            ref={attachmentInputRef} 
-                                            className="hidden" 
-                                            onChange={handleAttachmentUpload}
-                                        />
-                                        {canEditMetadata && (
-                                            <button 
-                                                onClick={() => attachmentInputRef.current?.click()}
-                                                className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded hover:bg-blue-50 hover:text-blue-600 font-bold border border-slate-200"
-                                            >
-                                                + Upload
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        {!activeNode.attachments || activeNode.attachments.length === 0 ? (
-                                            <div className="text-center py-4 border-2 border-dashed border-slate-200 rounded text-slate-400 text-xs">
-                                                No documents attached.
-                                            </div>
-                                        ) : (
-                                            activeNode.attachments.map(att => (
-                                                <div key={att.id} className="flex items-center gap-3 p-2 border border-slate-200 rounded bg-white hover:bg-slate-50 group">
-                                                    <div className={`w-8 h-8 rounded flex items-center justify-center ${att.type === 'datasheet' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-                                                        {att.type === 'datasheet' ? <FileText className="w-4 h-4" /> : <FileBox className="w-4 h-4" />}
-                                                    </div>
-                                                    <div className="flex-1 overflow-hidden">
-                                                        <div className="text-xs font-bold text-slate-700 truncate" title={att.name}>{att.name}</div>
-                                                        <div className="text-[10px] text-slate-500">{att.size} • {att.uploadDate}</div>
-                                                    </div>
-                                                    <button 
-                                                        onClick={() => window.open(att.url, '_blank')}
-                                                        className="p-1 hover:bg-slate-200 rounded text-blue-600"
-                                                        aria-label={`View attachment ${att.name}`}
-                                                        title="View"
-                                                    >
-                                                        <Download className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {canEditMetadata && (
-                                                        <button 
-                                                            onClick={() => deleteAttachment(activeNode.id, att.id)}
-                                                            className="p-1 hover:bg-rose-100 rounded text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                            aria-label={`Remove attachment ${att.name}`}
-                                                            title="Remove"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="border-t border-slate-200 my-2"></div>
-                                
-                                {/* SECTION 4: PART DEFINITION (Global Attributes) */}
-                                <div>
-                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Base Attributes</h4>
-                                    
-                                    <div className="grid grid-cols-2 gap-3 mb-4">
-                                        <div className="p-2 bg-slate-50 border border-slate-200 rounded">
-                                            <label className="text-[10px] font-bold text-slate-500 block mb-1">Weight (g)</label>
-                                            <div className="flex items-center gap-1">
-                                                <Scale className="w-3 h-3 text-slate-400" />
-                                                <input 
-                                                    type="number"
-                                                    value={activeNode.weightG || ''}
-                                                    onChange={(e) => handleUpdateField(activeNode.id, 'weightG', parseFloat(e.target.value))}
-                                                    className="w-full bg-transparent text-sm font-mono focus:outline-none"
-                                                    placeholder="-"
-                                                    disabled={!canEditMetadata}
-                                                />
-                                            </div>
-                                        </div>
-                                         <div className="p-2 bg-slate-50 border border-slate-200 rounded">
-                                            <label className="text-[10px] font-bold text-slate-500 block mb-1">Unit Cost</label>
-                                            <div className="flex items-center gap-1">
-                                                <span className="text-xs font-mono text-slate-500">$</span>
-                                                <span className="text-sm font-mono">{activeNode.cost.toFixed(2)}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Procurement Rules */}
-                                    <div className="mb-4">
-                                        <h5 className="text-[10px] font-bold text-slate-500 uppercase mb-2">Procurement Rules</h5>
+                                        {/* Weight & Cost */}
                                         <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="text-xs text-slate-500 font-semibold">MOQ</label>
+                                            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded">
+                                                <label className="text-[10px] font-bold text-slate-500 block mb-1 flex items-center gap-1">
+                                                    <Scale className="w-3 h-3 text-slate-400" /> Weight (g)
+                                                </label>
                                                 <input 
                                                     type="number"
-                                                    value={activeNode.moq || ''}
-                                                    onChange={(e) => handleUpdateField(activeNode.id, 'moq', parseFloat(e.target.value))}
-                                                    className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-sm"
-                                                    placeholder="Min Order"
+                                                    value={activeNode.weightG !== undefined ? activeNode.weightG : (matchingPart?.weightG || '')}
+                                                    onChange={(e) => handleUpdateField(activeNode.id, 'weightG', parseFloat(e.target.value) || 0)}
+                                                    className="w-full bg-transparent text-sm font-mono focus:outline-none"
+                                                    placeholder={matchingPart?.weightG !== undefined ? `Inherited: ${matchingPart.weightG}` : "-"}
                                                     disabled={!canEditMetadata}
                                                 />
                                             </div>
-                                            <div>
-                                                <label className="text-xs text-slate-500 font-semibold">SPQ</label>
-                                                <input 
-                                                    type="number"
-                                                    value={activeNode.spq || ''}
-                                                    onChange={(e) => handleUpdateField(activeNode.id, 'spq', parseFloat(e.target.value))}
-                                                    className="w-full mt-1 px-2 py-1.5 border border-slate-300 rounded text-sm"
-                                                    placeholder="Std Pack"
-                                                    disabled={!canEditMetadata}
-                                                />
+                                            
+                                            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded">
+                                                <label className="text-[10px] font-bold text-slate-500 block mb-1 flex items-center gap-1">
+                                                    <Coins className="w-3 h-3 text-slate-400" /> Unit Cost
+                                                </label>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-xs font-mono text-slate-400">$</span>
+                                                    <input 
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={activeNode.cost !== undefined ? activeNode.cost : (matchingPart?.cost || 0)}
+                                                        onChange={(e) => handleUpdateField(activeNode.id, 'cost', parseFloat(e.target.value) || 0)}
+                                                        className="w-full bg-transparent text-sm font-mono focus:outline-none font-bold text-slate-800"
+                                                        placeholder={matchingPart?.cost !== undefined ? `Inherited: ${matchingPart.cost}` : "-"}
+                                                        disabled={!canEditCost}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Procurement MOQ / SPQ */}
+                                        <div>
+                                            <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Procurement Rules</h5>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="text-xs text-slate-500 font-semibold block mb-1">MOQ</label>
+                                                    <input 
+                                                        type="number"
+                                                        value={activeNode.moq !== undefined ? activeNode.moq : (matchingPart?.moq || '')}
+                                                        onChange={(e) => handleUpdateField(activeNode.id, 'moq', parseFloat(e.target.value) || 0)}
+                                                        className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs font-mono"
+                                                        placeholder={matchingPart?.moq !== undefined ? `Inherited: ${matchingPart.moq}` : "Min Order Qty"}
+                                                        disabled={!canEditMetadata}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-slate-500 font-semibold block mb-1">SPQ</label>
+                                                    <input 
+                                                        type="number"
+                                                        value={activeNode.spq !== undefined ? activeNode.spq : (matchingPart?.spq || '')}
+                                                        onChange={(e) => handleUpdateField(activeNode.id, 'spq', parseFloat(e.target.value) || 0)}
+                                                        className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs font-mono"
+                                                        placeholder={matchingPart?.spq !== undefined ? `Inherited: ${matchingPart.spq}` : "Std Pack Qty"}
+                                                        disabled={!canEditMetadata}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Custom Attributes */}
+                                        <div className="border-t border-slate-100 pt-3">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                                    <Settings className="w-3.5 h-3.5" /> Scoped Custom Attributes
+                                                </h5>
+                                                {canManageAttributes && (
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setIsAttrModalOpen(true)}
+                                                        className="text-[10px] bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 px-2 py-0.5 rounded border border-slate-200 font-bold transition-colors"
+                                                    >
+                                                        + Add Column
+                                                    </button>
+                                                )}
+                                            </div>
+                                            
+                                            <div className="space-y-3 bg-slate-50 p-3 rounded border border-slate-200">
+                                                {visibleAttributeDefs.length === 0 ? (
+                                                    <p className="text-xs text-slate-400 italic text-center">No custom attributes defined.</p>
+                                                ) : (
+                                                    visibleAttributeDefs.map(def => {
+                                                        const resolvedValue = activeNode.customAttributes?.[def.key] !== undefined 
+                                                            ? activeNode.customAttributes[def.key] 
+                                                            : (matchingPart?.customAttributes?.[def.key] || '');
+                                                        return (
+                                                            <div key={def.id}>
+                                                                <label className="text-[10px] font-bold text-slate-500 block mb-1">{def.name}</label>
+                                                                {def.type === 'select' ? (
+                                                                    <select 
+                                                                        value={resolvedValue}
+                                                                        onChange={(e) => handleUpdateAttribute(activeNode.id, def.key, e.target.value)}
+                                                                        className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded bg-white"
+                                                                        disabled={!canEditMetadata}
+                                                                    >
+                                                                        <option value="">- Select -</option>
+                                                                        {def.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                                    </select>
+                                                                ) : (
+                                                                    <input 
+                                                                        type={def.type === 'number' ? 'number' : 'text'}
+                                                                        value={resolvedValue}
+                                                                        onChange={(e) => handleUpdateAttribute(activeNode.id, def.key, e.target.value)}
+                                                                        className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded"
+                                                                        placeholder={matchingPart?.customAttributes?.[def.key] ? `Inherited: ${matchingPart.customAttributes[def.key]}` : `Enter ${def.name.toLowerCase()}...`}
+                                                                        disabled={!canEditMetadata}
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="space-y-5">
-                                <div>
-                                    <h4 className="mb-2 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500">
-                                        <History className="h-3.5 w-3.5" />
-                                        Audit Trail
-                                    </h4>
-                                    <div className="space-y-2">
-                                        {activeNodeAuditEvents.length > 0 ? activeNodeAuditEvents.map((event) => (
-                                            <div key={event.id} className="rounded border border-slate-200 bg-slate-50 p-3">
-                                                <div className="text-xs font-bold text-slate-800">{event.summary}</div>
-                                                <div className="mt-1 text-[10px] text-slate-500">
-                                                    {event.sourceModule} · {event.actor.name} · {new Date(event.timestamp).toLocaleString()}
+                                )}
+
+                                {detailsTab === 'attachments' && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                                <Paperclip className="w-3.5 h-3.5" /> File Attachments
+                                            </h5>
+                                            <input 
+                                                type="file" 
+                                                ref={attachmentInputRef} 
+                                                className="hidden" 
+                                                onChange={handleAttachmentUpload}
+                                            />
+                                            {canEditMetadata && (
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => attachmentInputRef.current?.click()}
+                                                    className="text-[10px] bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 px-2 py-1 rounded border border-slate-200 font-bold transition-colors"
+                                                >
+                                                    + Upload File
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {!activeNode.attachments || activeNode.attachments.length === 0 ? (
+                                                <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded text-slate-400 text-xs">
+                                                    No documents attached to this BOM item.
                                                 </div>
-                                            </div>
-                                        )) : (
-                                            <div className="rounded border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
-                                                No audit events recorded for this BOM context yet.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div>
-                                    <h4 className="mb-2 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500">
-                                        <Camera className="h-3.5 w-3.5" />
-                                        Snapshots
-                                    </h4>
-                                    <div className="space-y-2">
-                                        {snapshots.length > 0 ? snapshots.map((snapshot) => (
-                                            <div key={snapshot.id} className="rounded border border-slate-200 bg-white p-3">
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div>
-                                                        <div className="text-xs font-bold text-slate-800">{snapshot.name}</div>
-                                                        <div className="mt-1 text-[10px] text-slate-500">{new Date(snapshot.timestamp).toLocaleString()}</div>
+                                            ) : (
+                                                activeNode.attachments.map(att => (
+                                                    <div key={att.id} className="flex items-center gap-3 p-2 border border-slate-200 rounded bg-white hover:bg-slate-50 group">
+                                                        <div className={`w-8 h-8 rounded flex items-center justify-center ${att.type === 'datasheet' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                            {att.type === 'datasheet' ? <FileText className="w-4 h-4" /> : <FileBox className="w-4 h-4" />}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-xs font-bold text-slate-700 truncate" title={att.name}>{att.name}</div>
+                                                            <div className="text-[10px] text-slate-500">{att.size} • {att.uploadDate}</div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => window.open(att.url, '_blank')}
+                                                                className="p-1 hover:bg-slate-100 rounded text-blue-600"
+                                                                aria-label={`View attachment ${att.name}`}
+                                                                title="Download/View"
+                                                            >
+                                                                <Download className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            {canEditMetadata && (
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => deleteAttachment(activeNode.id, att.id)}
+                                                                    className="p-1 hover:bg-rose-100 rounded text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                    aria-label={`Remove attachment ${att.name}`}
+                                                                    title="Remove"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    {canEditStructure && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleLoadSnapshot(snapshot.id, snapshot.name)}
-                                                            className="rounded border border-blue-200 px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-50"
-                                                        >
-                                                            Reload
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )) : (
-                                            <div className="rounded border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
-                                                No snapshots created yet.
-                                            </div>
-                                        )}
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
+
+                                {detailsTab === 'aml' && (
+                                    <div className="space-y-4">
+                                        <div className="bg-blue-50/50 border border-blue-100 rounded p-3 text-xs text-blue-800">
+                                            Approved Manufacturer List (AML) details for the linked library part number.
+                                        </div>
+                                        
+                                        <div className="space-y-2">
+                                            {(() => {
+                                                const amlList = (matchingPart?.customAttributes?.aml as Array<{ mfr: string, mpn: string, datasheet: string, status: string, cost?: number, leadTime?: number }>) || [];
+                                                if (amlList.length === 0) {
+                                                    return (
+                                                        <div className="text-center py-6 bg-slate-50 border border-slate-200 border-dashed rounded text-slate-400 text-xs">
+                                                            No manufacturer parts mapped in library.
+                                                        </div>
+                                                    );
+                                                }
+                                                return amlList.map((entry, idx) => (
+                                                    <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-bold text-slate-800 text-sm">{entry.mfr}</span>
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase border ${
+                                                                    entry.status === 'Preferred' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 
+                                                                    entry.status === 'Approved' ? 'bg-blue-100 text-blue-700 border-blue-200' : 
+                                                                    entry.status === 'Qualified' ? 'bg-slate-100 text-slate-700 border-slate-200' : 
+                                                                    'bg-rose-100 text-rose-700 border-rose-200'
+                                                                }`}>{entry.status}</span>
+                                                            </div>
+                                                            <p className="text-xs font-mono text-slate-600 mt-1">MPN: {entry.mpn}</p>
+                                                            <div className="flex gap-3 text-[10px] text-slate-500 mt-1">
+                                                                {entry.cost !== undefined && <span>Cost: ${entry.cost.toFixed(3)}</span>}
+                                                                {entry.leadTime !== undefined && <span>Lead Time: {entry.leadTime} wks</span>}
+                                                            </div>
+                                                            {entry.datasheet && (
+                                                                <a href={entry.datasheet} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 hover:underline mt-1 block">
+                                                                    Datasheet Link
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {detailsTab === 'tooling' && (
+                                    <div className="space-y-4">
+                                        <div className="bg-emerald-50/50 border border-emerald-100 rounded p-3 text-xs text-emerald-800">
+                                            Tooling records resolved for the concrete library part using coreRepository.
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            {(() => {
+                                                if (!matchingPart) {
+                                                    return (
+                                                        <div className="text-center py-6 text-slate-400 text-xs italic">
+                                                            Cannot resolve concrete part number.
+                                                        </div>
+                                                    );
+                                                }
+                                                const toolingLinks = coreRepository.getToolingLinksForPart(matchingPart.id);
+                                                if (toolingLinks.length === 0) {
+                                                    return (
+                                                        <div className="text-center py-8 text-slate-400 text-sm bg-slate-50 border border-slate-200 border-dashed rounded">
+                                                            No tooling links resolved for this part.
+                                                        </div>
+                                                    );
+                                                }
+                                                return toolingLinks.map((tooling) => (
+                                                    <div key={tooling.id} className="rounded border border-slate-200 bg-slate-50 p-3 space-y-3 shadow-sm hover:border-blue-300 transition-colors">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <div className="text-sm font-bold text-slate-800">{tooling.name}</div>
+                                                                <div className="mt-0.5 text-xs text-slate-500 font-medium">
+                                                                    {tooling.supplier ?? 'Supplier TBD'} · {tooling.cavityCount ? `${tooling.cavityCount} cavities` : 'Cavity TBD'}
+                                                                </div>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenToolingHub(tooling.id)}
+                                                                className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50 hover:border-blue-300 shadow-sm transition-all whitespace-nowrap"
+                                                            >
+                                                                <Hammer className="h-3 h-3 text-blue-500" />
+                                                                Open in Tooling Hub
+                                                            </button>
+                                                        </div>
+
+                                                        {tooling.milestones && tooling.milestones.length > 0 && (
+                                                            <div className="border-t border-slate-200/60 pt-2">
+                                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Milestones</div>
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    {tooling.milestones.map((ms) => {
+                                                                        let statusColor = "bg-slate-200 text-slate-600 border-slate-300";
+                                                                        if (ms.status === 'done') statusColor = "bg-emerald-100 text-emerald-700 border-emerald-200";
+                                                                        else if (ms.status === 'in-progress') statusColor = "bg-blue-100 text-blue-700 border-blue-200";
+                                                                        else if (ms.status === 'blocked') statusColor = "bg-rose-100 text-rose-700 border-rose-200";
+                                                                        
+                                                                        return (
+                                                                            <div key={ms.key} className="flex items-center justify-between p-1.5 bg-white rounded border border-slate-200 text-[10px] shadow-xs">
+                                                                                <span className="font-bold text-slate-700">{ms.key}</span>
+                                                                                <span className={`px-1.5 py-0.2 rounded border font-bold uppercase ${statusColor}`}>
+                                                                                    {ms.status}
+                                                                                </span>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {detailsTab === 'history' && (
+                                    <div className="space-y-6">
+                                        <div>
+                                            <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                                <History className="h-4 w-4 text-slate-400" />
+                                                Audit Trail
+                                            </h4>
+                                            <div className="space-y-2">
+                                                {activeNodeAuditEvents.length > 0 ? activeNodeAuditEvents.map((event) => (
+                                                    <div key={event.id} className="rounded border border-slate-200 bg-slate-50 p-3">
+                                                        <div className="text-xs font-bold text-slate-800">{event.summary}</div>
+                                                        <div className="mt-1 text-[10px] text-slate-500 flex justify-between">
+                                                            <span>{event.sourceModule} · {event.actor.name}</span>
+                                                            <span>{new Date(event.timestamp).toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+                                                )) : (
+                                                    <div className="rounded border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
+                                                        No audit events recorded for this BOM context yet.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                                <Camera className="h-4 w-4 text-slate-400" />
+                                                Snapshots
+                                            </h4>
+                                            <div className="space-y-2">
+                                                {snapshots.length > 0 ? snapshots.map((snapshot) => (
+                                                    <div key={snapshot.id} className="rounded border border-slate-200 bg-white p-3 shadow-xs">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <div className="text-xs font-bold text-slate-800">{snapshot.name}</div>
+                                                                <div className="mt-1 text-[10px] text-slate-500">{new Date(snapshot.timestamp).toLocaleString()}</div>
+                                                            </div>
+                                                            {canEditStructure && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleLoadSnapshot(snapshot.id, snapshot.name)}
+                                                                    className="rounded border border-blue-200 px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-50 shadow-xs transition-colors"
+                                                                >
+                                                                    Reload
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )) : (
+                                                    <div className="rounded border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
+                                                        No snapshots created yet.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        );
+                    })()}
                 </div>
             )}
 

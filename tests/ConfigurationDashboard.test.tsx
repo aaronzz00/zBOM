@@ -158,6 +158,7 @@ describe('Configuration Dashboard & Scoping Integration Tests', () => {
 
     // Select Software node
     fireEvent.click(screen.getByText('SW-10001'));
+    fireEvent.click(screen.getByRole('button', { name: /Attributes/i }));
     // In BOMEditor side panel details, "GitHub Repo URL" label and input should be visible (2 occurrences: table header column and edit label)
     expect(screen.getAllByText('GitHub Repo URL').length).toBe(2);
     expect(screen.getByPlaceholderText(/Enter GitHub Repo URL.../i)).toBeInTheDocument();
@@ -165,6 +166,7 @@ describe('Configuration Dashboard & Scoping Integration Tests', () => {
 
     // Now select Part node
     fireEvent.click(screen.getByText('R-0402-10K-1'));
+    fireEvent.click(screen.getByRole('button', { name: /Attributes/i }));
     // In BOMEditor side panel details, "GitHub Repo URL" should NOT be visible since it is type-scoped to Software (only 1 occurrence in table header column)
     expect(screen.getAllByText('GitHub Repo URL').length).toBe(1);
 
@@ -288,6 +290,7 @@ describe('Configuration Dashboard & Scoping Integration Tests', () => {
     // 2. Act: Mount BOMEditor and click a node to view its custom attributes
     const { rerender } = render(<BOMEditor />);
     fireEvent.click(screen.getByText('700-00112-B'));
+    fireEvent.click(screen.getByRole('button', { name: /Attributes/i }));
 
     // Assert: Old Label should be present
     expect(screen.getAllByText('Old Label').length).toBeGreaterThanOrEqual(1);
@@ -300,6 +303,7 @@ describe('Configuration Dashboard & Scoping Integration Tests', () => {
 
     // Rerender BOMEditor
     rerender(<BOMEditor />);
+    fireEvent.click(screen.getByRole('button', { name: /Attributes/i }));
 
     // Assert: Verify New Label is now present and Old Label is gone
     expect(screen.queryByText('Old Label')).not.toBeInTheDocument();

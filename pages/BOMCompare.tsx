@@ -319,60 +319,132 @@ export const BOMCompare: React.FC = () => {
       <div className="flex-1 overflow-auto p-6">
         <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
           <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-              <tr>
-                <th className="px-4 py-3 w-32">Status</th>
-                <th className="px-4 py-3 w-48">Part Number</th>
-                <th className="px-4 py-3">Name / Description</th>
-                <th className="px-4 py-3 w-28 text-center">Rev</th>
-                <th className="px-4 py-3 w-32 text-right">Quantity</th>
-                <th className="px-4 py-3 w-32 text-right">Unit Cost</th>
+            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 text-xs">
+              <tr className="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase tracking-wider">
+                <th colSpan={4} className="px-4 py-2 text-center bg-slate-200/40">Baseline (Old Version A)</th>
+                <th className="px-2 py-2 text-center bg-slate-200 border-x border-slate-200 w-28">Diff</th>
+                <th colSpan={4} className="px-4 py-2 text-center bg-blue-50/50">Target (New Version B)</th>
+              </tr>
+              <tr className="uppercase text-[10px]">
+                {/* Left columns */}
+                <th className="px-4 py-2.5">Part Number & Name</th>
+                <th className="px-4 py-2.5 w-14 text-center">Rev</th>
+                <th className="px-4 py-2.5 w-16 text-right">Qty</th>
+                <th className="px-4 py-2.5 w-24 text-right border-r border-slate-200">Unit Cost</th>
+                
+                {/* Middle column */}
+                <th className="px-2 py-2.5 text-center border-r border-slate-200 w-28">Status</th>
+                
+                {/* Right columns */}
+                <th className="px-4 py-2.5">Part Number & Name</th>
+                <th className="px-4 py-2.5 w-14 text-center">Rev</th>
+                <th className="px-4 py-2.5 w-16 text-right">Qty</th>
+                <th className="px-4 py-2.5 w-24 text-right">Unit Cost</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 text-xs">
               {(!leftBOM || !rightBOM) ? (
                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                    <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
                         <AlertCircle className="w-12 h-12 mx-auto mb-3 text-slate-200" />
                         <p>Please select two valid snapshots or versions to compare.</p>
                     </td>
                  </tr>
               ) : diffItems.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                    <Package className="w-12 h-12 mx-auto mb-3 text-slate-200" />
-                    <p>Models are identical.</p>
-                  </td>
-                </tr>
+                 <tr>
+                    <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
+                      <Package className="w-12 h-12 mx-auto mb-3 text-slate-200" />
+                      <p>Models are identical.</p>
+                    </td>
+                 </tr>
               ) : (
-                diffItems.map((item, idx) => (
-                  <tr key={`${item.partNumber}-${idx}`} className={getRowClass(item.status)}>
-                    <td className="px-4 py-3">
-                      {getStatusBadge(item.status)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {item.oldPartNumber && item.status === DiffStatus.Modified 
-                        ? renderDiffCell(item.oldPartNumber, item.partNumber, 'partnumber')
-                        : <span className="font-medium text-slate-700 font-mono">{item.partNumber}</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {item.name}
-                      {item.oldPartNumber && <div className="text-[10px] text-amber-600 font-medium mt-0.5">Part Replacement Detected</div>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-center">
-                        {renderDiffCell(item.oldRev, item.newRev, 'text')}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                       {renderDiffCell(item.oldQty, item.newQty, 'number')}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                       {renderDiffCell(item.oldCost, item.newCost, 'currency')}
-                    </td>
-                  </tr>
-                ))
+                diffItems.map((item, idx) => {
+                  const isAdded = item.status === DiffStatus.Added;
+                  const isRemoved = item.status === DiffStatus.Removed;
+                  const isModified = item.status === DiffStatus.Modified;
+                  
+                  // Old values for Left Pane
+                  const oldPartNum = item.oldPartNumber || (isAdded ? undefined : item.partNumber);
+                  const oldName = isAdded ? undefined : item.name;
+                  const oldRev = item.oldRev;
+                  const oldQty = item.oldQty;
+                  const oldCost = item.oldCost;
+                  
+                  // New values for Right Pane
+                  const newPartNum = isRemoved ? undefined : item.partNumber;
+                  const newName = isRemoved ? undefined : item.name;
+                  const newRev = item.newRev;
+                  const newQty = item.newQty;
+                  const newCost = item.newCost;
+
+                  // Determine cell highlights
+                  const isRevChanged = isModified && item.oldRev !== item.newRev;
+                  const isQtyChanged = isModified && item.oldQty !== item.newQty;
+                  const isCostChanged = isModified && item.oldCost !== item.newCost;
+                  const isPartNumChanged = isModified && item.oldPartNumber !== undefined;
+
+                  return (
+                    <tr key={`${item.partNumber}-${idx}`} className={getRowClass(item.status)}>
+                      {/* --- LEFT PANE (Version A) --- */}
+                      {isAdded ? (
+                        <td colSpan={4} className="px-4 py-3 bg-slate-50/50 border-r border-slate-100 text-center text-slate-300 italic">
+                          - Not Present -
+                        </td>
+                      ) : (
+                        <>
+                          <td className="px-4 py-3 font-medium">
+                            <div className="flex flex-col">
+                              <span className={`font-mono text-slate-800 ${isPartNumChanged ? 'bg-amber-100 px-1 rounded' : ''}`}>{oldPartNum}</span>
+                              <span className="text-[10px] text-slate-400 truncate max-w-[180px]">{oldName}</span>
+                            </div>
+                          </td>
+                          <td className={`px-4 py-3 text-center ${isRevChanged ? 'bg-amber-100/50 font-bold text-amber-800' : 'text-slate-600'}`}>
+                            {oldRev !== undefined ? oldRev : '-'}
+                          </td>
+                          <td className={`px-4 py-3 text-right ${isQtyChanged ? 'bg-amber-100/50 font-bold text-amber-800' : 'text-slate-600'}`}>
+                            {oldQty !== undefined ? oldQty : '-'}
+                          </td>
+                          <td className={`px-4 py-3 text-right border-r border-slate-100 ${isCostChanged ? 'bg-amber-100/50 font-bold text-amber-800' : 'text-slate-600'}`}>
+                            {oldCost !== undefined ? (canViewCommercial ? `$${oldCost.toFixed(2)}` : 'Restricted') : '-'}
+                          </td>
+                        </>
+                      )}
+
+                      {/* --- MIDDLE STATUS --- */}
+                      <td className="px-2 py-3 text-center border-r border-slate-100">
+                        {getStatusBadge(item.status)}
+                        {isPartNumChanged && (
+                          <div className="text-[9px] text-amber-600 font-bold mt-1 uppercase tracking-tight">Replacement</div>
+                        )}
+                      </td>
+
+                      {/* --- RIGHT PANE (Version B) --- */}
+                      {isRemoved ? (
+                        <td colSpan={4} className="px-4 py-3 bg-slate-50/50 text-center text-slate-300 italic">
+                          - Removed -
+                        </td>
+                      ) : (
+                        <>
+                          <td className="px-4 py-3 font-medium">
+                            <div className="flex flex-col">
+                              <span className={`font-mono text-slate-800 ${isPartNumChanged ? 'bg-amber-100 px-1 rounded' : ''}`}>{newPartNum}</span>
+                              <span className="text-[10px] text-slate-400 truncate max-w-[180px]">{newName}</span>
+                            </div>
+                          </td>
+                          <td className={`px-4 py-3 text-center ${isRevChanged ? 'bg-amber-100/50 font-bold text-amber-800' : 'text-slate-600'}`}>
+                            {newRev !== undefined ? newRev : '-'}
+                          </td>
+                          <td className={`px-4 py-3 text-right ${isQtyChanged ? 'bg-amber-100/50 font-bold text-amber-800' : 'text-slate-600'}`}>
+                            {newQty !== undefined ? newQty : '-'}
+                          </td>
+                          <td className={`px-4 py-3 text-right ${isCostChanged ? 'bg-amber-100/50 font-bold text-amber-800' : 'text-slate-600'}`}>
+                            {newCost !== undefined ? (canViewCommercial ? `$${newCost.toFixed(2)}` : 'Restricted') : '-'}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
