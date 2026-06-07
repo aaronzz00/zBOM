@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { BOMNode, Project, LibraryPart, ComponentType, Supplier, BOMSnapshot, AttributeDefinition, Attachment } from '../types';
+import { BOMNode, Project, LibraryPart, ComponentType, Supplier, BOMSnapshot, AttributeDefinition, Attachment, ProjectStageFlow } from '../types';
 import { mockProject, previousBOM } from '../data/mockBOM';
 import { FormulaEngine } from '../services/FormulaEngine';
 import { coreRepository, toLegacyLibraryParts } from '../repositories/core/coreRepository';
@@ -14,6 +14,8 @@ interface BOMState {
     suppliers: Supplier[];
     snapshots: BOMSnapshot[];
     attributeDefs: AttributeDefinition[];
+    projectFlows: ProjectStageFlow[];
+    projectFlowAssociations: Record<string, string>;
 
     // Actions
     setActiveProject: (projectId: string) => void;
@@ -29,6 +31,9 @@ interface BOMState {
     deleteAttributeDef: (id: string) => void;
     addAttachment: (nodeId: string, file: File) => void;
     deleteAttachment: (nodeId: string, attachmentId: string) => void;
+    updateProjectPhase: (projectId: string, newPhase: 'EVT' | 'DVT' | 'PVT' | 'MP') => void;
+    updateProjectFlows: (flows: ProjectStageFlow[]) => void;
+    setProjectFlowAssociation: (projectId: string, flowId: string) => void;
 }
 
 const getActor = () => {
@@ -168,6 +173,56 @@ const findNodeAndProcess = (node: BOMNode, id: string, processor: (n: BOMNode) =
     return node;
 };
 
+const DEFAULT_PROJECT_FLOWS: ProjectStageFlow[] = [
+    {
+        id: 'flow-standard',
+        name: 'Standard Hardware Flow',
+        stages: ['EVT', 'DVT', 'PVT', 'MP'],
+        transitions: {
+            EVT: { targetStages: ['DVT'], checklist: ['BOM Cost Review Completed', 'DFM Review Completed', 'Initial EVT Yield Report Attached'] },
+            DVT: { targetStages: ['PVT'], checklist: ['Functional Testing Completed', 'Compliance Certificates Obtained', 'Tooling T1 Trials Completed'] },
+            PVT: { targetStages: ['MP'], checklist: ['PVT Qualification Complete', 'Operator Training Complete', 'Final Golden Sample Approved'] },
+            MP: { targetStages: [], checklist: [] }
+        }
+    },
+    {
+        id: 'flow-fast',
+        name: 'Fast-Track IoT Flow',
+        stages: ['EVT', 'PVT', 'MP'],
+        transitions: {
+            EVT: { targetStages: ['PVT'], checklist: ['BOM Cost Review Completed', 'Functional Testing Completed', 'DFM Review Completed'] },
+            PVT: { targetStages: ['MP'], checklist: ['Operator Training Complete', 'Final Golden Sample Approved'] },
+            MP: { targetStages: [], checklist: [] }
+        }
+    }
+];
+
+const FLOWS_STORAGE_KEY = 'zbom.flows.configs';
+const FLOW_ASSOC_STORAGE_KEY = 'zbom.flows.associations';
+
+const loadSavedFlows = (): ProjectStageFlow[] => {
+    try {
+        const saved = localStorage.getItem(FLOWS_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch (e) {
+        console.error('Failed to load flows configs', e);
+    }
+    return DEFAULT_PROJECT_FLOWS;
+};
+
+const loadSavedFlowAssociations = (): Record<string, string> => {
+    try {
+        const saved = localStorage.getItem(FLOW_ASSOC_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch (e) {
+        console.error('Failed to load flow associations', e);
+    }
+    return {
+        'project-zphone-2026': 'flow-standard',
+        'project-zphone-lite-2026': 'flow-fast'
+    };
+};
+
 export const useBOMStore = create<BOMState>((set, get) => ({
     ...getRepositoryState(),
     attributeDefs: [
@@ -176,6 +231,8 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         { id: 'attr-3', name: 'Torque Spec', key: 'torque', type: 'text' },
         { id: 'attr-4', name: 'Compliance', key: 'compliance', type: 'select', options: ['RoHS', 'REACH', 'UN38.3'] }
     ],
+    projectFlows: loadSavedFlows(),
+    projectFlowAssociations: loadSavedFlowAssociations(),
 
     setActiveProject: (projectId: string) => {
         coreRepository.setActiveProject(projectId);
@@ -333,5 +390,32 @@ export const useBOMStore = create<BOMState>((set, get) => ({
             coreRepository.replaceLegacyBOMTree(newData, getActor());
             return { bomData: newData };
         });
+    },
+
+    updateProjectPhase: (projectId: string, newPhase: 'EVT' | 'DVT' | 'PVT' | 'MP') => {
+        const actor = getActor();
+        const updatedCoreProject = coreRepository.updateProjectPhase(projectId, newPhase, actor);
+        set((state) => {
+            const calculatedTree = state.bomData;
+            const totals = FormulaEngine.calculateTotals(calculatedTree);
+            const legacyProject = coreProjectToProject(updatedCoreProject, totals.totalCost, totals.totalWeight);
+            const projects = state.projects.map((p) => p.id === projectId ? legacyProject : p);
+            const project = state.project.id === projectId ? legacyProject : state.project;
+            return { projects, project };
+        });
+    },
+
+    updateProjectFlows: (flows: ProjectStageFlow[]) => {
+        localStorage.setItem(FLOWS_STORAGE_KEY, JSON.stringify(flows));
+        set({ projectFlows: flows });
+    },
+
+    setProjectFlowAssociation: (projectId: string, flowId: string) => {
+        const updatedAssoc = {
+            ...get().projectFlowAssociations,
+            [projectId]: flowId
+        };
+        localStorage.setItem(FLOW_ASSOC_STORAGE_KEY, JSON.stringify(updatedAssoc));
+        set({ projectFlowAssociations: updatedAssoc });
     }
 }));

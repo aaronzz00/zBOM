@@ -41,6 +41,7 @@ export interface CoreRepository {
   loadWorkspace: () => CoreWorkspaceSnapshot;
   getProjects: () => CoreProject[];
   setActiveProject: (projectId: string) => CoreProject;
+  updateProjectPhase: (projectId: string, phase: 'EVT' | 'DVT' | 'PVT' | 'MP', actor: CoreActor) => CoreProject;
   searchParts: (input?: PartSearchInput) => PartSearchResult;
   getPart: (partId: string) => CorePart;
   createPart: (input: CreatePartInput, actor: CoreActor) => CorePart;
@@ -399,6 +400,34 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
         throw new CoreRepositoryError('NOT_FOUND', 'Project was not found.', { projectId });
       }
       workspace = { ...workspace, projectId, activeProjectId: projectId };
+      persist();
+      return clone(project);
+    },
+
+    updateProjectPhase(projectId, phase, actor) {
+      const project = workspace.projects.find((item) => item.id === projectId);
+      if (!project) {
+        throw new CoreRepositoryError('NOT_FOUND', 'Project was not found.', { projectId });
+      }
+      const oldPhase = project.phase;
+      project.phase = phase;
+      project.updatedAt = now();
+      
+      workspace = {
+        ...workspace,
+        projects: workspace.projects.map((item) => item.id === projectId ? project : item),
+      };
+      
+      recordAudit(createAuditEvent(
+        'project',
+        projectId,
+        'transition-phase',
+        actor,
+        `Transitioned project ${project.name} from ${oldPhase} to ${phase}.`,
+        'BOM Editor',
+        { oldPhase, newPhase: phase }
+      ));
+      
       persist();
       return clone(project);
     },

@@ -9,8 +9,8 @@ const MOCK_USERS: Record<UserRole, User> = {
     VIEWER: { id: 'u4', name: 'Guest Viewer', email: 'guest@zbom.com', role: 'VIEWER', avatarInitials: 'GV' },
 };
 
-// Role-Permission Matrix (Copied from AuthContext)
-const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+// Default Role-Permission Matrix
+const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     ADMIN: Object.values(Permission), // All permissions
     ENG_LEAD: [
         Permission.VIEW_DASHBOARD,
@@ -22,6 +22,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
         Permission.EDIT_EBOM_ARCHITECTURE,
         Permission.MANAGE_SKU_LIFECYCLE,
         Permission.MANAGE_TOOLING,
+        Permission.TRANSITION_PROJECT_PHASE,
     ],
     SOURCING: [
         Permission.VIEW_DASHBOARD,
@@ -41,22 +42,64 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     ]
 };
 
+const STORAGE_KEY = 'zbom.auth.role_permissions';
+
+const loadSavedPermissions = (): Record<UserRole, Permission[]> => {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            const parsed = JSON.parse(saved) as Record<UserRole, Permission[]>;
+            // Ensure ADMIN always has all permissions (Safety Lock)
+            parsed.ADMIN = Object.values(Permission);
+            return parsed;
+        }
+    } catch (e) {
+        console.error('Failed to load role permissions', e);
+    }
+    return { ...DEFAULT_ROLE_PERMISSIONS };
+};
+
 interface AuthState {
     currentUser: User;
+    rolePermissions: Record<UserRole, Permission[]>;
     switchRole: (role: UserRole) => void;
     hasPermission: (permission: Permission) => boolean;
+    updateRolePermissions: (role: UserRole, permissions: Permission[]) => void;
+    resetRolePermissions: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
     currentUser: MOCK_USERS.ADMIN,
+    rolePermissions: loadSavedPermissions(),
 
     switchRole: (role: UserRole) => {
         set({ currentUser: MOCK_USERS[role] });
     },
 
     hasPermission: (permission: Permission) => {
-        const { currentUser } = get();
-        const perms = ROLE_PERMISSIONS[currentUser.role];
+        const { currentUser, rolePermissions } = get();
+        const perms = rolePermissions[currentUser.role] || [];
         return perms.includes(permission);
+    },
+
+    updateRolePermissions: (role: UserRole, permissions: Permission[]) => {
+        if (role === 'ADMIN') {
+            // Safety Lock: Do not allow modifying ADMIN role permissions
+            return;
+        }
+        const updated = {
+            ...get().rolePermissions,
+            [role]: permissions,
+        };
+        // Always ensure ADMIN is fully locked
+        updated.ADMIN = Object.values(Permission);
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        set({ rolePermissions: updated });
+    },
+
+    resetRolePermissions: () => {
+        localStorage.removeItem(STORAGE_KEY);
+        set({ rolePermissions: { ...DEFAULT_ROLE_PERMISSIONS } });
     }
 }));

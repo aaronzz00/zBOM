@@ -16,6 +16,7 @@ const ECOManager = lazy(() => import('./pages/ECOManager').then(({ ECOManager })
 const BOMCompare = lazy(() => import('./pages/BOMCompare').then(({ BOMCompare }) => ({ default: BOMCompare })));
 const PartLibrary = lazy(() => import('./pages/PartLibrary').then(({ PartLibrary }) => ({ default: PartLibrary })));
 const SupplyChain = lazy(() => import('./pages/SupplyChain').then(({ SupplyChain }) => ({ default: SupplyChain })));
+import { SettingsPage } from './pages/SettingsPage';
 
 const PageFallback = () => (
   <div className="flex flex-1 items-center justify-center bg-slate-50 text-sm font-medium text-slate-400" role="status">
@@ -128,18 +129,7 @@ function App() {
 	        );
 	      case 'settings':
 	        return (
-	          <DevelopmentPreviewFrame><SetupPage
-	            eyebrow="Admin Console"
-            title="System Settings"
-            description="Role access and application preferences are collected here as a deterministic setup surface for frontend testing."
-            checklistTitle="Configuration areas"
-            items={[
-              'Role access matrix and QA/demo chrome flags.',
-              'Commercial field visibility defaults by role.',
-              'BOM import, export, snapshot, and approval workflow preferences.',
-              'Integration readiness checks for ERP and supplier audit modules.',
-            ]}
-	          /></DevelopmentPreviewFrame>
+	          <DevelopmentPreviewFrame><SettingsPage /></DevelopmentPreviewFrame>
 	        );
       default:
         return (

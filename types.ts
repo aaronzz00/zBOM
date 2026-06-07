@@ -51,6 +51,7 @@ export enum Permission {
   EDIT_EBOM_ARCHITECTURE = 'EDIT_EBOM_ARCHITECTURE',
   MANAGE_TOOLING = 'MANAGE_TOOLING',
   VIEW_DEMO_ROLE_SWITCHER = 'VIEW_DEMO_ROLE_SWITCHER',
+  TRANSITION_PROJECT_PHASE = 'TRANSITION_PROJECT_PHASE',
 }
 
 export interface PricingTier {
@@ -232,4 +233,19 @@ export interface AIAnalysisResult {
     partNumber: string;
     suggestion: string;
   }>;
+}
+
+export interface ProjectStageFlow {
+  id: string;
+  name: string;
+  stages: string[];
+  transitions: Record<string, {
+    targetStages: string[];
+    checklist: string[];
+  }>;
+}
+
+export interface ProjectFlowAssociation {
+  projectId: string;
+  flowId: string;
 }

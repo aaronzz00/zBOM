@@ -13,6 +13,9 @@ export const useAuth = () => {
   return {
     currentUser: store.currentUser,
     switchRole: store.switchRole,
-    hasPermission: store.hasPermission
+    hasPermission: store.hasPermission,
+    rolePermissions: store.rolePermissions,
+    updateRolePermissions: store.updateRolePermissions,
+    resetRolePermissions: store.resetRolePermissions,
   };
 };
