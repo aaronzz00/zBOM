@@ -1,79 +1,54 @@
-import React, { useState } from 'react';
-import { ECO, Permission } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ECO, Permission, ECOImpact } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useAppStore } from '../context/AppContext';
 import { FileSignature, Plus, CheckCircle, XCircle, Clock, ChevronRight, AlertCircle, ArrowRight } from 'lucide-react';
 
-// Mock ECO Data
-const MOCK_ECOS: ECO[] = [
-  {
-    id: 'eco-001',
-    ecoNumber: 'ECO-2024-112',
-    title: 'Replace M1.2 screws with M1.4',
-    description: 'Field failure reports indicate M1.2 screws stripping during assembly torque. Upgrading to M1.4 for durability.',
-    status: 'Approved',
-    initiator: 'Alex Chen',
-    createdDate: '2024-10-12',
-    approvedBy: 'Sarah Engineer',
-    approvalDate: '2024-10-14',
-    priority: 'High',
-    impacts: [
-      { partNumber: '500-22101-A', name: 'Screw, M1.2x3, Torx', changeType: 'Obsolete' },
-      { partNumber: '500-22105-A', name: 'Screw, M1.4x3, Torx', changeType: 'New' }
-    ]
-  },
-  {
-    id: 'eco-002',
-    ecoNumber: 'ECO-2024-115',
-    title: 'Update FW Bootloader',
-    description: 'Security patch for bootloader. Required for PVT builds.',
-    status: 'Pending Approval',
-    initiator: 'Mike Smith',
-    createdDate: '2024-10-14',
-    priority: 'Medium',
-    impacts: [
-      { partNumber: 'SW-10001', name: 'Firmware, Bootloader', changeType: 'RevUp', from: 'v1.2', to: 'v1.3' }
-    ]
-  }
-];
-
 export const ECOManager: React.FC = () => {
-  const { hasPermission } = useAuth();
-  const [ecos, setEcos] = useState<ECO[]>(MOCK_ECOS);
+  const { currentUser, hasPermission } = useAuth();
+  const { ecos, createECO, approveECO, rejectECO } = useAppStore();
   const [selectedEco, setSelectedEco] = useState<ECO | null>(null);
+
+  // Sync selected ECO with store updates
+  useEffect(() => {
+    if (selectedEco) {
+      const found = ecos.find(e => e.id === selectedEco.id);
+      if (found) {
+        setSelectedEco(found);
+      }
+    }
+  }, [ecos, selectedEco]);
 
   const canApprove = hasPermission(Permission.APPROVE_CHANGE);
   const canCreate = hasPermission(Permission.CREATE_ECO);
 
   const handleCreateDraft = () => {
     const nextIndex = ecos.length + 1;
-    const draftEco: ECO = {
-      id: `eco-draft-${nextIndex}`,
-      ecoNumber: `ECO-2024-DRAFT-${String(nextIndex).padStart(3, '0')}`,
-      title: 'Draft BOM update request',
-      description: 'Draft change order created from current BOM context.',
-      status: 'Draft',
-      initiator: 'Alex Admin',
-      createdDate: '2026-06-04',
-      priority: 'Medium',
-      impacts: [
-        {
-          partNumber: '800-00234-A',
-          name: 'Top Level Assembly, zPhone Pro',
-          changeType: 'RevUp',
-          from: 'A.02',
-          to: 'Draft',
-        },
-      ],
-    };
-
-    setEcos((current) => [draftEco, ...current]);
-    setSelectedEco(draftEco);
+    const impacts: ECOImpact[] = [
+      {
+        partNumber: '800-00234-A',
+        name: 'Top Level Assembly, zPhone Pro',
+        changeType: 'RevUp',
+        from: 'A.02',
+        to: 'Draft',
+      },
+    ];
+    
+    const draft = createECO(
+      'Draft BOM update request',
+      'Draft change order created from current BOM context.',
+      currentUser.name,
+      impacts,
+      'Medium'
+    );
+    setSelectedEco(draft);
   };
 
   const handleStatusChange = (ecoId: string, newStatus: ECO['status']) => {
-    setEcos(prev => prev.map(e => e.id === ecoId ? { ...e, status: newStatus } : e));
-    if (selectedEco && selectedEco.id === ecoId) {
-        setSelectedEco({ ...selectedEco, status: newStatus });
+    if (newStatus === 'Approved') {
+      approveECO(ecoId, currentUser.name);
+    } else if (newStatus === 'Rejected') {
+      rejectECO(ecoId);
     }
   };
 

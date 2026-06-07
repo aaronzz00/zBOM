@@ -7,26 +7,46 @@ import { BOMNode, Permission } from '../types';
 import { FeatureDialog } from '../components/FeatureDialog';
 
 export const BOMCompare: React.FC = () => {
-  const { bomData, snapshots } = useAppStore();
+  const { bomData, snapshots: currentSnapshots, projects, getBOMAndSnapshotsForProject, project: currentProject } = useAppStore();
   const { hasPermission } = useAuth();
   const canViewCommercial = hasPermission(Permission.VIEW_COMMERCIAL_FIELDS) || hasPermission(Permission.VIEW_COST);
   
+  // State for project selections
+  const [leftProjectId, setLeftProjectId] = useState<string>(currentProject.id);
+  const [rightProjectId, setRightProjectId] = useState<string>(currentProject.id);
+
   // State for selectors
-  // Default: Left = Latest Snapshot (or null), Right = Current Working Copy
-  const [leftId, setLeftId] = useState<string>(snapshots.length > 0 ? snapshots[0].id : '');
+  // Default: Left = Latest Snapshot of active project (if exists, else 'current'), Right = Current Working Copy
+  const [leftId, setLeftId] = useState<string>(currentSnapshots.length > 0 ? currentSnapshots[0].id : 'current');
   const [rightId, setRightId] = useState<string>('current');
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [showExportSummary, setShowExportSummary] = useState(false);
 
-  // Helper to get BOM Object from ID
-  const getBOMById = (id: string): BOMNode | null => {
-    if (id === 'current') return bomData;
-    const snap = snapshots.find(s => s.id === id);
-    return snap ? snap.data : null;
+  // Dynamically resolve BOM data and snapshots list for left project
+  const leftProjectData = useMemo(() => {
+    if (leftProjectId === currentProject.id) {
+      return { bomData, snapshots: currentSnapshots };
+    }
+    return getBOMAndSnapshotsForProject(leftProjectId) || { bomData, snapshots: [] };
+  }, [leftProjectId, currentProject.id, bomData, currentSnapshots, getBOMAndSnapshotsForProject]);
+
+  // Dynamically resolve BOM data and snapshots list for right project
+  const rightProjectData = useMemo(() => {
+    if (rightProjectId === currentProject.id) {
+      return { bomData, snapshots: currentSnapshots };
+    }
+    return getBOMAndSnapshotsForProject(rightProjectId) || { bomData, snapshots: [] };
+  }, [rightProjectId, currentProject.id, bomData, currentSnapshots, getBOMAndSnapshotsForProject]);
+
+  // Helper to get BOM Object from ID and project data context
+  const getBOMById = (id: string, projectData: { bomData: BOMNode, snapshots: Array<{ id: string, name: string, data: BOMNode }> }): BOMNode | null => {
+    if (id === 'current') return projectData.bomData;
+    const snap = projectData.snapshots.find(s => s.id === id);
+    return snap ? snap.data : projectData.bomData; // Fallback if snapshot is out of sync
   };
 
-  const leftBOM = getBOMById(leftId);
-  const rightBOM = getBOMById(rightId);
+  const leftBOM = getBOMById(leftId, leftProjectData);
+  const rightBOM = getBOMById(rightId, rightProjectData);
 
   // Calculate Diff
   const diffItems = useMemo(() => {
@@ -173,24 +193,49 @@ export const BOMCompare: React.FC = () => {
         </div>
         
         {/* Model Selection Bar */}
-        <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4">
+        <div className="flex gap-6 bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4 items-stretch">
+            {/* Baseline (Left) */}
             <div className="flex-1 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs">A</div>
-                <div className="flex-1">
+                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs flex-shrink-0">A</div>
+                <div className="flex-1 min-w-0">
                     <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Baseline (Old)</label>
-                    <div className="relative">
-                        <select 
-                            value={leftId}
-                            onChange={(e) => setLeftId(e.target.value)}
-                            className="w-full appearance-none bg-white border border-slate-300 hover:border-blue-400 px-3 py-2 pr-8 rounded text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors"
-                        >
-                            <option value="" disabled>Select a snapshot</option>
-                            <option value="current">Current Working Copy ({bomData.revision})</option>
-                            {snapshots.map(snap => (
-                                <option key={snap.id} value={snap.id}>{snap.name} ({new Date(snap.timestamp).toLocaleDateString()})</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <div className="flex gap-2">
+                        {/* Project selector */}
+                        <div className="w-1/2 relative">
+                            <select 
+                                value={leftProjectId}
+                                onChange={(e) => {
+                                    const pid = e.target.value;
+                                    setLeftProjectId(pid);
+                                    const pData = pid === currentProject.id ? { bomData, snapshots: currentSnapshots } : getBOMAndSnapshotsForProject(pid);
+                                    if (pData && pData.snapshots.length > 0) {
+                                        setLeftId(pData.snapshots[0].id);
+                                    } else {
+                                        setLeftId('current');
+                                    }
+                                }}
+                                className="w-full appearance-none bg-white border border-slate-300 hover:border-blue-400 px-3 py-2 pr-8 rounded text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors"
+                            >
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                        {/* Snapshot selector */}
+                        <div className="w-1/2 relative">
+                            <select 
+                                value={leftId}
+                                onChange={(e) => setLeftId(e.target.value)}
+                                className="w-full appearance-none bg-white border border-slate-300 hover:border-blue-400 px-3 py-2 pr-8 rounded text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors"
+                            >
+                                <option value="current">Current Copy ({leftProjectData.bomData.revision})</option>
+                                {leftProjectData.snapshots.map(snap => (
+                                    <option key={snap.id} value={snap.id}>{snap.name} ({new Date(snap.timestamp).toLocaleDateString()})</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -201,22 +246,48 @@ export const BOMCompare: React.FC = () => {
                 </div>
             </div>
 
+            {/* Target (Right) */}
             <div className="flex-1 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">B</div>
-                <div className="flex-1">
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">B</div>
+                <div className="flex-1 min-w-0">
                     <label className="text-xs font-semibold text-blue-700 uppercase tracking-wider block mb-1">Target (New)</label>
-                    <div className="relative">
-                        <select 
-                            value={rightId}
-                            onChange={(e) => setRightId(e.target.value)}
-                            className="w-full appearance-none bg-white border border-blue-300 px-3 py-2 pr-8 rounded text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
-                        >
-                             <option value="current">Current Working Copy ({bomData.revision})</option>
-                             {snapshots.map(snap => (
-                                <option key={snap.id} value={snap.id}>{snap.name} ({new Date(snap.timestamp).toLocaleDateString()})</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <div className="flex gap-2">
+                        {/* Project selector */}
+                        <div className="w-1/2 relative">
+                            <select 
+                                value={rightProjectId}
+                                onChange={(e) => {
+                                    const pid = e.target.value;
+                                    setRightProjectId(pid);
+                                    const pData = pid === currentProject.id ? { bomData, snapshots: currentSnapshots } : getBOMAndSnapshotsForProject(pid);
+                                    if (pData && pData.snapshots.length > 0) {
+                                        setRightId(pData.snapshots[0].id);
+                                    } else {
+                                        setRightId('current');
+                                    }
+                                }}
+                                className="w-full appearance-none bg-white border border-slate-300 hover:border-blue-400 px-3 py-2 pr-8 rounded text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
+                            >
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                        {/* Snapshot selector */}
+                        <div className="w-1/2 relative">
+                            <select 
+                                value={rightId}
+                                onChange={(e) => setRightId(e.target.value)}
+                                className="w-full appearance-none bg-white border border-blue-300 px-3 py-2 pr-8 rounded text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
+                            >
+                                 <option value="current">Current Copy ({rightProjectData.bomData.revision})</option>
+                                 {rightProjectData.snapshots.map(snap => (
+                                    <option key={snap.id} value={snap.id}>{snap.name} ({new Date(snap.timestamp).toLocaleDateString()})</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
                     </div>
                 </div>
             </div>

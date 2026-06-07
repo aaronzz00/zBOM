@@ -44,10 +44,7 @@ export const parseCSVToBOM = (csvText: string): BOMNode | null => {
   const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
   if (lines.length < 2) return null; // Header + 1 row minimum
 
-  // Basic CSV parser (ignoring complex quoted commas for this prototype, assume standard format)
-  // For production, use a library like PapaParse
   const parseLine = (line: string) => {
-    // Simple split by comma, handling basic quotes
     const res = [];
     let inQuote = false;
     let current = '';
@@ -61,47 +58,116 @@ export const parseCSVToBOM = (csvText: string): BOMNode | null => {
     return res;
   };
 
+  const headers = parseLine(lines[0]).map(h => h.trim().toLowerCase());
+  
+  // Find column indices
+  const levelIdx = headers.findIndex(h => h === 'level' || h === 'bom level' || h === 'indent');
+  const pnIdx = headers.findIndex(h => h === 'part number' || h === 'partnumber' || h === 'pn' || h.includes('part number'));
+  const nameIdx = headers.findIndex(h => h === 'name' || h === 'item name' || h === 'description' || h.includes('name'));
+  const descIdx = headers.findIndex(h => h === 'description' || h.includes('desc'));
+  const revIdx = headers.findIndex(h => h === 'revision' || h === 'rev');
+  const stateIdx = headers.findIndex(h => h === 'state' || h === 'lifecycle state');
+  const typeIdx = headers.findIndex(h => h === 'type' || h === 'component type');
+  const qtyIdx = headers.findIndex(h => h === 'quantity' || h === 'qty');
+  const costIdx = headers.findIndex(h => h === 'unit cost' || h === 'cost' || h === 'price');
+  const mfrIdx = headers.findIndex(h => h === 'manufacturer' || h === 'mfr');
+  const mpnIdx = headers.findIndex(h => h === 'mpn' || h === 'mfg part number');
+
   // Skip header
   const dataRows = lines.slice(1).map(parseLine);
 
-  // Logic to reconstruct tree based on 'Level' column (index 0)
   const rootStack: BOMNode[] = [];
   let rootNode: BOMNode | null = null;
 
+  // Let's determine indentation pattern if level column is absent
+  let useIndentation = levelIdx === -1;
+
   dataRows.forEach((row, index) => {
-    const level = parseInt(row[0]);
-    if (isNaN(level)) return;
+    let rawPn = pnIdx !== -1 ? row[pnIdx] || '' : row[1] || '';
+    let level = 0;
+
+    if (useIndentation) {
+      // Calculate level based on leading spaces or dots in Part Number
+      const match = rawPn.match(/^([.\s]+)/);
+      if (match) {
+        const prefix = match[1];
+        if (prefix.includes('.')) {
+          level = prefix.split('.').length - 1;
+        } else {
+          // Spaces - assume 2 or 4 spaces per level
+          level = Math.floor(prefix.length / 2);
+        }
+      }
+    } else {
+      const rawLevel = levelIdx !== -1 ? row[levelIdx] || '' : '0';
+      if (rawLevel.includes('.')) {
+        // Dot separated like 1.1.1
+        level = rawLevel.split('.').length - 1;
+      } else {
+        level = parseInt(rawLevel, 10);
+      }
+    }
+
+    if (isNaN(level)) level = 0;
+
+    // Clean Part Number (strip leading dots/spaces)
+    const partNumber = rawPn.replace(/^[.\s]+/, '').trim();
+    const name = (nameIdx !== -1 ? row[nameIdx] : row[2]) || 'Imported Item';
+    const description = (descIdx !== -1 ? row[descIdx] : row[3]) || '';
+    const revision = (revIdx !== -1 ? row[revIdx] : row[4]) || 'A';
+    const state = (stateIdx !== -1 ? row[stateIdx] as LifecycleState : undefined) || LifecycleState.Draft;
+    const type = (typeIdx !== -1 ? row[typeIdx] as ComponentType : undefined) || ComponentType.Part;
+    const quantity = parseFloat(qtyIdx !== -1 ? row[qtyIdx] : row[7]) || 1;
+    const cost = parseFloat(costIdx !== -1 ? row[costIdx] : row[8]) || 0;
+    const manufacturer = (mfrIdx !== -1 ? row[mfrIdx] : row[9]) || '';
+    const mpn = (mpnIdx !== -1 ? row[mpnIdx] : row[10]) || '';
 
     const node: BOMNode = {
       id: `imp-${Date.now()}-${index}`,
-      partNumber: row[1] || 'UNKNOWN',
-      name: row[2] || 'Imported Item',
-      description: row[3] || '',
-      revision: row[4] || 'A',
-      state: (row[5] as LifecycleState) || LifecycleState.Draft,
-      type: (row[6] as ComponentType) || ComponentType.Part,
-      quantity: parseFloat(row[7]) || 1,
-      unit: 'EA', // Default
-      cost: parseFloat(row[8]) || 0,
+      partNumber,
+      name,
+      description,
+      revision,
+      state,
+      type,
+      quantity,
+      unit: 'EA',
+      cost,
       currency: 'USD',
-      manufacturer: row[9] || '',
-      mpn: row[10] || '',
+      manufacturer,
+      mpn,
       children: []
     };
 
-    if (level === 0) {
-      rootNode = node;
-      rootStack[0] = node;
+    if (level === 0 || !rootNode) {
+      if (!rootNode) {
+        rootNode = node;
+        rootStack[0] = node;
+      } else {
+        if (!rootNode.children) rootNode.children = [];
+        rootNode.children.push(node);
+        rootStack[1] = node;
+      }
     } else {
-      // Find parent at level - 1
       const parent = rootStack[level - 1];
       if (parent) {
         if (!parent.children) parent.children = [];
         parent.children.push(node);
-        // Set self as potential parent for next level
         rootStack[level] = node;
       } else {
-        console.warn(`Orphan node detected at row ${index + 2}, level ${level}`);
+        let foundParent = null;
+        for (let i = level - 1; i >= 0; i--) {
+          if (rootStack[i]) {
+            foundParent = rootStack[i];
+            break;
+          }
+        }
+        const parentToUse = foundParent || rootNode;
+        if (parentToUse) {
+          if (!parentToUse.children) parentToUse.children = [];
+          parentToUse.children.push(node);
+          rootStack[level] = node;
+        }
       }
     }
   });

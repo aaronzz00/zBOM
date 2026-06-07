@@ -129,7 +129,7 @@ function App() {
 	        );
 	      case 'settings':
 	        return (
-	          <DevelopmentPreviewFrame><SettingsPage /></DevelopmentPreviewFrame>
+	          <SettingsPage />
 	        );
       default:
         return (

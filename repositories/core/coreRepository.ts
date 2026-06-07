@@ -41,8 +41,9 @@ export interface CoreRepository {
   loadWorkspace: () => CoreWorkspaceSnapshot;
   getProjects: () => CoreProject[];
   setActiveProject: (projectId: string) => CoreProject;
-  updateProjectPhase: (projectId: string, phase: 'EVT' | 'DVT' | 'PVT' | 'MP', actor: CoreActor) => CoreProject;
+  updateProjectPhase: (projectId: string, phase: 'EVT' | 'DVT' | 'PVT' | 'MP', actor: CoreActor, signatures?: any) => CoreProject;
   createProject: (input: Omit<CoreProject, 'updatedAt' | 'status'>, actor: CoreActor) => CoreProject;
+  updateProject: (projectId: string, updates: Partial<CoreProject>, actor: CoreActor) => CoreProject;
   searchParts: (input?: PartSearchInput) => PartSearchResult;
   getPart: (partId: string) => CorePart;
   createPart: (input: CreatePartInput, actor: CoreActor) => CorePart;
@@ -405,7 +406,7 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
       return clone(project);
     },
 
-    updateProjectPhase(projectId, phase, actor) {
+    updateProjectPhase(projectId, phase, actor, signatures) {
       const project = workspace.projects.find((item) => item.id === projectId);
       if (!project) {
         throw new CoreRepositoryError('NOT_FOUND', 'Project was not found.', { projectId });
@@ -426,7 +427,7 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
         actor,
         `Transitioned project ${project.name} from ${oldPhase} to ${phase}.`,
         'BOM Editor',
-        { oldPhase, newPhase: phase }
+        { oldPhase, newPhase: phase, signatures }
       ));
       
       persist();
@@ -481,6 +482,36 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
       recordAudit(createAuditEvent('project', project.id, 'create', actor, `Created project ${project.name}.`, 'Admin Console'));
       persist();
       return clone(project);
+    },
+
+    updateProject(projectId, updates, actor) {
+      requireCorePermission(actor, Permission.EDIT_BOM_STRUCTURE, 'update projects');
+      const project = workspace.projects.find((p) => p.id === projectId);
+      if (!project) {
+        throw new CoreRepositoryError('NOT_FOUND', `Project ${projectId} not found.`);
+      }
+      
+      if (updates.code && updates.code.toLowerCase() !== project.code.toLowerCase()) {
+        const duplicate = workspace.projects.find((p) => p.code.toLowerCase() === updates.code!.toLowerCase());
+        if (duplicate) {
+          throw new CoreRepositoryError('CONFLICT', `Project code ${updates.code} already exists.`, { code: updates.code });
+        }
+      }
+      
+      const updatedProject = {
+        ...project,
+        ...updates,
+        updatedAt: now()
+      };
+      
+      workspace = {
+        ...workspace,
+        projects: workspace.projects.map((p) => p.id === projectId ? updatedProject : p)
+      };
+      
+      recordAudit(createAuditEvent('project', projectId, 'update', actor, `Updated project ${updatedProject.name}.`, 'Admin Console', updates));
+      persist();
+      return clone(updatedProject);
     },
 
     searchParts(input = {}) {

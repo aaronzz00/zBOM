@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Search, Filter, Plus, Package, Cpu, Zap, Activity, Grid, List, MoreHorizontal, X, Edit, Save, Network, ArrowRight, MapPin, Scale, Coins, Trash2, Archive, Hammer, History } from 'lucide-react';
+import { Search, Filter, Plus, Package, Cpu, Zap, Activity, Grid, List, MoreHorizontal, X, Edit, Save, Network, ArrowRight, MapPin, Scale, Coins, Trash2, Archive, Hammer, History, ShieldCheck } from 'lucide-react';
 import { LifecycleState, LibraryPart, ComponentType, BOMNode, Permission, PricingTier } from '../types';
 import { useAppStore } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -15,8 +15,20 @@ export const PartLibrary: React.FC = () => {
     enabledComponentTypes = [ComponentType.Assembly, ComponentType.Part, ComponentType.Material, ComponentType.Software],
     enabledLifecycleStates = [LifecycleState.Draft, LifecycleState.InReview, LifecycleState.Released, LifecycleState.Obsolete, LifecycleState.Prototype],
     warehouseLocations = ['WH-A', 'WH-B', 'WH-C'],
-    complianceStandards = ['RoHS', 'REACH', 'UN38.3']
+    complianceStandards = ['RoHS', 'REACH', 'UN38.3'],
+    componentTypeLabels = {},
+    lifecycleStateLabels = {},
+    attributeDefs = [],
+    project
   } = useAppStore();
+
+  // Helper to map category string to ComponentType
+  const getComponentTypeFromCategory = (cat: string): ComponentType => {
+    if (cat === 'Software') return ComponentType.Software;
+    if (cat === 'Assembly') return ComponentType.Assembly;
+    if (cat === 'Material') return ComponentType.Material;
+    return ComponentType.Part;
+  };
 
   const activeCategories = useMemo(() => {
     const categories = ['All'];
@@ -73,35 +85,59 @@ export const PartLibrary: React.FC = () => {
   const [isEditPanelOpen, setIsEditPanelOpen] = useState(false);
   const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
   const [editForm, setEditForm] = useState<Partial<LibraryPart>>({});
-	  const [createForm, setCreateForm] = useState({
-	    partNumber: '',
-	    mpn: '',
-	    manufacturer: '',
-	    description: '',
-	    category: activeCategoriesWithoutAll[0] || '',
-	    cost: '0',
-	    leadTimeWeeks: '',
-	    supplierId: '',
-	    moq: '',
-	    spq: '',
-	    stock: '0',
-	    minStock: '0',
-	  });
+  const [createForm, setCreateForm] = useState({
+    partNumber: '',
+    mpn: '',
+    manufacturer: '',
+    description: '',
+    category: activeCategoriesWithoutAll[0] || '',
+    cost: '0',
+    leadTimeWeeks: '',
+    supplierId: '',
+    moq: '',
+    spq: '',
+    stock: '0',
+    minStock: '0',
+    customAttributes: {} as Record<string, any>
+  });
 
-	  useEffect(() => {
-	    if (!activeCategoriesWithoutAll.includes(createForm.category)) {
-	      setCreateForm((prev) => ({
-	        ...prev,
-	        category: activeCategoriesWithoutAll[0] || '',
-	      }));
-	    }
-	  }, [activeCategoriesWithoutAll, createForm.category]);
-	  const [panelTab, setPanelTab] = useState<'details' | 'usage' | 'tooling' | 'audit'>('details');
-	  const [createError, setCreateError] = useState('');
-	  const [editError, setEditError] = useState('');
-	  const [saveStatus, setSaveStatus] = useState('');
-    const [toolingLinkRevision, setToolingLinkRevision] = useState(0);
-    const [designMasterLinkId, setDesignMasterLinkId] = useState('');
+  useEffect(() => {
+    if (!activeCategoriesWithoutAll.includes(createForm.category)) {
+      setCreateForm((prev) => ({
+        ...prev,
+        category: activeCategoriesWithoutAll[0] || '',
+      }));
+    }
+  }, [activeCategoriesWithoutAll, createForm.category]);
+
+  // Scoped attributeDefs matching active project & the current category in createForm
+  const createVisibleAttributeDefs = useMemo(() => {
+    const partType = getComponentTypeFromCategory(createForm.category);
+    return attributeDefs.filter(def => {
+      if (def.projectIdScope && def.projectIdScope !== project.id) return false;
+      if (def.componentTypeScope && !def.componentTypeScope.includes(partType)) return false;
+      return true;
+    });
+  }, [attributeDefs, createForm.category, project.id]);
+
+  // Scoped attributeDefs matching active project & the selected part category in editForm
+  const editVisibleAttributeDefs = useMemo(() => {
+    if (!selectedPart) return [];
+    const cat = editForm.category || selectedPart.category;
+    const partType = getComponentTypeFromCategory(cat);
+    return attributeDefs.filter(def => {
+      if (def.projectIdScope && def.projectIdScope !== project.id) return false;
+      if (def.componentTypeScope && !def.componentTypeScope.includes(partType)) return false;
+      return true;
+    });
+  }, [attributeDefs, editForm.category, selectedPart, project.id]);
+
+  const [panelTab, setPanelTab] = useState<'details' | 'usage' | 'tooling' | 'audit' | 'aml'>('details');
+  const [createError, setCreateError] = useState('');
+  const [editError, setEditError] = useState('');
+  const [saveStatus, setSaveStatus] = useState('');
+  const [toolingLinkRevision, setToolingLinkRevision] = useState(0);
+  const [designMasterLinkId, setDesignMasterLinkId] = useState('');
 
   const canEditMetadata = hasPermission(Permission.EDIT_BOM_METADATA);
   const canViewCommercial = hasPermission(Permission.VIEW_COMMERCIAL_FIELDS) || hasPermission(Permission.VIEW_COST);
@@ -131,7 +167,7 @@ export const PartLibrary: React.FC = () => {
   }, []);
 
   // Where Used Calculation
-	  const whereUsedList = useMemo(() => {
+  const whereUsedList = useMemo(() => {
     if (!selectedPart) return [];
 
     const results: { path: string[], parent: string, qty: number }[] = [];
@@ -154,68 +190,68 @@ export const PartLibrary: React.FC = () => {
 
     search(bomData, []);
     return results;
-	  }, [selectedPart, bomData]);
+  }, [selectedPart, bomData]);
 
-	  const toolingLinks = useMemo(() => {
-	    if (!selectedPart) return [];
-	    try {
-	      return coreRepository.getToolingLinksForPart(selectedPart.id);
-	    } catch {
-	      return [];
-	    }
-	  }, [selectedPart, libraryParts, toolingLinkRevision]);
+  const toolingLinks = useMemo(() => {
+    if (!selectedPart) return [];
+    try {
+      return coreRepository.getToolingLinksForPart(selectedPart.id);
+    } catch {
+      return [];
+    }
+  }, [selectedPart, libraryParts, toolingLinkRevision]);
 
-    const toolingLinkWorkspace = useMemo(() => {
-      try {
-        return coreRepository.loadWorkspace();
-      } catch {
-        return null;
-      }
-    }, [selectedPart, libraryParts, toolingLinkRevision]);
+  const toolingLinkWorkspace = useMemo(() => {
+    try {
+      return coreRepository.loadWorkspace();
+    } catch {
+      return null;
+    }
+  }, [selectedPart, libraryParts, toolingLinkRevision]);
 
-    const activeDesignMasters = useMemo(() => {
-      if (!toolingLinkWorkspace) return [];
-      return toolingLinkWorkspace.designMasterParts.filter((part) => part.projectId === toolingLinkWorkspace.activeProjectId);
-    }, [toolingLinkWorkspace]);
+  const activeDesignMasters = useMemo(() => {
+    if (!toolingLinkWorkspace) return [];
+    return toolingLinkWorkspace.designMasterParts.filter((part) => part.projectId === toolingLinkWorkspace.activeProjectId);
+  }, [toolingLinkWorkspace]);
 
-    const linkedDesignMasters = useMemo(() => {
-      if (!selectedPart || !toolingLinkWorkspace) return [];
-      const linkedIds = new Set(toolingLinkWorkspace.concretePartMappings
-        .filter((mapping) => mapping.partId === selectedPart.id)
-        .map((mapping) => mapping.designMasterPartId));
-      return activeDesignMasters.filter((part) => linkedIds.has(part.id));
-    }, [activeDesignMasters, selectedPart, toolingLinkWorkspace]);
+  const linkedDesignMasters = useMemo(() => {
+    if (!selectedPart || !toolingLinkWorkspace) return [];
+    const linkedIds = new Set(toolingLinkWorkspace.concretePartMappings
+      .filter((mapping) => mapping.partId === selectedPart.id)
+      .map((mapping) => mapping.designMasterPartId));
+    return activeDesignMasters.filter((part) => linkedIds.has(part.id));
+  }, [activeDesignMasters, selectedPart, toolingLinkWorkspace]);
 
-    const linkableDesignMasters = useMemo(() => {
-      const linkedIds = new Set(linkedDesignMasters.map((part) => part.id));
-      return activeDesignMasters.filter((part) => !linkedIds.has(part.id));
-    }, [activeDesignMasters, linkedDesignMasters]);
+  const linkableDesignMasters = useMemo(() => {
+    const linkedIds = new Set(linkedDesignMasters.map((part) => part.id));
+    return activeDesignMasters.filter((part) => !linkedIds.has(part.id));
+  }, [activeDesignMasters, linkedDesignMasters]);
 
-    const selectedDesignMasterForLink = designMasterLinkId || linkableDesignMasters[0]?.id || '';
+  const selectedDesignMasterForLink = designMasterLinkId || linkableDesignMasters[0]?.id || '';
 
-	  const auditEvents = useMemo(() => {
-	    if (!selectedPart) return [];
-	    try {
-	      return coreRepository.getAuditEvents('part', selectedPart.id).slice(0, 8);
-	    } catch {
-	      return [];
-	    }
-	  }, [selectedPart, libraryParts]);
+  const auditEvents = useMemo(() => {
+    if (!selectedPart) return [];
+    try {
+      return coreRepository.getAuditEvents('part', selectedPart.id).slice(0, 8);
+    } catch {
+      return [];
+    }
+  }, [selectedPart, libraryParts]);
 
-	  const selectedPartAvl = useMemo(() => {
-	    if (!selectedPart) return [];
-	    try {
-	      return coreRepository.loadWorkspace().avl.filter((entry) => entry.partId === selectedPart.id);
-	    } catch {
-	      return [];
-	    }
-	  }, [selectedPart, libraryParts]);
+  const selectedPartAvl = useMemo(() => {
+    if (!selectedPart) return [];
+    try {
+      return coreRepository.loadWorkspace().avl.filter((entry) => entry.partId === selectedPart.id);
+    } catch {
+      return [];
+    }
+  }, [selectedPart, libraryParts]);
 
-    const getActor = () => ({
-      userId: currentUser.id,
-      name: currentUser.name,
-      role: currentUser.role,
-    });
+  const getActor = () => ({
+    userId: currentUser.id,
+    name: currentUser.name,
+    role: currentUser.role,
+  });
 
   const getSupplierLabel = (supplierId?: string) => {
     if (!supplierId) return 'Unassigned';
@@ -309,7 +345,7 @@ export const PartLibrary: React.FC = () => {
     };
     return (
       <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${styles[state]}`}>
-        {state}
+        {lifecycleStateLabels[state] || state}
       </span>
     );
   };
@@ -328,71 +364,71 @@ export const PartLibrary: React.FC = () => {
       setIsEditPanelOpen(true);
   };
 
-	  const validatePricingTiers = (tiers?: PricingTier[]) => {
-	      if (!tiers || tiers.length === 0) return '';
-	      const seenMinQty = new Set<number>();
-	      for (const tier of tiers) {
-	          if (!Number.isFinite(tier.minQty) || tier.minQty < 0) return 'Pricing tier minimum quantity must be zero or greater.';
-	          if (!Number.isFinite(tier.price) || tier.price < 0) return 'Pricing tier price must be zero or greater.';
-	          if (seenMinQty.has(tier.minQty)) return 'Pricing tiers cannot reuse the same minimum quantity.';
-	          seenMinQty.add(tier.minQty);
-	      }
-	      return '';
-	  };
-
-	  const handleSave = () => {
-	      if (selectedPart && editForm) {
-	          const tierError = validatePricingTiers(editForm.pricingTiers);
-	          if (tierError) {
-	              setEditError(tierError);
-	              return;
-	          }
-	          updateLibraryPart(selectedPart.id, editForm);
-	          setSaveStatus(`Saved ${selectedPart.partNumber}. BOM and Tooling links will read the updated master data.`);
-	          setIsEditPanelOpen(false);
-	      }
-	  };
-
-	  const handleArchivePart = () => {
-	      if (!selectedPart) return;
-	      if (!window.confirm(`Archive ${selectedPart.partNumber}? Existing BOM usage remains traceable.`)) return;
-	      updateLibraryPart(selectedPart.id, { state: LifecycleState.Obsolete, stock: 0 });
-	      setSaveStatus(`Archived ${selectedPart.partNumber}.`);
-	      setIsEditPanelOpen(false);
-	  };
-
-    const handleLinkDesignMaster = () => {
-      if (!selectedPart || !selectedDesignMasterForLink) return;
-      const designMaster = activeDesignMasters.find((part) => part.id === selectedDesignMasterForLink);
-      try {
-        coreRepository.mapConcretePart(selectedDesignMasterForLink, selectedPart.id, getActor());
-        setToolingLinkRevision((value) => value + 1);
-        setDesignMasterLinkId('');
-        setSaveStatus(`Linked ${selectedPart.partNumber} to ${designMaster?.code ?? 'design master'}.`);
-        setEditError('');
-      } catch (error) {
-        setEditError(error instanceof Error ? error.message : 'Unable to link design master.');
+  const validatePricingTiers = (tiers?: PricingTier[]) => {
+      if (!tiers || tiers.length === 0) return '';
+      const seenMinQty = new Set<number>();
+      for (const tier of tiers) {
+          if (!Number.isFinite(tier.minQty) || tier.minQty < 0) return 'Pricing tier minimum quantity must be zero or greater.';
+          if (!Number.isFinite(tier.price) || tier.price < 0) return 'Pricing tier price must be zero or greater.';
+          if (seenMinQty.has(tier.minQty)) return 'Pricing tiers cannot reuse the same minimum quantity.';
+          seenMinQty.add(tier.minQty);
       }
-    };
+      return '';
+  };
 
-    const handleUnlinkDesignMaster = (designMasterId: string) => {
+  const handleSave = () => {
+      if (selectedPart && editForm) {
+          const tierError = validatePricingTiers(editForm.pricingTiers);
+          if (tierError) {
+              setEditError(tierError);
+              return;
+          }
+          updateLibraryPart(selectedPart.id, editForm);
+          setSaveStatus(`Saved ${selectedPart.partNumber}. BOM and Tooling links will read the updated master data.`);
+          setIsEditPanelOpen(false);
+      }
+  };
+
+  const handleArchivePart = () => {
       if (!selectedPart) return;
-      const designMaster = activeDesignMasters.find((part) => part.id === designMasterId);
-      try {
-        coreRepository.unmapConcretePart(designMasterId, selectedPart.id, getActor());
-        setToolingLinkRevision((value) => value + 1);
-        setSaveStatus(`Unlinked ${selectedPart.partNumber} from ${designMaster?.code ?? 'design master'}.`);
-        setEditError('');
-      } catch (error) {
-        setEditError(error instanceof Error ? error.message : 'Unable to unlink design master.');
-      }
-    };
+      if (!window.confirm(`Archive ${selectedPart.partNumber}? Existing BOM usage remains traceable.`)) return;
+      updateLibraryPart(selectedPart.id, { state: LifecycleState.Obsolete, stock: 0 });
+      setSaveStatus(`Archived ${selectedPart.partNumber}.`);
+      setIsEditPanelOpen(false);
+  };
 
-    const openToolingHubForTooling = (toolingId: string) => {
-      window.sessionStorage.setItem('zbom.toolingHub.toolingId', toolingId);
-      window.sessionStorage.setItem('zbom.toolingHub.tab', 'overview');
-      window.dispatchEvent(new CustomEvent('zbom:navigate', { detail: { page: 'tooling' } }));
-    };
+  const handleLinkDesignMaster = () => {
+    if (!selectedPart || !selectedDesignMasterForLink) return;
+    const designMaster = activeDesignMasters.find((part) => part.id === selectedDesignMasterForLink);
+    try {
+      coreRepository.mapConcretePart(selectedDesignMasterForLink, selectedPart.id, getActor());
+      setToolingLinkRevision((value) => value + 1);
+      setDesignMasterLinkId('');
+      setSaveStatus(`Linked ${selectedPart.partNumber} to ${designMaster?.code ?? 'design master'}.`);
+      setEditError('');
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : 'Unable to link design master.');
+    }
+  };
+
+  const handleUnlinkDesignMaster = (designMasterId: string) => {
+    if (!selectedPart) return;
+    const designMaster = activeDesignMasters.find((part) => part.id === designMasterId);
+    try {
+      coreRepository.unmapConcretePart(designMasterId, selectedPart.id, getActor());
+      setToolingLinkRevision((value) => value + 1);
+      setSaveStatus(`Unlinked ${selectedPart.partNumber} from ${designMaster?.code ?? 'design master'}.`);
+      setEditError('');
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : 'Unable to unlink design master.');
+    }
+  };
+
+  const openToolingHubForTooling = (toolingId: string) => {
+    window.sessionStorage.setItem('zbom.toolingHub.toolingId', toolingId);
+    window.sessionStorage.setItem('zbom.toolingHub.tab', 'overview');
+    window.dispatchEvent(new CustomEvent('zbom:navigate', { detail: { page: 'tooling' } }));
+  };
 
   const toggleLocation = (loc: string) => {
       if (selectedLocations.includes(loc)) {
@@ -419,60 +455,62 @@ export const PartLibrary: React.FC = () => {
     setEditForm({ ...editForm, pricingTiers: currentTiers });
   };
 
-	  const handleCreatePart = () => {
-	    const partNumber = createForm.partNumber.trim();
-	    const mpn = createForm.mpn.trim();
-	    const description = createForm.description.trim();
-	    if (!partNumber || !mpn || !description) return;
-	    if (libraryParts.some((part) => part.partNumber.toLowerCase() === partNumber.toLowerCase())) {
-	      setCreateError(`Part number ${partNumber} already exists.`);
-	      return;
-	    }
+  const handleCreatePart = () => {
+    const partNumber = createForm.partNumber.trim();
+    const mpn = createForm.mpn.trim();
+    const description = createForm.description.trim();
+    if (!partNumber || !mpn || !description) return;
+    if (libraryParts.some((part) => part.partNumber.toLowerCase() === partNumber.toLowerCase())) {
+      setCreateError(`Part number ${partNumber} already exists.`);
+      return;
+    }
 
-	    const cost = Number(createForm.cost);
-	    const leadTimeWeeks = Number(createForm.leadTimeWeeks);
-	    const moq = Number(createForm.moq);
-	    const spq = Number(createForm.spq);
-	    const stock = Number(createForm.stock);
-	    const minStock = Number(createForm.minStock);
-	    addLibraryPart({
-	      id: `lib-${partNumber.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    const cost = Number(createForm.cost);
+    const leadTimeWeeks = Number(createForm.leadTimeWeeks);
+    const moq = Number(createForm.moq);
+    const spq = Number(createForm.spq);
+    const stock = Number(createForm.stock);
+    const minStock = Number(createForm.minStock);
+    addLibraryPart({
+      id: `lib-${partNumber.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
       partNumber,
       mpn,
       manufacturer: createForm.manufacturer.trim() || 'Unassigned',
       description,
       category: createForm.category,
-	      cost: Number.isFinite(cost) && cost >= 0 ? cost : 0,
-	      stock: Number.isFinite(stock) && stock >= 0 ? stock : 0,
-	      minStock: Number.isFinite(minStock) && minStock >= 0 ? minStock : 0,
-	      state: enabledLifecycleStates[0] || LifecycleState.Draft,
-	      location: createForm.category === 'Software' ? 'Git/Repo' : (warehouseLocations[0] || 'WH-A'),
-	      type: createForm.category === 'Software' ? ComponentType.Software : ComponentType.Part,
-	      supplierId: createForm.supplierId || undefined,
-	      leadTimeWeeks: Number.isFinite(leadTimeWeeks) && leadTimeWeeks >= 0 ? leadTimeWeeks : undefined,
-	      moq: Number.isFinite(moq) && moq >= 0 ? moq : undefined,
-	      spq: Number.isFinite(spq) && spq >= 0 ? spq : undefined,
-	    });
-	    setSelectedCategory('All');
-	    setSearchQuery(partNumber);
+      cost: Number.isFinite(cost) && cost >= 0 ? cost : 0,
+      stock: Number.isFinite(stock) && stock >= 0 ? stock : 0,
+      minStock: Number.isFinite(minStock) && minStock >= 0 ? minStock : 0,
+      state: enabledLifecycleStates[0] || LifecycleState.Draft,
+      location: createForm.category === 'Software' ? 'Git/Repo' : (warehouseLocations[0] || 'WH-A'),
+      type: createForm.category === 'Software' ? ComponentType.Software : ComponentType.Part,
+      supplierId: createForm.supplierId || undefined,
+      leadTimeWeeks: Number.isFinite(leadTimeWeeks) && leadTimeWeeks >= 0 ? leadTimeWeeks : undefined,
+      moq: Number.isFinite(moq) && moq >= 0 ? moq : undefined,
+      spq: Number.isFinite(spq) && spq >= 0 ? spq : undefined,
+      customAttributes: createForm.customAttributes
+    });
+    setSelectedCategory('All');
+    setSearchQuery(partNumber);
     setCreateForm({
       partNumber: '',
       mpn: '',
       manufacturer: '',
       description: '',
-	      category: 'Mechanical',
-	      cost: '0',
-	      leadTimeWeeks: '',
-	      supplierId: '',
-	      moq: '',
-	      spq: '',
-	      stock: '0',
-	      minStock: '0',
-	    });
-	    setCreateError('');
-	    setSaveStatus(`Created ${partNumber} in Part Library.`);
-	    setIsCreatePanelOpen(false);
-	  };
+      category: activeCategoriesWithoutAll[0] || 'Mechanical',
+      cost: '0',
+      leadTimeWeeks: '',
+      supplierId: '',
+      moq: '',
+      spq: '',
+      stock: '0',
+      minStock: '0',
+      customAttributes: {}
+    });
+    setCreateError('');
+    setSaveStatus(`Created ${partNumber} in Part Library.`);
+    setIsCreatePanelOpen(false);
+  };
 
   return (
     <div className="flex h-full bg-slate-50 overflow-hidden relative">
@@ -499,7 +537,7 @@ export const PartLibrary: React.FC = () => {
                     >
                         <span className="flex items-center gap-2">
                             {cat !== 'All' && getCategoryIcon(cat)}
-                            {cat}
+                            {cat === 'All' ? 'All' : (componentTypeLabels[cat as ComponentType] || cat)}
                         </span>
                         {cat === 'All' && <span className="text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">{libraryParts.length}</span>}
                     </button>
@@ -520,7 +558,7 @@ export const PartLibrary: React.FC = () => {
                                 : 'text-slate-600 hover:bg-slate-50'
                             }`}
                          >
-                            {state}
+                            {state === 'All' ? 'All' : (lifecycleStateLabels[state] || state)}
                          </button>
                     ))}
                  </div>
@@ -579,24 +617,24 @@ export const PartLibrary: React.FC = () => {
                     className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                 />
              </div>
-	             <div className="flex items-center gap-3">
-	                {saveStatus && <span className="text-xs font-semibold text-emerald-700">{saveStatus}</span>}
-	                <label className="flex items-center gap-2 text-xs font-semibold text-slate-500" htmlFor="part-sort">
-	                    Sort
-	                    <select
-	                        id="part-sort"
-	                        aria-label="Sort parts"
-	                        value={sortBy}
-	                        onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
-	                        className="rounded border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700"
-	                    >
-	                        <option value="partNumber">Part No.</option>
-	                        <option value="description">Description</option>
-	                        <option value="supplier">Supplier</option>
-	                        <option value="stock">Stock</option>
-	                        <option value="state">Lifecycle</option>
-	                    </select>
-	                </label>
+             <div className="flex items-center gap-3">
+                {saveStatus && <span className="text-xs font-semibold text-emerald-700">{saveStatus}</span>}
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-500" htmlFor="part-sort">
+                    Sort
+                    <select
+                        id="part-sort"
+                        aria-label="Sort parts"
+                        value={sortBy}
+                        onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
+                        className="rounded border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700"
+                    >
+                        <option value="partNumber">Part No.</option>
+                        <option value="description">Description</option>
+                        <option value="supplier">Supplier</option>
+                        <option value="stock">Stock</option>
+                        <option value="state">Lifecycle</option>
+                    </select>
+                </label>
                 <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
                     <button
                         type="button"
@@ -671,6 +709,16 @@ export const PartLibrary: React.FC = () => {
                                     <div className="flex flex-col">
                                         <span className="text-xs font-bold text-slate-700">{getSupplierName(part.supplierId)}</span>
                                         <span className="text-[10px] text-slate-400">{part.manufacturer}</span>
+                                        {part.customAttributes?.aml && part.customAttributes.aml.length > 0 && (
+                                            <div className="text-[9px] text-slate-500 mt-1 flex flex-wrap gap-1">
+                                                <span className="font-semibold text-slate-400">AML:</span>
+                                                {part.customAttributes.aml.map((a: any, i: number) => (
+                                                    <span key={i} className={`px-1 rounded font-medium ${a.status === 'Preferred' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                                                        {a.mfr} ({a.status})
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </td>
                                 <td className="px-6 py-3 text-slate-500">
@@ -780,7 +828,7 @@ export const PartLibrary: React.FC = () => {
                                 className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
                               >
                                   {activeCategoriesWithoutAll.map((category) => (
-                                      <option key={category} value={category}>{category}</option>
+                                      <option key={category} value={category}>{componentTypeLabels[category as ComponentType] || category}</option>
                                   ))}
                               </select>
                           </label>
@@ -795,8 +843,8 @@ export const PartLibrary: React.FC = () => {
                             className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
                           />
                       </label>
-	                      <label className="block text-sm font-semibold text-slate-700" htmlFor="create-cost">
-	                          Initial Unit Cost
+                      <label className="block text-sm font-semibold text-slate-700" htmlFor="create-cost">
+                          Initial Unit Cost
                           <input
                             id="create-cost"
                             type="number"
@@ -804,58 +852,103 @@ export const PartLibrary: React.FC = () => {
                             onChange={(event) => setCreateForm((value) => ({ ...value, cost: event.target.value }))}
                             className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
                           />
-	                      </label>
-	                      <div className="grid gap-4 md:grid-cols-2">
-	                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-supplier">
-	                              Supplier
-	                              <select
-	                                id="create-supplier"
-	                                value={createForm.supplierId}
-	                                onChange={(event) => setCreateForm((value) => ({ ...value, supplierId: event.target.value }))}
-	                                className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
-	                              >
-	                                  <option value="">Unassigned</option>
-	                                  {suppliers.map((supplier) => (
-	                                      <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-	                                  ))}
-	                              </select>
-	                          </label>
-	                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-lead-time">
-	                              Lead Time (Wks)
-	                              <input
-	                                id="create-lead-time"
-	                                type="number"
-	                                value={createForm.leadTimeWeeks}
-	                                onChange={(event) => setCreateForm((value) => ({ ...value, leadTimeWeeks: event.target.value }))}
-	                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-	                              />
-	                          </label>
-	                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-moq">
-	                              MOQ
-	                              <input
-	                                id="create-moq"
-	                                type="number"
-	                                value={createForm.moq}
-	                                onChange={(event) => setCreateForm((value) => ({ ...value, moq: event.target.value }))}
-	                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-	                              />
-	                          </label>
-	                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-spq">
-	                              SPQ
-	                              <input
-	                                id="create-spq"
-	                                type="number"
-	                                value={createForm.spq}
-	                                onChange={(event) => setCreateForm((value) => ({ ...value, spq: event.target.value }))}
-	                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-	                              />
-	                          </label>
-	                      </div>
-	                      {createError && (
-	                        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
-	                          {createError}
-	                        </div>
-	                      )}
+                      </label>
+                      <div className="grid gap-4 md:grid-cols-2">
+                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-supplier">
+                              Supplier
+                              <select
+                                id="create-supplier"
+                                value={createForm.supplierId}
+                                onChange={(event) => setCreateForm((value) => ({ ...value, supplierId: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+                              >
+                                  <option value="">Unassigned</option>
+                                  {suppliers.map((supplier) => (
+                                      <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                                  ))}
+                              </select>
+                          </label>
+                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-lead-time">
+                              Lead Time (Wks)
+                              <input
+                                id="create-lead-time"
+                                type="number"
+                                value={createForm.leadTimeWeeks}
+                                onChange={(event) => setCreateForm((value) => ({ ...value, leadTimeWeeks: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                              />
+                          </label>
+                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-moq">
+                              MOQ
+                              <input
+                                id="create-moq"
+                                type="number"
+                                value={createForm.moq}
+                                onChange={(event) => setCreateForm((value) => ({ ...value, moq: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                              />
+                          </label>
+                          <label className="block text-sm font-semibold text-slate-700" htmlFor="create-spq">
+                              SPQ
+                              <input
+                                id="create-spq"
+                                type="number"
+                                value={createForm.spq}
+                                onChange={(event) => setCreateForm((value) => ({ ...value, spq: event.target.value }))}
+                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                              />
+                          </label>
+                      </div>
+
+                      {/* Dynamic Custom Attributes */}
+                      {createVisibleAttributeDefs.length > 0 && (
+                          <div className="border-t border-slate-200 pt-4 mt-4 space-y-3">
+                              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Custom Attributes</h4>
+                              <div className="grid grid-cols-2 gap-4">
+                                  {createVisibleAttributeDefs.map((def) => (
+                                      <label key={def.id} className="block text-sm font-semibold text-slate-700">
+                                          {def.name}
+                                          {def.type === 'select' ? (
+                                              <select
+                                                  value={createForm.customAttributes?.[def.key] || ''}
+                                                  onChange={(e) => setCreateForm((value) => ({
+                                                      ...value,
+                                                      customAttributes: {
+                                                          ...(value.customAttributes || {}),
+                                                          [def.key]: e.target.value
+                                                      }
+                                                  }))}
+                                                  className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm bg-white"
+                                              >
+                                                  <option value="">- Select -</option>
+                                                  {def.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                              </select>
+                                          ) : (
+                                              <input
+                                                  type={def.type === 'number' ? 'number' : 'text'}
+                                                  value={createForm.customAttributes?.[def.key] || ''}
+                                                  onChange={(e) => setCreateForm((value) => ({
+                                                      ...value,
+                                                      customAttributes: {
+                                                          ...(value.customAttributes || {}),
+                                                          [def.key]: e.target.value
+                                                      }
+                                                  }))}
+                                                  placeholder={`Enter ${def.name.toLowerCase()}...`}
+                                                  className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                                              />
+                                          )}
+                                      </label>
+                                  ))}
+                              </div>
+                          </div>
+                      )}
+
+                      {createError && (
+                        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                          {createError}
+                        </div>
+                      )}
                       <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
                           <button
                             type="button"
@@ -909,8 +1002,8 @@ export const PartLibrary: React.FC = () => {
                       <Edit className="w-4 h-4" />
                       Details
                   </button>
-	                  <button
-	                      onClick={() => setPanelTab('usage')}
+                  <button
+                      onClick={() => setPanelTab('usage')}
                       className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
                           panelTab === 'usage'
                           ? 'text-blue-600 border-blue-600 bg-white'
@@ -918,30 +1011,30 @@ export const PartLibrary: React.FC = () => {
                       }`}
                   >
                       <Network className="w-4 h-4" />
-	                      Where Used <span className="text-[10px] bg-slate-200 px-1.5 rounded-full">{whereUsedList.length}</span>
-	                  </button>
-	                  <button
-	                      onClick={() => setPanelTab('tooling')}
-	                      className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
-	                          panelTab === 'tooling'
-	                          ? 'text-blue-600 border-blue-600 bg-white'
-	                          : 'text-slate-500 border-transparent hover:bg-slate-50'
-	                      }`}
-	                  >
-	                      <Hammer className="w-4 h-4" />
-	                      Tooling <span className="text-[10px] bg-slate-200 px-1.5 rounded-full">{toolingLinks.length}</span>
-	                  </button>
-	                  <button
-	                      onClick={() => setPanelTab('audit')}
-	                      className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
-	                          panelTab === 'audit'
-	                          ? 'text-blue-600 border-blue-600 bg-white'
-	                          : 'text-slate-500 border-transparent hover:bg-slate-50'
-	                      }`}
-	                  >
-	                      <History className="w-4 h-4" />
-	                      Audit
-	                  </button>
+                      Usage <span className="text-[10px] bg-slate-200 px-1.5 rounded-full">{whereUsedList.length}</span>
+                  </button>
+                  <button
+                      onClick={() => setPanelTab('tooling')}
+                      className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
+                          panelTab === 'tooling'
+                          ? 'text-blue-600 border-blue-600 bg-white'
+                          : 'text-slate-500 border-transparent hover:bg-slate-50'
+                      }`}
+                  >
+                      <Hammer className="w-4 h-4" />
+                      Tooling <span className="text-[10px] bg-slate-200 px-1.5 rounded-full">{toolingLinks.length}</span>
+                  </button>
+                  <button
+                      onClick={() => setPanelTab('aml')}
+                      className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
+                          panelTab === 'aml'
+                          ? 'text-blue-600 border-blue-600 bg-white'
+                          : 'text-slate-500 border-transparent hover:bg-slate-50'
+                      }`}
+                  >
+                      <ShieldCheck className="w-4 h-4" />
+                      AML <span className="text-[10px] bg-slate-200 px-1.5 rounded-full">{(selectedPart.customAttributes?.aml || []).length}</span>
+                  </button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -969,7 +1062,7 @@ export const PartLibrary: React.FC = () => {
                                             onChange={(e) => setEditForm({...editForm, category: e.target.value})}
                                             className="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white"
                                         >
-                                            {Array.from(new Set([editForm.category, ...activeCategoriesWithoutAll])).filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
+                                            {Array.from(new Set([editForm.category, ...activeCategoriesWithoutAll])).filter(Boolean).map(c => <option key={c} value={c}>{componentTypeLabels[c as ComponentType] || c}</option>)}
                                         </select>
                                     </div>
                                     <div>
@@ -980,26 +1073,49 @@ export const PartLibrary: React.FC = () => {
                                             onChange={(e) => setEditForm({...editForm, state: e.target.value as LifecycleState})}
                                             className="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white"
                                         >
-                                            {Array.from(new Set([editForm.state, ...enabledLifecycleStates])).filter(Boolean).map(s => <option key={s} value={s}>{s}</option>)}
+                                            {Array.from(new Set([editForm.state, ...enabledLifecycleStates])).filter(Boolean).map(s => <option key={s} value={s}>{lifecycleStateLabels[s as LifecycleState] || s}</option>)}
                                         </select>
                                     </div>
                                 </div>
-                                <div className="p-3 bg-slate-50 rounded border border-slate-200">
-                                     <label className="text-xs font-bold text-slate-500 block mb-2">Physical Attributes</label>
-                                     <div className="flex items-center gap-2">
-                                         <Scale className="w-4 h-4 text-slate-400" />
-                                         <span className="text-sm text-slate-600">Weight</span>
-                                         <input
-                                            disabled={!canEditMetadata}
-                                            type="number"
-                                            value={editForm.weightG || ''}
-                                            onChange={(e) => setEditForm({...editForm, weightG: parseFloat(e.target.value)})}
-                                            placeholder="grams"
-                                            className="flex-1 px-2 py-1 text-sm border border-slate-300 rounded text-right"
-                                         />
-                                         <span className="text-xs text-slate-400">g</span>
-                                     </div>
-                                </div>
+                                
+                                {/* Custom Attributes Editor */}
+                                {editVisibleAttributeDefs.length > 0 && (
+                                    <div className="pt-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Custom Attributes</label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {editVisibleAttributeDefs.map((def) => (
+                                                <div key={def.id}>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">{def.name}</label>
+                                                    {def.type === 'select' ? (
+                                                        <select
+                                                            disabled={!canEditMetadata}
+                                                            value={editForm.customAttributes?.[def.key] || ''}
+                                                            onChange={(e) => setEditForm({
+                                                                ...editForm,
+                                                                customAttributes: { ...(editForm.customAttributes || {}), [def.key]: e.target.value }
+                                                            })}
+                                                            className="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white"
+                                                        >
+                                                            <option value="">- Select -</option>
+                                                            {def.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                        </select>
+                                                    ) : (
+                                                        <input
+                                                            disabled={!canEditMetadata}
+                                                            type={def.type === 'number' ? 'number' : 'text'}
+                                                            value={editForm.customAttributes?.[def.key] || ''}
+                                                            onChange={(e) => setEditForm({
+                                                                ...editForm,
+                                                                customAttributes: { ...(editForm.customAttributes || {}), [def.key]: e.target.value }
+                                                            })}
+                                                            className="w-full px-3 py-2 border border-slate-300 rounded text-sm"
+                                                        />
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -1158,15 +1274,102 @@ export const PartLibrary: React.FC = () => {
                                 You do not have permission to edit this part.
                             </div>
                         )}
-	                        {editError && (
-	                            <div className="bg-rose-50 text-rose-700 p-3 rounded text-sm mt-4 border border-rose-200 flex items-center gap-2">
-	                                <Activity className="w-4 h-4" />
-	                                {editError}
-	                            </div>
-	                        )}
+                        {editError && (
+                            <div className="bg-rose-50 text-rose-700 p-3 rounded text-sm mt-4 border border-rose-200 flex items-center gap-2">
+                                <Activity className="w-4 h-4" />
+                                {editError}
+                            </div>
+                        )}
                       </>
-	                  ) : panelTab === 'usage' ? (
-	                      // Usage Tab Content
+                  ) : panelTab === 'aml' ? (
+                      <div className="space-y-4">
+                          <div className="bg-blue-50 border border-blue-100 rounded p-3 text-xs text-blue-700">
+                              Approved Manufacturer List (AML) maps internal part numbers to qualified manufacturer parts.
+                          </div>
+                          {canSave && (
+                              <div className="bg-slate-50 border border-slate-200 rounded p-3 space-y-2">
+                                  <h4 className="text-xs font-bold text-slate-700 uppercase">Add Manufacturer Part</h4>
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <input type="text" placeholder="Mfr Name" id="new-aml-mfr" className="px-2 py-1 border border-slate-300 rounded text-xs" />
+                                      <input type="text" placeholder="MPN" id="new-aml-mpn" className="px-2 py-1 border border-slate-300 rounded text-xs" />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <input type="number" step="0.001" placeholder="Cost ($)" id="new-aml-cost" className="px-2 py-1 border border-slate-300 rounded text-xs" />
+                                      <input type="number" placeholder="Lead Time (wks)" id="new-aml-leadtime" className="px-2 py-1 border border-slate-300 rounded text-xs" />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <input type="text" placeholder="Datasheet URL" id="new-aml-datasheet" className="px-2 py-1 border border-slate-300 rounded text-xs" />
+                                      <select id="new-aml-status" className="px-2 py-1 border border-slate-300 rounded bg-white text-xs">
+                                          <option value="Approved">Approved</option>
+                                          <option value="Preferred">Preferred</option>
+                                          <option value="Qualified">Qualified</option>
+                                          <option value="Disqualified">Disqualified</option>
+                                      </select>
+                                  </div>
+                                  <button type="button" onClick={() => {
+                                      const mfrInput = document.getElementById('new-aml-mfr') as HTMLInputElement;
+                                      const mpnInput = document.getElementById('new-aml-mpn') as HTMLInputElement;
+                                      const costInput = document.getElementById('new-aml-cost') as HTMLInputElement;
+                                      const ltInput = document.getElementById('new-aml-leadtime') as HTMLInputElement;
+                                      const dsInput = document.getElementById('new-aml-datasheet') as HTMLInputElement;
+                                      const statusInput = document.getElementById('new-aml-status') as HTMLSelectElement;
+                                      const mfr = mfrInput?.value.trim();
+                                      const mpn = mpnInput?.value.trim();
+                                      if (!mfr || !mpn) return;
+                                      const currentAml = selectedPart.customAttributes?.aml || [];
+                                      const costVal = costInput?.value ? parseFloat(costInput.value) : undefined;
+                                      const ltVal = ltInput?.value ? parseInt(ltInput.value, 10) : undefined;
+                                      const newEntry = { 
+                                          mfr, 
+                                          mpn, 
+                                          datasheet: dsInput?.value.trim() || '', 
+                                          status: statusInput?.value || 'Approved',
+                                          cost: costVal,
+                                          leadTime: ltVal
+                                      };
+                                      const updatedAml = [...currentAml, newEntry];
+                                      const updatedAttrs = { ...(selectedPart.customAttributes || {}), aml: updatedAml };
+                                      updateLibraryPart(selectedPart.id, { customAttributes: updatedAttrs });
+                                      setSelectedPart({ ...selectedPart, customAttributes: updatedAttrs });
+                                      mfrInput.value = ''; mpnInput.value = ''; dsInput.value = '';
+                                      if (costInput) costInput.value = '';
+                                      if (ltInput) ltInput.value = '';
+                                  }} className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded py-1 text-xs font-bold transition-colors">Add to AML</button>
+                              </div>
+                          )}
+                          <div className="space-y-2">
+                              {((selectedPart.customAttributes?.aml as Array<{ mfr: string, mpn: string, datasheet: string, status: string, cost?: number, leadTime?: number }>) || []).length === 0 ? (
+                                  <p className="text-xs text-slate-400 italic text-center py-4 bg-slate-50 border border-slate-200 border-dashed rounded">No manufacturer parts mapped.</p>
+                              ) : (
+                                  ((selectedPart.customAttributes?.aml as Array<{ mfr: string, mpn: string, datasheet: string, status: string, cost?: number, leadTime?: number }>) || []).map((entry, idx) => (
+                                      <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded flex justify-between items-start">
+                                          <div>
+                                              <div className="flex items-center gap-2">
+                                                  <span className="font-bold text-slate-800 text-sm">{entry.mfr}</span>
+                                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase border ${entry.status === 'Preferred' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : entry.status === 'Approved' ? 'bg-blue-100 text-blue-700 border-blue-200' : entry.status === 'Qualified' ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>{entry.status}</span>
+                                              </div>
+                                              <p className="text-xs font-mono text-slate-600 mt-1">MPN: {entry.mpn}</p>
+                                              <div className="flex gap-3 text-[10px] text-slate-500 mt-1">
+                                                  {entry.cost !== undefined && <span>Cost: ${entry.cost.toFixed(3)}</span>}
+                                                  {entry.leadTime !== undefined && <span>Lead Time: {entry.leadTime} wks</span>}
+                                              </div>
+                                              {entry.datasheet && <a href={entry.datasheet} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 hover:underline mt-1 block">Datasheet Link</a>}
+                                          </div>
+                                          {canSave && (
+                                              <button type="button" onClick={() => {
+                                                  const currentAml = selectedPart.customAttributes?.aml || [];
+                                                  const updatedAml = currentAml.filter((_, i) => i !== idx);
+                                                  const updatedAttrs = { ...(selectedPart.customAttributes || {}), aml: updatedAml };
+                                                  updateLibraryPart(selectedPart.id, { customAttributes: updatedAttrs });
+                                                  setSelectedPart({ ...selectedPart, customAttributes: updatedAttrs });
+                                              }} className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-rose-600 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                                          )}
+                                      </div>
+                                  ))
+                              )}
+                          </div>
+                      </div>
+                  ) : panelTab === 'usage' ? (
                       <div className="space-y-4">
                           <div className="bg-blue-50 border border-blue-100 rounded p-3 text-xs text-blue-700 mb-4">
                               This list shows all assemblies in the active BOM that directly consume this part number.

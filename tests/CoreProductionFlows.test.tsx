@@ -10,6 +10,9 @@ import { coreRepository, toLegacyLibraryParts } from '../repositories/core/coreR
 import { useAuthStore } from '../stores/useAuthStore';
 import { useBOMStore } from '../stores/useBOMStore';
 import { useToolingStore } from '../stores/useToolingStore';
+import { useMBOMDeltaStore } from '../stores/useMBOMDeltaStore';
+import { parseCSVToBOM } from '../utils/csvHelper';
+import { LifecycleState } from '../types';
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: vi.fn(({ count }) => ({
@@ -212,5 +215,115 @@ describe('production core flows', () => {
 
     expect(screen.getAllByText('blocked').length).toBeGreaterThan(0);
     expect(screen.getByText(/Updated DFM blocker reason/i)).toBeInTheDocument();
+  });
+
+  it('enforces ECO Sandbox gates for Released nodes', async () => {
+    const store = useBOMStore.getState();
+    store.updateBOMNode('root', { state: LifecycleState.Released });
+    
+    render(<BOMEditor />);
+    
+    const rootRow = screen.getByText(store.bomData.partNumber);
+    fireEvent.click(rootRow);
+    
+    const qtyInput = screen.getByLabelText('Quantity');
+    fireEvent.change(qtyInput, { target: { value: '5' } });
+    
+    expect(screen.getByText('ECO Gate Enforced')).toBeInTheDocument();
+    
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(screen.queryByText('ECO Gate Enforced')).not.toBeInTheDocument();
+  });
+
+  it('parses hierarchical CSV with dot or space indentations', () => {
+    const csvWithDots = `Level,Part Number,Name,Description,Revision,State,Type,Quantity,Unit Cost,Manufacturer,MPN
+0,100-ROOT-001,Root Assembly,Root desc,A,Draft,Assembly,1,10,MfrA,MPN-1
+.1,200-CHILD-001,Child 1,Child 1 desc,A,Draft,Part,2,5,MfrB,MPN-2
+..2,300-SUBCHILD-001,Sub Child,Sub desc,A,Draft,Part,3,2,MfrC,MPN-3`;
+
+    const parsed = parseCSVToBOM(csvWithDots);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.partNumber).toBe('100-ROOT-001');
+    expect(parsed!.children).toHaveLength(1);
+    expect(parsed!.children![0].partNumber).toBe('200-CHILD-001');
+    expect(parsed!.children![0].children).toHaveLength(1);
+    expect(parsed!.children![0].children![0].partNumber).toBe('300-SUBCHILD-001');
+  });
+
+  it('authors MBOM delta packs and delta items correctly', () => {
+    const initialPackCount = useMBOMDeltaStore.getState().deltaPacks.length;
+    
+    useMBOMDeltaStore.getState().addDeltaPack({
+      projectId: 'ZP-15',
+      skuId: 'sku-1',
+      baseStructureId: 'struct-1',
+      name: 'New US Region Packaging Pack',
+      status: 'draft'
+    });
+    
+    const updatedPacks = useMBOMDeltaStore.getState().deltaPacks;
+    expect(updatedPacks).toHaveLength(initialPackCount + 1);
+    const addedPack = updatedPacks[updatedPacks.length - 1];
+    expect(addedPack.name).toBe('New US Region Packaging Pack');
+    
+    const initialItemCount = useMBOMDeltaStore.getState().deltaItems.length;
+    useMBOMDeltaStore.getState().addDeltaItem({
+      packId: addedPack.id,
+      type: 'add',
+      targetPartNumber: undefined,
+      newPartNumber: '900-PKG-001',
+      quantity: 1,
+      reason: 'Regional packaging box'
+    });
+    
+    const updatedItems = useMBOMDeltaStore.getState().deltaItems;
+    expect(updatedItems).toHaveLength(initialItemCount + 1);
+    const addedItem = updatedItems[updatedItems.length - 1];
+    expect(addedItem.packId).toBe(addedPack.id);
+    expect(addedItem.newPartNumber).toBe('900-PKG-001');
+  });
+
+  it('allows selecting existing draft ECO and switching sandbox ECOs while staging together', async () => {
+    const bomStore = useBOMStore.getState();
+    bomStore.updateBOMNode('root', { state: LifecycleState.Released });
+    
+    // Seed an existing draft ECO
+    const eco1 = bomStore.createECO('Draft ECO 1', 'Test eco 1', 'Admin', [], 'Low');
+    const eco2 = bomStore.createECO('Draft ECO 2', 'Test eco 2', 'Admin', [], 'Low');
+    
+    render(<BOMEditor />);
+    
+    // Select root row and change qty to trigger ECO prompt
+    const rootRow = screen.getByText(bomStore.bomData.partNumber);
+    fireEvent.click(rootRow);
+    const qtyInput = screen.getByLabelText('Quantity');
+    fireEvent.change(qtyInput, { target: { value: '12' } });
+    
+    // Verify gate modal is open and has dropdown with Draft ECO 1
+    expect(screen.getByText('ECO Gate Enforced')).toBeInTheDocument();
+    const selectEco = screen.getByLabelText('Select Existing Draft ECO');
+    expect(selectEco).toBeInTheDocument();
+    
+    // Select ECO 1 and activate sandbox
+    fireEvent.change(selectEco, { target: { value: eco1.id } });
+    fireEvent.click(screen.getByRole('button', { name: 'Activate Sandbox & Edit' }));
+    
+    // Verify sandbox mode is active under ECO 1
+    expect(useBOMStore.getState().isSandboxMode).toBe(true);
+    expect(useBOMStore.getState().sandboxECOId).toBe(eco1.id);
+    
+    // Click Change ECO button in warning banner
+    fireEvent.click(screen.getByRole('button', { name: 'Change ECO' }));
+    expect(screen.getByText('Switch Sandbox ECO')).toBeInTheDocument();
+    
+    // Select ECO 2 and switch
+    const switchSelectEco = screen.getByLabelText('Select Existing Draft ECO');
+    fireEvent.change(switchSelectEco, { target: { value: eco2.id } });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch ECO' }));
+    
+    // Verify sandbox mode is active under ECO 2 and modifications are staged together
+    expect(useBOMStore.getState().isSandboxMode).toBe(true);
+    expect(useBOMStore.getState().sandboxECOId).toBe(eco2.id);
+    expect(useBOMStore.getState().sandboxBOMData?.quantity).toBe(12);
   });
 });

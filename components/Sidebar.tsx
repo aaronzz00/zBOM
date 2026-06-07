@@ -108,9 +108,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
         >
           <Settings className="w-5 h-5" />
           <span className="hidden lg:inline">Settings</span>
-          <span className="hidden rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-200 lg:inline">
-            In dev
-          </span>
         </button>
         <div className="mt-4 hidden px-4 text-xs text-slate-600 lg:block">
           v2.5.0 (Build 9924)<br/>

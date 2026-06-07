@@ -48,7 +48,13 @@ export const Header: React.FC<HeaderProps> = ({ project, projects, onProjectChan
 
   const handleConfirmTransition = () => {
     if (!targetPhase) return;
-    updateProjectPhase(project.id, targetPhase as 'EVT' | 'DVT' | 'PVT' | 'MP');
+    const signatures = checklistItems.map((item) => ({
+      item,
+      actor: currentUser.name,
+      role: currentUser.role,
+      timestamp: new Date().toISOString(),
+    }));
+    updateProjectPhase(project.id, targetPhase as 'EVT' | 'DVT' | 'PVT' | 'MP', signatures);
     setShowTransitionModal(false);
   };
 

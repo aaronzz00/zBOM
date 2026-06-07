@@ -71,7 +71,7 @@ export const BOMTable: React.FC<BOMTableProps> = ({
     enableWhereUsed = true,
 }) => {
     const { hasPermission } = useAuth();
-    const { attributeDefs: rawAttributeDefs, project } = useAppStore();
+    const { attributeDefs: rawAttributeDefs, project, componentTypeLabels = {}, lifecycleStateLabels = {}, libraryParts } = useAppStore();
     const attributeDefs = useMemo(() => {
         return rawAttributeDefs.filter(def => !def.projectIdScope || def.projectIdScope === project.id);
     }, [rawAttributeDefs, project.id]);
@@ -269,7 +269,7 @@ export const BOMTable: React.FC<BOMTableProps> = ({
                                             {expandedIds.has(row.id) ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                                         </button>
                                     ) : <span className="w-5 mr-1" />}
-                                    <span className="opacity-70 mr-2" title={row.type}>{getTypeIcon(row.type)}</span>
+                                    <span className="opacity-70 mr-2" title={componentTypeLabels[row.type] || row.type}>{getTypeIcon(row.type)}</span>
                                     <span className="font-medium truncate text-slate-700 mr-2">{row.partNumber}</span>
 
                                     {enableWhereUsed && (
@@ -307,7 +307,7 @@ export const BOMTable: React.FC<BOMTableProps> = ({
                                 {/* State */}
                                 {isColumnVisible('state') && (
                                     <div className="px-3 border-r border-slate-100 h-full flex items-center">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getLifecycleColor(row.state)}`}>{row.state}</span>
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getLifecycleColor(row.state)}`}>{lifecycleStateLabels[row.state] || row.state}</span>
                                     </div>
                                 )}
 
@@ -326,9 +326,11 @@ export const BOMTable: React.FC<BOMTableProps> = ({
                                 {/* Dynamic Attrs */}
                                 {attributeDefs.map(def => {
                                     const isTypeMatch = !def.componentTypeScope || def.componentTypeScope.includes(row.type);
+                                    const matchingPart = libraryParts?.find(p => p.partNumber === row.partNumber);
+                                    const mergedAttributes = { ...(matchingPart?.customAttributes || {}), ...(row.customAttributes || {}) };
                                     return isColumnVisible(def.key) && (
                                         <div key={def.id} className="px-3 border-r border-slate-100 h-full flex items-center truncate text-slate-600 text-xs">
-                                            {isTypeMatch ? (row.customAttributes?.[def.key] || '-') : '-'}
+                                            {isTypeMatch ? (mergedAttributes[def.key] || '-') : '-'}
                                         </div>
                                     );
                                 })}

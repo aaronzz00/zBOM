@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { BOMNode, Project, LibraryPart, ComponentType, Supplier, BOMSnapshot, AttributeDefinition, Attachment, ProjectStageFlow, LifecycleState } from '../types';
+import { BOMNode, Project, LibraryPart, ComponentType, Supplier, BOMSnapshot, AttributeDefinition, Attachment, ProjectStageFlow, LifecycleState, ECO, ECOImpact } from '../types';
 import { mockProject, previousBOM } from '../data/mockBOM';
 import { FormulaEngine } from '../services/FormulaEngine';
 import { coreRepository, toLegacyLibraryParts } from '../repositories/core/coreRepository';
@@ -20,6 +20,12 @@ interface BOMState {
     enabledLifecycleStates: LifecycleState[];
     warehouseLocations: string[];
     complianceStandards: string[];
+    componentTypeLabels: Record<ComponentType, string>;
+    lifecycleStateLabels: Record<LifecycleState, string>;
+    ecos: ECO[];
+    isSandboxMode: boolean;
+    sandboxBOMData: BOMNode | null;
+    sandboxECOId: string | null;
 
     // Actions
     setActiveProject: (projectId: string) => void;
@@ -33,18 +39,35 @@ interface BOMState {
     loadSnapshot: (snapshotId: string) => void;
     addAttributeDef: (def: AttributeDefinition) => void;
     deleteAttributeDef: (id: string) => void;
+    updateAttributeDef: (id: string, updates: Partial<AttributeDefinition>) => void;
     addAttachment: (nodeId: string, file: File) => void;
     deleteAttachment: (nodeId: string, attachmentId: string) => void;
-    updateProjectPhase: (projectId: string, newPhase: 'EVT' | 'DVT' | 'PVT' | 'MP') => void;
+    updateProjectPhase: (projectId: string, newPhase: 'EVT' | 'DVT' | 'PVT' | 'MP', signatures?: any) => void;
     updateProjectFlows: (flows: ProjectStageFlow[]) => void;
     setProjectFlowAssociation: (projectId: string, flowId: string) => void;
     toggleComponentType: (type: ComponentType) => void;
     toggleLifecycleState: (state: LifecycleState) => void;
+    updateComponentTypeLabel: (type: ComponentType, label: string) => void;
+    updateLifecycleStateLabel: (state: LifecycleState, label: string) => void;
     addWarehouseLocation: (location: string) => void;
     deleteWarehouseLocation: (location: string) => void;
+    updateWarehouseLocation: (oldLoc: string, newLoc: string) => void;
     addComplianceStandard: (standard: string) => void;
     deleteComplianceStandard: (standard: string) => void;
     createProject: (input: { code: string, name: string, sku: string, flowId: string }) => void;
+    updateProject: (id: string, updates: Partial<Project>) => void;
+    getBOMAndSnapshotsForProject: (projectId: string) => {
+        bomData: BOMNode;
+        snapshots: Array<{ id: string; name: string; timestamp: string; data: BOMNode }>;
+    } | null;
+
+    // ECO / Sandbox actions
+    createECO: (title: string, description: string, initiator: string, impacts: ECOImpact[], priority: ECO['priority']) => ECO;
+    approveECO: (ecoId: string, approvedBy: string) => void;
+    rejectECO: (ecoId: string) => void;
+    toggleSandboxMode: (enabled: boolean, ecoId?: string | null) => void;
+    publishSandboxChanges: (ecoId?: string) => void;
+    discardSandboxChanges: () => void;
 }
 
 const getActor = () => {
@@ -215,6 +238,35 @@ const STATES_STORAGE_KEY = 'zbom.config.lifecycle_states';
 const WAREHOUSE_STORAGE_KEY = 'zbom.config.warehouse_locations';
 const COMPLIANCE_STORAGE_KEY = 'zbom.config.compliance_standards';
 const ATTRIBUTES_STORAGE_KEY = 'zbom.config.attribute_defs';
+const COMP_TYPE_LABELS_STORAGE_KEY = 'zbom.config.component_type_labels';
+const LIFECYCLE_STATE_LABELS_STORAGE_KEY = 'zbom.config.lifecycle_state_labels';
+
+const loadSavedComponentTypeLabels = (): Record<ComponentType, string> => {
+    try {
+        const saved = localStorage.getItem(COMP_TYPE_LABELS_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+        [ComponentType.Assembly]: 'Assembly',
+        [ComponentType.Part]: 'Part',
+        [ComponentType.Material]: 'Material',
+        [ComponentType.Software]: 'Software'
+    };
+};
+
+const loadSavedLifecycleStateLabels = (): Record<LifecycleState, string> => {
+    try {
+        const saved = localStorage.getItem(LIFECYCLE_STATE_LABELS_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+        [LifecycleState.Draft]: 'Draft',
+        [LifecycleState.InReview]: 'In Review',
+        [LifecycleState.Released]: 'Released',
+        [LifecycleState.Obsolete]: 'Obsolete',
+        [LifecycleState.Prototype]: 'Prototype'
+    };
+};
 
 const loadSavedFlows = (): ProjectStageFlow[] => {
     try {
@@ -284,6 +336,46 @@ const loadSavedAttributeDefs = (): AttributeDefinition[] => {
     ];
 };
 
+const ECO_STORAGE_KEY = 'zbom.ecos.v1';
+
+const loadSavedECOs = (): ECO[] => {
+    try {
+        const saved = localStorage.getItem(ECO_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      {
+        id: 'eco-001',
+        ecoNumber: 'ECO-2024-112',
+        title: 'Replace M1.2 screws with M1.4',
+        description: 'Field failure reports indicate M1.2 screws stripping during assembly torque. Upgrading to M1.4 for durability.',
+        status: 'Approved',
+        initiator: 'Alex Chen',
+        createdDate: '2024-10-12',
+        approvedBy: 'Sarah Engineer',
+        approvalDate: '2024-10-14',
+        priority: 'High',
+        impacts: [
+          { partNumber: '500-22101-A', name: 'Screw, M1.2x3, Torx', changeType: 'Obsolete' },
+          { partNumber: '500-22105-A', name: 'Screw, M1.4x3, Torx', changeType: 'New' }
+        ]
+      },
+      {
+        id: 'eco-002',
+        ecoNumber: 'ECO-2024-115',
+        title: 'Update FW Bootloader',
+        description: 'Security patch for bootloader. Required for PVT builds.',
+        status: 'Pending Approval',
+        initiator: 'Mike Smith',
+        createdDate: '2024-10-14',
+        priority: 'Medium',
+        impacts: [
+          { partNumber: 'SW-10001', name: 'Firmware, Bootloader', changeType: 'RevUp', from: 'v1.2', to: 'v1.3' }
+        ]
+      }
+    ];
+};
+
 export const useBOMStore = create<BOMState>((set, get) => ({
     ...getRepositoryState(),
     attributeDefs: loadSavedAttributeDefs(),
@@ -293,6 +385,12 @@ export const useBOMStore = create<BOMState>((set, get) => ({
     enabledLifecycleStates: loadSavedLifecycleStates(),
     warehouseLocations: loadSavedWarehouseLocations(),
     complianceStandards: loadSavedComplianceStandards(),
+    componentTypeLabels: loadSavedComponentTypeLabels(),
+    lifecycleStateLabels: loadSavedLifecycleStateLabels(),
+    ecos: loadSavedECOs(),
+    isSandboxMode: false,
+    sandboxBOMData: null,
+    sandboxECOId: null,
 
     setActiveProject: (projectId: string) => {
         coreRepository.setActiveProject(projectId);
@@ -310,6 +408,14 @@ export const useBOMStore = create<BOMState>((set, get) => ({
     },
 
     updateBOMNode: (nodeId: string, updates: Partial<BOMNode>) => {
+        if (get().isSandboxMode && get().sandboxBOMData) {
+            set((state) => {
+                const updatedTree = updateNodeRecursive(state.sandboxBOMData!, nodeId, updates);
+                const recalculated = FormulaEngine.recalculate(updatedTree);
+                return { sandboxBOMData: recalculated };
+            });
+            return;
+        }
         set((state) => {
             const updatedTree = updateNodeRecursive(state.bomData, nodeId, updates);
             const recalculated = FormulaEngine.recalculate(updatedTree);
@@ -323,6 +429,14 @@ export const useBOMStore = create<BOMState>((set, get) => ({
     },
 
     addBOMNode: (parentId: string, newNode: BOMNode) => {
+        if (get().isSandboxMode && get().sandboxBOMData) {
+            set((state) => {
+                const updatedTree = addNodeRecursive(state.sandboxBOMData!, parentId, newNode);
+                const recalculated = FormulaEngine.recalculate(updatedTree);
+                return { sandboxBOMData: recalculated };
+            });
+            return;
+        }
         set((state) => {
             const updatedTree = addNodeRecursive(state.bomData, parentId, newNode);
             const recalculated = FormulaEngine.recalculate(updatedTree);
@@ -342,6 +456,14 @@ export const useBOMStore = create<BOMState>((set, get) => ({
                 .filter((child) => child.id !== nodeId)
                 .map(deleteNodeRecursive)
         });
+        if (get().isSandboxMode && get().sandboxBOMData) {
+            set((state) => {
+                const updatedTree = deleteNodeRecursive(state.sandboxBOMData!);
+                const recalculated = FormulaEngine.recalculate(updatedTree);
+                return { sandboxBOMData: recalculated };
+            });
+            return;
+        }
         set((state) => {
             const updatedTree = deleteNodeRecursive(state.bomData);
             const recalculated = FormulaEngine.recalculate(updatedTree);
@@ -420,6 +542,17 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         set({ attributeDefs: updated });
     },
 
+    updateAttributeDef: (id: string, updates: Partial<AttributeDefinition>) => {
+        const updated = get().attributeDefs.map((def) => {
+            if (def.id === id) {
+                return { ...def, ...updates };
+            }
+            return def;
+        });
+        localStorage.setItem(ATTRIBUTES_STORAGE_KEY, JSON.stringify(updated));
+        set({ attributeDefs: updated });
+    },
+
     addAttachment: (nodeId: string, file: File) => {
         const fakeUrl = URL.createObjectURL(file);
         const newAtt: Attachment = {
@@ -452,9 +585,9 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         });
     },
 
-    updateProjectPhase: (projectId: string, newPhase: 'EVT' | 'DVT' | 'PVT' | 'MP') => {
+    updateProjectPhase: (projectId: string, newPhase: 'EVT' | 'DVT' | 'PVT' | 'MP', signatures?: any) => {
         const actor = getActor();
-        const updatedCoreProject = coreRepository.updateProjectPhase(projectId, newPhase, actor);
+        const updatedCoreProject = coreRepository.updateProjectPhase(projectId, newPhase, actor, signatures);
         set((state) => {
             const calculatedTree = state.bomData;
             const totals = FormulaEngine.calculateTotals(calculatedTree);
@@ -497,6 +630,20 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         set({ enabledLifecycleStates: updated });
     },
 
+    updateComponentTypeLabel: (type: ComponentType, label: string) => {
+        const current = get().componentTypeLabels;
+        const updated = { ...current, [type]: label };
+        localStorage.setItem(COMP_TYPE_LABELS_STORAGE_KEY, JSON.stringify(updated));
+        set({ componentTypeLabels: updated });
+    },
+
+    updateLifecycleStateLabel: (state: LifecycleState, label: string) => {
+        const current = get().lifecycleStateLabels;
+        const updated = { ...current, [state]: label };
+        localStorage.setItem(LIFECYCLE_STATE_LABELS_STORAGE_KEY, JSON.stringify(updated));
+        set({ lifecycleStateLabels: updated });
+    },
+
     addWarehouseLocation: (location: string) => {
         const current = get().warehouseLocations;
         if (current.includes(location)) return;
@@ -511,6 +658,21 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         set({ warehouseLocations: updated });
     },
 
+    updateWarehouseLocation: (oldLoc: string, newLoc: string) => {
+        const current = get().warehouseLocations;
+        const updated = current.map((l) => l === oldLoc ? newLoc : l);
+        localStorage.setItem(WAREHOUSE_STORAGE_KEY, JSON.stringify(updated));
+
+        // Cascade update to library parts
+        const updatedParts = get().libraryParts.map((p) => p.location === oldLoc ? { ...p, location: newLoc } : p);
+        coreRepository.replaceLegacyLibraryParts(updatedParts, getActor());
+
+        set({
+            warehouseLocations: updated,
+            ...getRepositoryState()
+        });
+    },
+
     addComplianceStandard: (standard: string) => {
         const current = get().complianceStandards;
         if (current.includes(standard)) return;
@@ -523,6 +685,29 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         const updated = get().complianceStandards.filter((s) => s !== standard);
         localStorage.setItem(COMPLIANCE_STORAGE_KEY, JSON.stringify(updated));
         set({ complianceStandards: updated });
+    },
+
+    updateComplianceStandard: (oldStd: string, newStd: string) => {
+        const current = get().complianceStandards;
+        const updated = current.map((s) => s === oldStd ? newStd : s);
+        localStorage.setItem(COMPLIANCE_STORAGE_KEY, JSON.stringify(updated));
+
+        // Update attributeDefs options if they contain the old compliance standard
+        const updatedAttrs = get().attributeDefs.map((def) => {
+            if (def.type === 'select' && def.options) {
+                return {
+                    ...def,
+                    options: def.options.map((o) => o === oldStd ? newStd : o)
+                };
+            }
+            return def;
+        });
+        localStorage.setItem(ATTRIBUTES_STORAGE_KEY, JSON.stringify(updatedAttrs));
+
+        set({
+            complianceStandards: updated,
+            attributeDefs: updatedAttrs
+        });
     },
 
     createProject: (input: { code: string, name: string, sku: string, flowId: string }) => {
@@ -548,6 +733,194 @@ export const useBOMStore = create<BOMState>((set, get) => ({
                 projects: updatedProjects,
                 projectFlowAssociations: updatedAssoc
             };
+        });
+    },
+
+    updateProject: (id: string, updates: Partial<Project>) => {
+        const actor = getActor();
+        const updatedCoreProject = coreRepository.updateProject(id, {
+            code: updates.code,
+            name: updates.name,
+            sku: updates.sku
+        }, actor);
+
+        const totals = FormulaEngine.calculateTotals(get().bomData);
+        const legacyProject = coreProjectToProject(updatedCoreProject, totals.totalCost, totals.totalWeight);
+
+        set((state) => {
+            const projects = state.projects.map((p) => p.id === id ? legacyProject : p);
+            const project = state.project.id === id ? legacyProject : state.project;
+            return { projects, project };
+        });
+    },
+
+    getBOMAndSnapshotsForProject: (projectId: string) => {
+        const workspace = coreRepository.loadWorkspace();
+        const bom = workspace.boms.find((b) => b.projectId === projectId);
+        if (!bom) return null;
+
+        const childrenByParent = new Map<string | undefined, CoreBOMNode[]>();
+        for (const node of workspace.bomNodes.filter((item) => item.bomId === bom.id)) {
+            const children = childrenByParent.get(node.parentId) ?? [];
+            children.push(node);
+            childrenByParent.set(node.parentId, children);
+        }
+
+        const convert = (node: CoreBOMNode): BOMNode => {
+            const part = node.partId ? workspace.parts.find((item) => item.id === node.partId) : undefined;
+            const source = part && part.active ? part : undefined;
+            return {
+                id: node.id,
+                partNumber: source?.partNumber ?? node.partNumber,
+                name: source?.description ?? node.name,
+                description: source?.description ?? node.description,
+                imageUrl: source?.imageUrl ?? node.imageUrl,
+                revision: node.revision,
+                state: source?.state ?? node.state,
+                type: source?.type ?? node.type,
+                quantity: node.quantity,
+                unit: node.unit,
+                cost: source?.cost ?? node.cost,
+                currency: source?.currency ?? node.currency,
+                manufacturer: source?.manufacturer ?? node.manufacturer,
+                mpn: source?.mpn ?? node.mpn,
+                leadTimeWeeks: source?.leadTimeWeeks ?? node.leadTimeWeeks,
+                refDes: node.refDes,
+                variants: node.variants,
+                targetCost: node.targetCost,
+                moq: source?.moq ?? node.moq,
+                spq: source?.spq ?? node.spq,
+                pricingTiers: source?.pricingTiers ?? node.pricingTiers,
+                weightG: source?.weightG ?? node.weightG,
+                isAuxiliary: node.isAuxiliary,
+                customAttributes: node.customAttributes,
+                attachments: node.attachments,
+                children: childrenByParent.get(node.id)?.map(convert),
+            };
+        };
+
+        const root = workspace.bomNodes.find((node) => node.id === bom.rootNodeId);
+        if (!root) return null;
+
+        const bomData = FormulaEngine.recalculate(convert(root));
+
+        const projectSnapshots = workspace.bomSnapshots
+            .filter((item) => item.bomId === bom.id)
+            .map((item) => ({
+                id: item.id,
+                name: item.name,
+                timestamp: item.timestamp,
+                data: buildLegacySnapshotTree(item),
+            }));
+
+        return { bomData, snapshots: projectSnapshots };
+    },
+
+    createECO: (title: string, description: string, initiator: string, impacts: ECOImpact[], priority: ECO['priority'] = 'Medium') => {
+        const nextIndex = get().ecos.length + 1;
+        const newEco: ECO = {
+            id: `eco-draft-${Date.now()}-${nextIndex}`,
+            ecoNumber: `ECO-2024-DRAFT-${String(nextIndex).padStart(3, '0')}`,
+            title,
+            description,
+            status: 'Draft',
+            initiator,
+            createdDate: new Date().toISOString().split('T')[0],
+            priority,
+            impacts
+        };
+        const updated = [newEco, ...get().ecos];
+        localStorage.setItem(ECO_STORAGE_KEY, JSON.stringify(updated));
+        set({ ecos: updated });
+        return newEco;
+    },
+
+    approveECO: (ecoId: string, approvedBy: string) => {
+        const updated = get().ecos.map(e => {
+            if (e.id === ecoId) {
+                return {
+                    ...e,
+                    status: 'Approved' as const,
+                    approvedBy,
+                    approvalDate: new Date().toISOString().split('T')[0]
+                };
+            }
+            return e;
+        });
+        localStorage.setItem(ECO_STORAGE_KEY, JSON.stringify(updated));
+        set({ ecos: updated });
+    },
+
+    rejectECO: (ecoId: string) => {
+        const updated = get().ecos.map(e => {
+            if (e.id === ecoId) {
+                return {
+                    ...e,
+                    status: 'Rejected' as const
+                };
+            }
+            return e;
+        });
+        localStorage.setItem(ECO_STORAGE_KEY, JSON.stringify(updated));
+        set({ ecos: updated });
+    },
+
+    toggleSandboxMode: (enabled: boolean, ecoId?: string | null) => {
+        if (enabled) {
+            set((state) => ({
+                isSandboxMode: true,
+                sandboxBOMData: state.sandboxBOMData || JSON.parse(JSON.stringify(state.bomData)),
+                sandboxECOId: ecoId || null
+            }));
+        } else {
+            set({
+                isSandboxMode: false,
+                sandboxBOMData: null,
+                sandboxECOId: null
+            });
+        }
+    },
+
+    publishSandboxChanges: (ecoId?: string) => {
+        const { isSandboxMode, sandboxBOMData, sandboxECOId } = get();
+        if (!isSandboxMode || !sandboxBOMData) return;
+
+        // Apply changes to master
+        const recalculated = FormulaEngine.recalculate(sandboxBOMData);
+        const totals = FormulaEngine.calculateTotals(recalculated);
+        coreRepository.replaceLegacyBOMTree(recalculated, getActor());
+
+        // Update the ECO status to Pending Approval
+        const targetEcoId = ecoId || sandboxECOId;
+        let updatedEcos = get().ecos;
+        if (targetEcoId) {
+            updatedEcos = get().ecos.map(e => {
+                if (e.id === targetEcoId) {
+                    return {
+                        ...e,
+                        status: 'Pending Approval' as const
+                    };
+                }
+                return e;
+            });
+            localStorage.setItem(ECO_STORAGE_KEY, JSON.stringify(updatedEcos));
+        }
+
+        set((state) => ({
+            bomData: recalculated,
+            project: { ...state.project, totalCost: totals.totalCost, totalWeight: totals.totalWeight },
+            isSandboxMode: false,
+            sandboxBOMData: null,
+            sandboxECOId: null,
+            ecos: updatedEcos
+        }));
+    },
+
+    discardSandboxChanges: () => {
+        set({
+            isSandboxMode: false,
+            sandboxBOMData: null,
+            sandboxECOId: null
         });
     }
 }));

@@ -11,7 +11,14 @@ import { exportBOMToCSV, parseCSVToBOM } from '../utils/csvHelper';
 import { coreRepository } from '../repositories/core/coreRepository';
 
 export const BOMEditor: React.FC = () => {
-  const { bomData, setBOMData, libraryParts, updateBOMNode, addBOMNode, deleteBOMNode, createSnapshot, loadSnapshot, snapshots, attributeDefs: rawAttributeDefs, addAttributeDef, addAttachment, deleteAttachment, project } = useAppStore();
+  const { 
+    bomData, setBOMData, libraryParts, updateBOMNode, addBOMNode, deleteBOMNode, 
+    createSnapshot, loadSnapshot, snapshots, attributeDefs: rawAttributeDefs, 
+    addAttributeDef, addAttachment, deleteAttachment, project, 
+    componentTypeLabels = {}, lifecycleStateLabels = {},
+    isSandboxMode, sandboxBOMData, sandboxECOId, toggleSandboxMode,
+    publishSandboxChanges, discardSandboxChanges, createECO, ecos
+  } = useAppStore();
   const { hasPermission } = useAuth();
   
   const [selectedNode, setSelectedNode] = useState<BOMNode | null>(null);
@@ -19,6 +26,70 @@ export const BOMEditor: React.FC = () => {
   const [detailsTab, setDetailsTab] = useState<'info' | 'history'>('info');
   const [viewMode, setViewMode] = useState<'tree' | 'matrix' | 'flat'>('tree');
   const [isMBOMView, setIsMBOMView] = useState(false);
+
+  // Gating & Sandbox State
+  const [isGateModalOpen, setIsGateModalOpen] = useState(false);
+  const [pendingEditAction, setPendingEditAction] = useState<(() => void) | null>(null);
+  const [selectedExistingEcoId, setSelectedExistingEcoId] = useState<string>('');
+
+  const findNodeById = (root: BOMNode, id: string): BOMNode | null => {
+      if (root.id === id) return root;
+      if (root.children) {
+          for (const child of root.children) {
+              const found = findNodeById(child, id);
+              if (found) return found;
+          }
+      }
+      return null;
+  };
+
+  const checkReleasedGate = (nodeId: string, action: () => void) => {
+      if (isSandboxMode) {
+          action();
+          return;
+      }
+      const targetNode = findNodeById(bomData, nodeId);
+      if (targetNode && targetNode.state === LifecycleState.Released) {
+          setPendingEditAction(() => action);
+          const draftEcos = ecos.filter(e => e.status === 'Draft');
+          setSelectedExistingEcoId(draftEcos[0]?.id || '');
+          setIsGateModalOpen(true);
+      } else {
+          action();
+      }
+  };
+
+  const handleActivateSandboxWithECO = (ecoId: string | null) => {
+      let targetEcoId = ecoId;
+      if (!targetEcoId) {
+          const nextIndex = ecos.length + 1;
+          const impacts: ECOImpact[] = [
+              {
+                  partNumber: activeNode?.partNumber || bomData.partNumber,
+                  name: activeNode?.name || bomData.name,
+                  changeType: 'RevUp',
+                  from: activeNode?.revision || bomData.revision,
+                  to: 'Draft'
+              }
+          ];
+          const newEco = createECO(
+              `Draft ECO for editing ${activeNode?.partNumber || bomData.partNumber}`,
+              `Draft change order created from BOM Editor to stage modifications.`,
+              'Alex Admin',
+              impacts,
+              'Medium'
+          );
+          targetEcoId = newEco.id;
+      }
+      
+      toggleSandboxMode(true, targetEcoId);
+      setIsGateModalOpen(false);
+      
+      if (pendingEditAction) {
+          pendingEditAction();
+          setPendingEditAction(null);
+      }
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
@@ -63,10 +134,14 @@ export const BOMEditor: React.FC = () => {
       if (field === 'targetCost' && !canEditCost) return;
       if (['refDes', 'variants', 'description', 'moq', 'spq', 'weightG'].includes(field as string) && !canEditMetadata) return;
 
-      updateBOMNode(nodeId, { [field]: value });
-      if (selectedNode && selectedNode.id === nodeId) {
-          setSelectedNode({ ...selectedNode, [field]: value });
-      }
+      const performUpdate = () => {
+          updateBOMNode(nodeId, { [field]: value });
+          if (selectedNode && selectedNode.id === nodeId) {
+              setSelectedNode({ ...selectedNode, [field]: value });
+          }
+      };
+
+      checkReleasedGate(nodeId, performUpdate);
   };
 
   // Custom Attributes Logic
@@ -186,14 +261,7 @@ export const BOMEditor: React.FC = () => {
 	    libraryParts.find((part) => part.id === newBomItem.partId) ?? libraryParts[0]
 	  ), [libraryParts, newBomItem.partId]);
 
-	  const findNodeById = (node: BOMNode, nodeId: string): BOMNode | null => {
-	    if (node.id === nodeId) return node;
-	    for (const child of node.children ?? []) {
-	        const found = findNodeById(child, nodeId);
-	        if (found) return found;
-	    }
-	    return null;
-	  };
+
 
   useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
@@ -258,7 +326,8 @@ export const BOMEditor: React.FC = () => {
 	    const partNumber = libraryPart?.partNumber ?? newBomItem.partNumber.trim();
 	    const name = libraryPart?.description ?? newBomItem.name.trim();
 	    if (!partNumber || !name) return;
-	    const parentNode = findNodeById(bomData, newBomItem.parentId);
+	    const currentTree = isSandboxMode && sandboxBOMData ? sandboxBOMData : bomData;
+	    const parentNode = findNodeById(currentTree, newBomItem.parentId);
 	    if (parentNode?.children?.some((child) => child.partNumber === partNumber)) {
 	        setAddError(`${partNumber} is already used under the selected parent.`);
 	        return;
@@ -287,28 +356,37 @@ export const BOMEditor: React.FC = () => {
 	      children: (libraryPart?.type ?? newBomItem.type) === ComponentType.Assembly ? [] : undefined,
 	    };
 
-	    addBOMNode(newBomItem.parentId, createdNode);
-	    setSaveStatus(`Saved ${partNumber} to the BOM.`);
-	    setSelectedNode(createdNode);
-	    setNewBomItem({
-	      parentId: 'root',
-	      partId: libraryParts[0]?.id || '',
-	      partNumber: '',
-	      name: '',
-      type: ComponentType.Part,
-      quantity: '1',
-      unit: 'EA',
-      cost: '0',
-    });
-	    setIsAddModalOpen(false);
+	    const performAdd = () => {
+	        addBOMNode(newBomItem.parentId, createdNode);
+	        setSaveStatus(`Saved ${partNumber} to the BOM.`);
+	        setSelectedNode(createdNode);
+	        setNewBomItem({
+	          parentId: 'root',
+	          partId: libraryParts[0]?.id || '',
+	          partNumber: '',
+	          name: '',
+	          type: ComponentType.Part,
+	          quantity: '1',
+	          unit: 'EA',
+	          cost: '0',
+	        });
+	        setIsAddModalOpen(false);
+	    };
+
+	    checkReleasedGate(newBomItem.parentId, performAdd);
 	  };
 
 	  const handleDeleteActiveNode = () => {
 	    if (!activeNode || activeNode.id === bomData.id) return;
 	    if (!window.confirm(`Remove ${activeNode.partNumber} from the BOM?`)) return;
-	    deleteBOMNode(activeNode.id);
-	    setSelectedNode(null);
-	    setSaveStatus(`Removed ${activeNode.partNumber} from the BOM.`);
+
+	    const performDelete = () => {
+	        deleteBOMNode(activeNode.id);
+	        setSelectedNode(null);
+	        setSaveStatus(`Removed ${activeNode.partNumber} from the BOM.`);
+	    };
+
+	    checkReleasedGate(activeNode.id, performDelete);
 	  };
 
 	  const validateImportedTree = (tree: BOMNode) => {
@@ -366,6 +444,46 @@ export const BOMEditor: React.FC = () => {
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
 
       <div className="flex-1 flex flex-col p-4 overflow-hidden">
+        {/* Sandbox Warning Banner */}
+        {isSandboxMode && (
+          <div className="bg-amber-50 border border-amber-200 p-3 mb-4 rounded-lg flex items-center justify-between shadow-sm animate-in fade-in duration-200 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping animate-duration-1000"></span>
+              <div className="text-sm text-amber-800 font-medium flex items-center gap-2 flex-wrap">
+                <span><strong>Sandbox Mode Active:</strong> Staging changes for <strong>{sandboxECOId ? (ecos.find(e => e.id === sandboxECOId)?.ecoNumber + " - " + ecos.find(e => e.id === sandboxECOId)?.title) || sandboxECOId : 'Draft ECO'}</strong></span>
+                <button
+                  onClick={() => {
+                    const draftEcos = ecos.filter(e => e.status === 'Draft');
+                    setSelectedExistingEcoId(sandboxECOId || draftEcos[0]?.id || '');
+                    setIsGateModalOpen(true);
+                  }}
+                  className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 rounded text-[10px] font-bold transition-colors"
+                >
+                  Change ECO
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => publishSandboxChanges()}
+                className="px-3 py-1 bg-amber-600 text-white font-semibold text-xs rounded hover:bg-amber-700 transition-colors shadow-sm"
+              >
+                Publish changes to master
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm("Discard all staged sandbox changes?")) {
+                    discardSandboxChanges();
+                  }
+                }}
+                className="px-3 py-1 bg-slate-200 text-slate-700 font-semibold text-xs rounded hover:bg-slate-300 transition-colors"
+              >
+                Discard changes
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Toolbar */}
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <div className="flex items-center gap-4">
@@ -470,7 +588,7 @@ export const BOMEditor: React.FC = () => {
         <div className="flex-1 flex gap-4 overflow-hidden relative">
             {viewMode === 'tree' && (
                 <BOMTable 
-                    data={bomData} 
+                    data={isSandboxMode && sandboxBOMData ? sandboxBOMData : bomData} 
                     onSelect={handleNodeSelect}
                     selectedId={selectedNode?.id || null}
                     isMBOMView={isMBOMView}
@@ -479,14 +597,14 @@ export const BOMEditor: React.FC = () => {
             
             {viewMode === 'matrix' && (
                 <BOMMatrix 
-                    data={bomData} 
+                    data={isSandboxMode && sandboxBOMData ? sandboxBOMData : bomData} 
                     onSelect={handleNodeSelect}
                     selectedId={selectedNode?.id || null}
                 />
             )}
 
             {viewMode === 'flat' && (
-                <BOMFlatView data={bomData} />
+                <BOMFlatView data={isSandboxMode && sandboxBOMData ? sandboxBOMData : bomData} />
             )}
             
             {/* Properties Panel (Right Side) */}
@@ -530,8 +648,9 @@ export const BOMEditor: React.FC = () => {
                                     </h4>
                                     <div className="grid grid-cols-2 gap-3 mb-3">
                                         <div>
-                                            <label className="text-[10px] font-bold text-slate-500 block mb-1">Quantity</label>
+                                            <label htmlFor="bom-quantity-input" className="text-[10px] font-bold text-slate-500 block mb-1">Quantity</label>
                                             <input 
+                                                id="bom-quantity-input"
                                                 type="number"
                                                 value={activeNode.quantity}
                                                 onChange={(e) => handleUpdateField(activeNode.id, 'quantity', parseFloat(e.target.value))}
@@ -599,35 +718,39 @@ export const BOMEditor: React.FC = () => {
                                     </div>
                                     
                                     <div className="space-y-3 bg-slate-50 p-3 rounded border border-slate-200">
-                                        {visibleAttributeDefs.length === 0 ? (
-                                            <p className="text-xs text-slate-400 italic text-center">No custom attributes defined.</p>
-                                        ) : (
-                                            visibleAttributeDefs.map(def => (
-                                                <div key={def.id}>
-                                                    <label className="text-[10px] font-bold text-slate-500 block mb-1">{def.name}</label>
-                                                    {def.type === 'select' ? (
-                                                        <select 
-                                                            value={activeNode.customAttributes?.[def.key] || ''}
-                                                            onChange={(e) => handleUpdateAttribute(activeNode.id, def.key, e.target.value)}
-                                                            className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded bg-white"
-                                                            disabled={!canEditMetadata}
-                                                        >
-                                                            <option value="">- Select -</option>
-                                                            {def.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                                        </select>
-                                                    ) : (
-                                                        <input 
-                                                            type={def.type === 'number' ? 'number' : 'text'}
-                                                            value={activeNode.customAttributes?.[def.key] || ''}
-                                                            onChange={(e) => handleUpdateAttribute(activeNode.id, def.key, e.target.value)}
-                                                            className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded"
-                                                            placeholder={`Enter ${def.name.toLowerCase()}...`}
-                                                            disabled={!canEditMetadata}
-                                                        />
-                                                    )}
-                                                </div>
-                                            ))
-                                        )}
+                                         {visibleAttributeDefs.length === 0 ? (
+                                             <p className="text-xs text-slate-400 italic text-center">No custom attributes defined.</p>
+                                         ) : (
+                                             visibleAttributeDefs.map(def => {
+                                                 const matchingPart = libraryParts.find(p => p.partNumber === activeNode.partNumber);
+                                                 const resolvedValue = activeNode.customAttributes?.[def.key] !== undefined ? activeNode.customAttributes[def.key] : (matchingPart?.customAttributes?.[def.key] || '');
+                                                 return (
+                                                     <div key={def.id}>
+                                                         <label className="text-[10px] font-bold text-slate-500 block mb-1">{def.name}</label>
+                                                         {def.type === 'select' ? (
+                                                             <select 
+                                                                 value={resolvedValue}
+                                                                 onChange={(e) => handleUpdateAttribute(activeNode.id, def.key, e.target.value)}
+                                                                 className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded bg-white"
+                                                                 disabled={!canEditMetadata}
+                                                             >
+                                                                 <option value="">- Select -</option>
+                                                                 {def.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                             </select>
+                                                         ) : (
+                                                             <input 
+                                                                 type={def.type === 'number' ? 'number' : 'text'}
+                                                                 value={resolvedValue}
+                                                                 onChange={(e) => handleUpdateAttribute(activeNode.id, def.key, e.target.value)}
+                                                                 className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded"
+                                                                 placeholder={matchingPart?.customAttributes?.[def.key] ? `Inherited: ${matchingPart.customAttributes[def.key]}` : `Enter ${def.name.toLowerCase()}...`}
+                                                                 disabled={!canEditMetadata}
+                                                             />
+                                                         )}
+                                                     </div>
+                                                 );
+                                             })
+                                         )}
                                     </div>
                                 </div>
 
@@ -990,10 +1113,10 @@ export const BOMEditor: React.FC = () => {
 	                                className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
 	                                disabled={addMode === 'library'}
 	                             >
-                                <option value={ComponentType.Part}>Part</option>
-                                <option value={ComponentType.Assembly}>Assembly</option>
-                                <option value={ComponentType.Material}>Material</option>
-                                <option value={ComponentType.Software}>Software</option>
+                                <option value={ComponentType.Part}>{componentTypeLabels[ComponentType.Part] || 'Part'}</option>
+                                <option value={ComponentType.Assembly}>{componentTypeLabels[ComponentType.Assembly] || 'Assembly'}</option>
+                                <option value={ComponentType.Material}>{componentTypeLabels[ComponentType.Material] || 'Material'}</option>
+                                <option value={ComponentType.Software}>{componentTypeLabels[ComponentType.Software] || 'Software'}</option>
                              </select>
                          </label>
                          <label className="block text-sm font-semibold text-slate-700" htmlFor="bom-add-quantity">
@@ -1047,6 +1170,76 @@ export const BOMEditor: React.FC = () => {
                      </div>
                  </div>
              </div>
+        </div>
+      )}
+
+      {isGateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-amber-500" />
+                {isSandboxMode ? 'Switch Sandbox ECO' : 'ECO Gate Enforced'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setIsGateModalOpen(false);
+                  setPendingEditAction(null);
+                }} 
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-600">
+                {isSandboxMode 
+                  ? 'Select or create a different draft ECO to associate with your staged sandbox changes.' 
+                  : 'The item you are editing is in the Released state. To prevent unauthorized production changes, edits must be staged in Sandbox Mode under a draft ECO.'}
+              </p>
+              
+              {ecos.filter(e => e.status === 'Draft').length > 0 ? (
+                <div className="space-y-2">
+                  <label htmlFor="eco-gate-select" className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Select Existing Draft ECO
+                  </label>
+                  <select
+                    id="eco-gate-select"
+                    value={selectedExistingEcoId}
+                    onChange={(e) => setSelectedExistingEcoId(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white focus:border-blue-500 outline-none"
+                  >
+                    <option value="">- Create New Draft ECO instead -</option>
+                    {ecos.filter(e => e.status === 'Draft').map(eco => (
+                      <option key={eco.id} value={eco.id}>
+                        {eco.ecoNumber} - {eco.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic">No existing draft ECOs found. A new draft ECO will be created automatically.</p>
+              )}
+ 
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setIsGateModalOpen(false);
+                    setPendingEditAction(null);
+                  }}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded text-sm hover:bg-slate-50 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleActivateSandboxWithECO(selectedExistingEcoId || null)}
+                  className="px-4 py-2 bg-amber-600 text-white rounded text-sm hover:bg-amber-700 font-bold shadow-sm"
+                >
+                  {isSandboxMode ? 'Switch ECO' : 'Activate Sandbox & Edit'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

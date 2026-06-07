@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, GitMerge, Plus, Trash2, Save, RotateCcw, AlertTriangle, CheckCircle2, List, Settings, Database, FolderPlus, Tag } from 'lucide-react';
+import { Shield, GitMerge, Plus, Trash2, Save, RotateCcw, AlertTriangle, CheckCircle2, List, Settings, Database, FolderPlus, Tag, Edit, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useBOMStore } from '../stores/useBOMStore';
 import { Permission, UserRole, ProjectStageFlow, ComponentType, LifecycleState, AttributeDefinition } from '../types';
@@ -25,7 +25,15 @@ export const SettingsPage: React.FC = () => {
     deleteComplianceStandard,
     addAttributeDef,
     deleteAttributeDef,
-    createProject
+    createProject,
+    componentTypeLabels,
+    lifecycleStateLabels,
+    updateComponentTypeLabel,
+    updateLifecycleStateLabel,
+    updateWarehouseLocation,
+    updateComplianceStandard,
+    updateAttributeDef,
+    updateProject
   } = useBOMStore();
 
   const [activeTab, setActiveTab] = useState<'roles' | 'flows' | 'metadata' | 'fields'>('roles');
@@ -50,6 +58,35 @@ export const SettingsPage: React.FC = () => {
     projectScope: 'all',
     typeScope: [] as ComponentType[]
   });
+
+  // Edit configurations states
+  const [editingComponentType, setEditingComponentType] = useState<ComponentType | null>(null);
+  const [editingComponentTypeLabel, setEditingComponentTypeLabel] = useState<string>('');
+  
+  const [editingLifecycleState, setEditingLifecycleState] = useState<LifecycleState | null>(null);
+  const [editingLifecycleStateLabel, setEditingLifecycleStateLabel] = useState<string>('');
+
+  const [editingLocation, setEditingLocation] = useState<string | null>(null);
+  const [editingLocationValue, setEditingLocationValue] = useState<string>('');
+
+  const [editingCompliance, setEditingCompliance] = useState<string | null>(null);
+  const [editingComplianceValue, setEditingComplianceValue] = useState<string>('');
+
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editingProjectData, setEditingProjectData] = useState({ code: '', name: '', sku: '' });
+
+  const [editingAttributeId, setEditingAttributeId] = useState<string | null>(null);
+  const [editingAttributeData, setEditingAttributeData] = useState({
+    name: '',
+    key: '',
+    type: 'text' as 'text' | 'number' | 'select' | 'date',
+    optionsString: '',
+    projectScope: 'all',
+    typeScope: [] as ComponentType[]
+  });
+
+  const [editingChecklistIndex, setEditingChecklistIndex] = useState<{ phase: string, index: number } | null>(null);
+  const [editingChecklistValue, setEditingChecklistValue] = useState<string>('');
 
   const showNotification = (msg: string) => {
     setSuccessMessage(msg);
@@ -157,6 +194,35 @@ export const SettingsPage: React.FC = () => {
     showNotification('Checklist item removed.');
   };
 
+  const handleEditChecklistItem = (phase: string, index: number, newValue: string) => {
+    if (!newValue.trim() || !selectedFlow) return;
+    
+    const updatedFlows = projectFlows.map((flow) => {
+      if (flow.id !== selectedFlow.id) return flow;
+      
+      const transition = flow.transitions[phase];
+      if (!transition) return flow;
+      
+      const nextChecklist = [...transition.checklist];
+      nextChecklist[index] = newValue.trim();
+      
+      return {
+        ...flow,
+        transitions: {
+          ...flow.transitions,
+          [phase]: {
+            ...transition,
+            checklist: nextChecklist
+          }
+        }
+      };
+    });
+
+    updateProjectFlows(updatedFlows);
+    setEditingChecklistIndex(null);
+    showNotification('Checklist item updated.');
+  };
+
   const handleCreateProject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProj.code.trim() || !newProj.name.trim() || !newProj.sku.trim()) return;
@@ -205,7 +271,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50">
+    <div className="w-full h-full flex flex-col overflow-y-auto bg-slate-50">
       <div className="mx-auto max-w-6xl space-y-6 p-6">
         {/* Header Section */}
         <section className="rounded-none border border-slate-200 bg-white p-6 shadow-sm">
@@ -432,14 +498,91 @@ export const SettingsPage: React.FC = () => {
                 <div className="space-y-4">
                   {projects.map((proj) => {
                     const currentAssocId = projectFlowAssociations[proj.id] ?? 'flow-standard';
+                    const isEditing = editingProjectId === proj.id;
                     
                     return (
                       <div key={proj.id} className="border border-slate-200 p-3 bg-slate-50/50">
-                        <div className="font-bold text-sm text-slate-800">{proj.code}: {proj.name}</div>
-                        <div className="text-xs text-slate-500 mt-1">Current stage: <span className="font-bold text-slate-700">{proj.phase}</span></div>
+                        {isEditing ? (
+                          <div className="space-y-2 mb-3">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase block">Program Code</label>
+                              <input
+                                type="text"
+                                value={editingProjectData.code}
+                                onChange={(e) => setEditingProjectData({ ...editingProjectData, code: e.target.value.toUpperCase() })}
+                                className="w-full bg-white border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase block">Program Name</label>
+                              <input
+                                type="text"
+                                value={editingProjectData.name}
+                                onChange={(e) => setEditingProjectData({ ...editingProjectData, name: e.target.value })}
+                                className="w-full bg-white border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase block">Primary SKU</label>
+                              <input
+                                type="text"
+                                value={editingProjectData.sku}
+                                onChange={(e) => setEditingProjectData({ ...editingProjectData, sku: e.target.value })}
+                                className="w-full bg-white border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <div className="flex gap-2 justify-end pt-1">
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (editingProjectData.code.trim() && editingProjectData.name.trim()) {
+                                    updateProject(proj.id, editingProjectData);
+                                    showNotification(`Updated project details for ${editingProjectData.code}`);
+                                  }
+                                  setEditingProjectId(null);
+                                }}
+                                className="text-xs font-bold text-emerald-600 hover:text-emerald-700"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setEditingProjectId(null);
+                                }}
+                                className="text-xs font-bold text-slate-400 hover:text-slate-600"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-bold text-sm text-slate-800">{proj.code}: {proj.name}</div>
+                              <div className="text-xs text-slate-500 mt-1">
+                                Primary SKU: <span className="font-semibold text-slate-700">{proj.sku}</span>
+                              </div>
+                              <div className="text-xs text-slate-500 mt-0.5">
+                                Current stage: <span className="font-bold text-slate-700">{proj.phase}</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setEditingProjectId(proj.id);
+                                setEditingProjectData({ code: proj.code, name: proj.name, sku: proj.sku });
+                              }}
+                              className="text-slate-400 hover:text-blue-600 p-0.5"
+                              title="Edit project properties"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
                         
-                        <div className="mt-3">
-                          <label htmlFor={`flow-select-${proj.id}`} className="text-xs font-semibold text-slate-500 uppercase">Assigned Flow Rule</label>
+                        <div className="mt-3 border-t border-slate-200/60 pt-2">
+                          <label htmlFor={`flow-select-${proj.id}`} className="text-xs font-semibold text-slate-500 uppercase block">Assigned Flow Rule</label>
                           <select
                             id={`flow-select-${proj.id}`}
                             value={currentAssocId}
@@ -552,18 +695,69 @@ export const SettingsPage: React.FC = () => {
                           No checklist requirements defined. This transition will be immediate.
                         </div>
                       ) : (
-                        (selectedFlow.transitions[selectedTransitionSource]?.checklist || []).map((item, idx) => (
-                          <div key={`${selectedTransitionSource}-item-${idx}`} className="flex items-center justify-between bg-white border border-slate-200 px-3 py-2 text-xs">
-                            <span className="font-medium text-slate-700">{item}</span>
-                            <button
-                              onClick={() => handleDeleteChecklistItem(selectedTransitionSource, idx)}
-                              title="Delete checklist requirement"
-                              className="text-slate-400 hover:text-red-500 p-0.5"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))
+                        (selectedFlow.transitions[selectedTransitionSource]?.checklist || []).map((item, idx) => {
+                          const isEditing = editingChecklistIndex?.phase === selectedTransitionSource && editingChecklistIndex?.index === idx;
+                          
+                          return (
+                            <div key={`${selectedTransitionSource}-item-${idx}`} className="flex items-center justify-between bg-white border border-slate-200 px-3 py-2 text-xs">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editingChecklistValue}
+                                  onChange={(e) => setEditingChecklistValue(e.target.value)}
+                                  className="flex-1 bg-white border border-slate-300 px-2 py-0.5 text-xs font-normal focus:outline-none focus:border-blue-500 mr-2"
+                                />
+                              ) : (
+                                <span className="font-medium text-slate-700">{item}</span>
+                              )}
+                              <div className="flex items-center gap-1.5">
+                                {isEditing ? (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleEditChecklistItem(selectedTransitionSource, idx, editingChecklistValue);
+                                      }}
+                                      className="text-emerald-600 hover:text-emerald-700 font-bold"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        setEditingChecklistIndex(null);
+                                      }}
+                                      className="text-slate-400 hover:text-slate-600"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        setEditingChecklistIndex({ phase: selectedTransitionSource, index: idx });
+                                        setEditingChecklistValue(item);
+                                      }}
+                                      className="text-slate-400 hover:text-blue-600 p-0.5"
+                                      title="Edit requirement"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteChecklistItem(selectedTransitionSource, idx)}
+                                      title="Delete checklist requirement"
+                                      className="text-slate-400 hover:text-red-500 p-0.5"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </div>
@@ -583,48 +777,158 @@ export const SettingsPage: React.FC = () => {
                 <div className="space-y-2.5">
                   {Object.values(ComponentType).map((type) => {
                     const isEnabled = enabledComponentTypes.includes(type);
+                    const isEditing = editingComponentType === type;
+                    const displayLabel = componentTypeLabels[type] || type;
+                    
                     return (
-                      <label key={type} className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-200 cursor-pointer text-xs font-bold text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={isEnabled}
-                          onChange={() => {
-                            toggleComponentType(type);
-                            showNotification(`Toggled Component Type: ${type}`);
-                          }}
-                          className="h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        {type}
-                      </label>
+                      <div key={type} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700">
+                        <label className="flex items-center gap-3 cursor-pointer flex-1">
+                          <input
+                            type="checkbox"
+                            checked={isEnabled}
+                            onChange={() => {
+                              toggleComponentType(type);
+                              showNotification(`Toggled Component Type: ${displayLabel}`);
+                            }}
+                            className="h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editingComponentTypeLabel}
+                              onChange={(e) => setEditingComponentTypeLabel(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="bg-white border border-slate-300 px-2 py-0.5 text-xs font-normal focus:outline-none focus:border-blue-500"
+                            />
+                          ) : (
+                            <span>{displayLabel}</span>
+                          )}
+                        </label>
+                        <div className="flex items-center gap-1.5 ml-2">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (editingComponentTypeLabel.trim()) {
+                                    updateComponentTypeLabel(type, editingComponentTypeLabel.trim());
+                                    showNotification(`Renamed component type ${type} to ${editingComponentTypeLabel.trim()}`);
+                                  }
+                                  setEditingComponentType(null);
+                                }}
+                                className="text-emerald-600 hover:text-emerald-700 font-bold"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setEditingComponentType(null);
+                                }}
+                                className="text-slate-400 hover:text-slate-600"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setEditingComponentType(type);
+                                setEditingComponentTypeLabel(displayLabel);
+                              }}
+                              className="text-slate-400 hover:text-blue-600"
+                              title="Rename component type"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
               </section>
-
+ 
               <section className="bg-white border border-slate-200 p-5 shadow-sm">
                 <h2 className="text-base font-bold text-slate-900 mb-4">Active Lifecycle States</h2>
                 <div className="space-y-2.5">
                   {Object.values(LifecycleState).map((state) => {
                     const isEnabled = enabledLifecycleStates.includes(state);
+                    const isEditing = editingLifecycleState === state;
+                    const displayLabel = lifecycleStateLabels[state] || state;
+                    
                     return (
-                      <label key={state} className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-200 cursor-pointer text-xs font-bold text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={isEnabled}
-                          onChange={() => {
-                            toggleLifecycleState(state);
-                            showNotification(`Toggled Lifecycle State: ${state}`);
-                          }}
-                          className="h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        {state}
-                      </label>
+                      <div key={state} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700">
+                        <label className="flex items-center gap-3 cursor-pointer flex-1">
+                          <input
+                            type="checkbox"
+                            checked={isEnabled}
+                            onChange={() => {
+                              toggleLifecycleState(state);
+                              showNotification(`Toggled Lifecycle State: ${displayLabel}`);
+                            }}
+                            className="h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editingLifecycleStateLabel}
+                              onChange={(e) => setEditingLifecycleStateLabel(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="bg-white border border-slate-300 px-2 py-0.5 text-xs font-normal focus:outline-none focus:border-blue-500"
+                            />
+                          ) : (
+                            <span>{displayLabel}</span>
+                          )}
+                        </label>
+                        <div className="flex items-center gap-1.5 ml-2">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (editingLifecycleStateLabel.trim()) {
+                                    updateLifecycleStateLabel(state, editingLifecycleStateLabel.trim());
+                                    showNotification(`Renamed lifecycle state ${state} to ${editingLifecycleStateLabel.trim()}`);
+                                  }
+                                  setEditingLifecycleState(null);
+                                }}
+                                className="text-emerald-600 hover:text-emerald-700 font-bold"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setEditingLifecycleState(null);
+                                }}
+                                className="text-slate-400 hover:text-slate-600"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setEditingLifecycleState(state);
+                                setEditingLifecycleStateLabel(displayLabel);
+                              }}
+                              className="text-slate-400 hover:text-blue-600"
+                              title="Rename lifecycle state"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
               </section>
             </div>
-
+ 
             {/* Warehouse locations and compliance standards */}
             <div className="space-y-6">
               <section className="bg-white border border-slate-200 p-5 shadow-sm">
@@ -651,23 +955,77 @@ export const SettingsPage: React.FC = () => {
                   </button>
                 </form>
                 <div className="space-y-2">
-                  {warehouseLocations.map((loc) => (
-                    <div key={loc} className="flex items-center justify-between bg-slate-50 border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
-                      <span>{loc} Zone</span>
-                      <button 
-                        onClick={() => {
-                          deleteWarehouseLocation(loc);
-                          showNotification(`Removed location: ${loc}`);
-                        }}
-                        className="text-slate-400 hover:text-red-500"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                  {warehouseLocations.map((loc) => {
+                    const isEditing = editingLocation === loc;
+                    return (
+                      <div key={loc} className="flex items-center justify-between bg-slate-50 border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editingLocationValue}
+                            onChange={(e) => setEditingLocationValue(e.target.value.toUpperCase().trim())}
+                            className="bg-white border border-slate-300 px-2 py-0.5 text-xs font-normal focus:outline-none focus:border-blue-500"
+                          />
+                        ) : (
+                          <span>{loc} Zone</span>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (editingLocationValue && editingLocationValue !== loc) {
+                                    updateWarehouseLocation(loc, editingLocationValue);
+                                    showNotification(`Renamed location ${loc} to ${editingLocationValue}`);
+                                  }
+                                  setEditingLocation(null);
+                                }}
+                                className="text-emerald-600 hover:text-emerald-700 font-bold"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setEditingLocation(null);
+                                }}
+                                className="text-slate-400 hover:text-slate-600"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setEditingLocation(loc);
+                                  setEditingLocationValue(loc);
+                                }}
+                                className="text-slate-400 hover:text-blue-600"
+                                title="Rename warehouse location"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  deleteWarehouseLocation(loc);
+                                  showNotification(`Removed location: ${loc}`);
+                                }}
+                                className="text-slate-400 hover:text-red-500"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
-
+ 
               <section className="bg-white border border-slate-200 p-5 shadow-sm">
                 <h2 className="text-base font-bold text-slate-900 mb-4">Compliance Standards</h2>
                 <form 
@@ -692,20 +1050,74 @@ export const SettingsPage: React.FC = () => {
                   </button>
                 </form>
                 <div className="space-y-2">
-                  {complianceStandards.map((std) => (
-                    <div key={std} className="flex items-center justify-between bg-slate-50 border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
-                      <span>{std}</span>
-                      <button 
-                        onClick={() => {
-                          deleteComplianceStandard(std);
-                          showNotification(`Removed compliance standard: ${std}`);
-                        }}
-                        className="text-slate-400 hover:text-red-500"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                  {complianceStandards.map((std) => {
+                    const isEditing = editingCompliance === std;
+                    return (
+                      <div key={std} className="flex items-center justify-between bg-slate-50 border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editingComplianceValue}
+                            onChange={(e) => setEditingComplianceValue(e.target.value.toUpperCase().trim())}
+                            className="bg-white border border-slate-300 px-2 py-0.5 text-xs font-normal focus:outline-none focus:border-blue-500"
+                          />
+                        ) : (
+                          <span>{std}</span>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (editingComplianceValue && editingComplianceValue !== std) {
+                                    updateComplianceStandard(std, editingComplianceValue);
+                                    showNotification(`Renamed compliance standard ${std} to ${editingComplianceValue}`);
+                                  }
+                                  setEditingCompliance(null);
+                                }}
+                                className="text-emerald-600 hover:text-emerald-700 font-bold"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setEditingCompliance(null);
+                                }}
+                                className="text-slate-400 hover:text-slate-600"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setEditingCompliance(std);
+                                  setEditingComplianceValue(std);
+                                }}
+                                className="text-slate-400 hover:text-blue-600"
+                                title="Rename compliance standard"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  deleteComplianceStandard(std);
+                                  showNotification(`Removed compliance standard: ${std}`);
+                                }}
+                                className="text-slate-400 hover:text-red-500"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
             </div>
@@ -842,53 +1254,178 @@ export const SettingsPage: React.FC = () => {
                 <h2 className="text-base font-bold text-slate-900 mb-4">Configured Custom Attributes</h2>
                 <div className="space-y-3">
                   {attributeDefs.map((def) => {
+                    const isEditing = editingAttributeId === def.id;
                     const scopedProj = projects.find(p => p.id === def.projectIdScope);
                     
                     return (
-                      <div key={def.id} className="border border-slate-200 p-4 bg-slate-50/50 flex justify-between items-start">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm text-slate-800">{def.name}</span>
-                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[9px] font-bold uppercase border border-slate-300">
-                              {def.type}
-                            </span>
+                      <div key={def.id} className="border border-slate-200 p-4 bg-slate-50/50 flex flex-col gap-3">
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                              <span className="font-bold text-xs uppercase text-slate-500">Edit Custom Field</span>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    if (editingAttributeData.name.trim()) {
+                                      const options = editingAttributeData.type === 'select'
+                                        ? editingAttributeData.optionsString.split(',').map(o => o.trim()).filter(Boolean)
+                                        : undefined;
+                                      
+                                      updateAttributeDef(def.id, {
+                                        name: editingAttributeData.name.trim(),
+                                        options,
+                                        projectIdScope: editingAttributeData.projectScope === 'all' ? undefined : editingAttributeData.projectScope,
+                                        componentTypeScope: editingAttributeData.typeScope.length === 0 ? undefined : editingAttributeData.typeScope
+                                      });
+                                      showNotification(`Updated custom attribute: ${editingAttributeData.name}`);
+                                    }
+                                    setEditingAttributeId(null);
+                                  }}
+                                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setEditingAttributeId(null);
+                                  }}
+                                  className="text-xs font-bold text-slate-400 hover:text-slate-600"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase block">Field Label</label>
+                              <input
+                                type="text"
+                                value={editingAttributeData.name}
+                                onChange={(e) => setEditingAttributeData({ ...editingAttributeData, name: e.target.value })}
+                                className="w-full bg-white border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            
+                            {def.type === 'select' && (
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block">Dropdown Options</label>
+                                <input
+                                  type="text"
+                                  value={editingAttributeData.optionsString}
+                                  onChange={(e) => setEditingAttributeData({ ...editingAttributeData, optionsString: e.target.value })}
+                                  className="w-full bg-white border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                                />
+                                <span className="text-[9px] text-slate-400 mt-0.5 block">Comma-separated values</span>
+                              </div>
+                            )}
+                            
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block">Project Scope</label>
+                                <select
+                                  value={editingAttributeData.projectScope}
+                                  onChange={(e) => setEditingAttributeData({ ...editingAttributeData, projectScope: e.target.value })}
+                                  className="w-full bg-white border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                                >
+                                  <option value="all">All Projects</option>
+                                  {projects.map((p) => (
+                                    <option key={p.id} value={p.id}>{p.code}: {p.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Component Type Scope</span>
+                                <div className="space-y-1">
+                                  {Object.values(ComponentType).map((type) => {
+                                    const isChecked = editingAttributeData.typeScope.includes(type);
+                                    return (
+                                      <label key={type} className="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={() => {
+                                            const updated = isChecked
+                                              ? editingAttributeData.typeScope.filter(t => t !== type)
+                                              : [...editingAttributeData.typeScope, type];
+                                            setEditingAttributeData({ ...editingAttributeData, typeScope: updated });
+                                          }}
+                                          className="h-3 w-3 border-slate-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        {type}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div className="font-mono text-xs text-slate-500">Key: {def.key}</div>
-                          
-                          {/* Options if select */}
-                          {def.options && def.options.length > 0 && (
-                            <div className="text-xs text-slate-500 mt-1">
-                              Options: <span className="font-mono font-medium">{def.options.join(', ')}</span>
-                            </div>
-                          )}
-
-                          {/* Render scopes */}
-                          {(def.projectIdScope || def.componentTypeScope) && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {scopedProj && (
-                                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 border border-blue-200 text-[9px] font-bold uppercase">
-                                  Scope: {scopedProj.code}
+                        ) : (
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm text-slate-800">{def.name}</span>
+                                <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[9px] font-bold uppercase border border-slate-300">
+                                  {def.type}
                                 </span>
+                              </div>
+                              <div className="font-mono text-xs text-slate-500">Key: {def.key}</div>
+                              
+                              {def.options && def.options.length > 0 && (
+                                <div className="text-xs text-slate-500 mt-1">
+                                  Options: <span className="font-mono font-medium">{def.options.join(', ')}</span>
+                                </div>
                               )}
-                              {def.componentTypeScope && def.componentTypeScope.map((type) => (
-                                <span key={type} className="bg-indigo-50 text-indigo-700 px-2 py-0.5 border border-indigo-200 text-[9px] font-bold uppercase">
-                                  Type: {type}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
 
-                        <button
-                          onClick={() => {
-                            deleteAttributeDef(def.id);
-                            showNotification(`Removed attribute: ${def.name}`);
-                          }}
-                          className="text-slate-400 hover:text-red-500 p-1"
-                          title="Delete attribute"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                              {(def.projectIdScope || def.componentTypeScope) && (
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                  {scopedProj && (
+                                    <span className="bg-blue-50 text-blue-700 px-2 py-0.5 border border-blue-200 text-[9px] font-bold uppercase">
+                                      Scope: {scopedProj.code}
+                                    </span>
+                                  )}
+                                  {def.componentTypeScope && def.componentTypeScope.map((type) => (
+                                    <span key={type} className="bg-indigo-50 text-indigo-700 px-2 py-0.5 border border-indigo-200 text-[9px] font-bold uppercase">
+                                      Type: {type}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center gap-1 ml-2">
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setEditingAttributeId(def.id);
+                                  setEditingAttributeData({
+                                    name: def.name,
+                                    key: def.key,
+                                    type: def.type,
+                                    optionsString: def.options ? def.options.join(', ') : '',
+                                    projectScope: def.projectIdScope || 'all',
+                                    typeScope: def.componentTypeScope || []
+                                  });
+                                }}
+                                className="text-slate-400 hover:text-blue-600 p-1"
+                                title="Edit attribute"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  deleteAttributeDef(def.id);
+                                  showNotification(`Removed attribute: ${def.name}`);
+                                }}
+                                className="text-slate-400 hover:text-red-500 p-1"
+                                title="Delete attribute"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

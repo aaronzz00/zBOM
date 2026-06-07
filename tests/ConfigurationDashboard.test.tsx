@@ -5,6 +5,7 @@ import { useBOMStore } from '../stores/useBOMStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { PartLibrary } from '../pages/PartLibrary';
 import { BOMEditor } from '../pages/BOMEditor';
+import { BOMCompare } from '../pages/BOMCompare';
 import { ComponentType, LifecycleState } from '../types';
 import { mockProject, complexBOM, previousBOM } from '../data/mockBOM';
 import { mockLibraryData } from '../data/mockLibrary';
@@ -225,4 +226,121 @@ describe('Configuration Dashboard & Scoping Integration Tests', () => {
     // State 'In Review' should no longer be visible in the lifecycle filters list!
     expect(screen.queryByRole('button', { name: /In Review/i })).not.toBeInTheDocument();
   });
+
+  it('cascades warehouse location renames to all library parts', () => {
+    // 1. Arrange: Update a library part's location to 'WH-A' explicitly
+    const state = useBOMStore.getState();
+    const parts = [...state.libraryParts];
+    const targetPartIndex = parts.findIndex(p => p.partNumber === '100-55512-A');
+    if (targetPartIndex >= 0) {
+      parts[targetPartIndex] = { ...parts[targetPartIndex], location: 'WH-A' };
+      useBOMStore.setState({ libraryParts: parts });
+    }
+    
+    // Verify the setup worked
+    expect(useBOMStore.getState().libraryParts.find(p => p.partNumber === '100-55512-A')?.location).toBe('WH-A');
+
+    // 2. Act: Rename warehouse location 'WH-A' to 'WH-ALPHA'
+    useBOMStore.getState().updateWarehouseLocation('WH-A', 'WH-ALPHA');
+
+    // 3. Assert: Verify location updated in warehouseLocations array
+    const updatedState = useBOMStore.getState();
+    expect(updatedState.warehouseLocations).toContain('WH-ALPHA');
+    expect(updatedState.warehouseLocations).not.toContain('WH-A');
+
+    // Verify the library part's location updated dynamically (cascade update)
+    const updatedPart = updatedState.libraryParts.find(p => p.partNumber === '100-55512-A');
+    expect(updatedPart?.location).toBe('WH-ALPHA');
+
+    // Mount PartLibrary and check that 'WH-ALPHA Zone' checkbox exists
+    render(<PartLibrary />);
+    expect(screen.getByLabelText('WH-ALPHA Zone')).toBeInTheDocument();
+    expect(screen.queryByLabelText('WH-A Zone')).not.toBeInTheDocument();
+  });
+
+  it('propagates component type display label renames to Part Library and BOM Editor', () => {
+    // 1. Act: Rename ComponentType.Software to 'Embedded Software'
+    useBOMStore.getState().updateComponentTypeLabel(ComponentType.Software, 'Embedded Software');
+
+    // 2. Assert: Mount PartLibrary and check it shows the renamed label
+    const { unmount } = render(<PartLibrary />);
+    expect(screen.getByRole('button', { name: /Embedded Software/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Software$/i })).not.toBeInTheDocument();
+    unmount();
+
+    // Mount BOMEditor and check it renders 'Embedded Software' option in the type selection list
+    render(<BOMEditor />);
+    fireEvent.click(screen.getByLabelText('Add Item'));
+    expect(screen.getByRole('option', { name: 'Embedded Software' })).toBeInTheDocument();
+  });
+
+  it('propagates custom attribute definition updates to BOM Editor', () => {
+    // 1. Arrange: Define a custom attribute with 'Old Label'
+    const testDef = {
+      id: 'test-attr',
+      name: 'Old Label',
+      key: 'test_key',
+      type: 'text' as const,
+      projectIdScope: 'PRJ-2024-001'
+    };
+    useBOMStore.getState().addAttributeDef(testDef);
+
+    // 2. Act: Mount BOMEditor and click a node to view its custom attributes
+    const { rerender } = render(<BOMEditor />);
+    fireEvent.click(screen.getByText('700-00112-B'));
+
+    // Assert: Old Label should be present
+    expect(screen.getAllByText('Old Label').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByPlaceholderText(/Enter old label.../i)).toBeInTheDocument();
+
+    // 3. Act: Update the custom attribute name/label
+    useBOMStore.getState().updateAttributeDef('test-attr', {
+      name: 'New Label'
+    });
+
+    // Rerender BOMEditor
+    rerender(<BOMEditor />);
+
+    // Assert: Verify New Label is now present and Old Label is gone
+    expect(screen.queryByText('Old Label')).not.toBeInTheDocument();
+    expect(screen.getAllByText('New Label').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByPlaceholderText(/Enter new label.../i)).toBeInTheDocument();
+  });
+
+  it('supports comparing BOMs across different projects in BOMCompare', () => {
+    // 1. Arrange: Create a second project 'ZP15' which will seed its own root assembly
+    useBOMStore.getState().createProject({
+      code: 'ZP15',
+      name: 'zPhone 15 Pro',
+      sku: 'ZP15-US-Pro',
+      flowId: 'flow-standard'
+    });
+
+    const state = useBOMStore.getState();
+    const secondProject = state.projects.find(p => p.code === 'ZP15');
+    expect(secondProject).toBeDefined();
+
+    // 2. Act: Render BOMCompare
+    render(<BOMCompare />);
+
+    // Assert project selection options are visible in select dropdowns
+    const options = screen.getAllByRole('option');
+    
+    // Check that we have options for both the active project ('zPhone Pro Max') and the new project ('zPhone 15 Pro')
+    const hasActiveProjectOption = options.some(opt => opt.textContent?.includes('zPhone Pro Max'));
+    const hasSecondProjectOption = options.some(opt => opt.textContent?.includes('zPhone 15 Pro'));
+    expect(hasActiveProjectOption).toBe(true);
+    expect(hasSecondProjectOption).toBe(true);
+
+    // Verify select values can be changed
+    const selects = screen.getAllByRole('combobox');
+    
+    // The model selection bar has 4 select elements (Left Project, Left Snapshot, Right Project, Right Snapshot)
+    expect(selects.length).toBe(4);
+
+    // Left project select is index 0
+    fireEvent.change(selects[0], { target: { value: secondProject?.id } });
+    expect(selects[0]).toHaveValue(secondProject?.id);
+  });
 });
+
