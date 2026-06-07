@@ -240,7 +240,7 @@ export const FeedbackOverlay: React.FC<FeedbackOverlayProps> = ({ activePage }) 
       'mbom-delta': 'MBOM Delta Console 制造BOM差异控制台',
       'tooling': 'Tooling Hub 模具/工装中心',
       'eco': 'ECO Manager 工程变更管理',
-      'compare': 'Compare Revisions 版本比对',
+      'compare': 'BOM Compare 版本比对',
       'parts': 'Part Library 料库管理',
       'suppliers': 'Supply Chain Intelligence 供应链情报',
     };

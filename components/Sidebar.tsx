@@ -17,6 +17,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
     { id: 'bom', icon: Layers, label: 'BOM Editor', requiredPerm: Permission.VIEW_BOM },
     { id: 'parts', icon: Box, label: 'Part Library', requiredPerm: Permission.VIEW_BOM },
     { id: 'tooling', icon: Hammer, label: 'Tooling Hub', requiredPerm: Permission.VIEW_BOM },
+    { id: 'compare', icon: GitCompare, label: 'BOM Compare', requiredPerm: Permission.VIEW_BOM },
   ];
 
   const developmentPreviewItems = [
@@ -25,7 +26,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
     { id: 'ebom-architecture', icon: GitBranch, label: 'EBOM Architecture', requiredPerm: Permission.VIEW_BOM },
     { id: 'mbom-delta', icon: PackageSearch, label: 'MBOM Delta', requiredPerm: Permission.VIEW_BOM },
     { id: 'eco', icon: FileSignature, label: 'Change Orders', requiredPerm: Permission.VIEW_ECO },
-    { id: 'compare', icon: GitCompare, label: 'Compare Revisions', requiredPerm: Permission.VIEW_BOM },
     { id: 'suppliers', icon: Share2, label: 'Supply Chain', requiredPerm: Permission.VIEW_SUPPLY_CHAIN },
     { id: 'erp', icon: Database, label: 'ERP Connect', requiredPerm: Permission.MANAGE_AVL },
   ];

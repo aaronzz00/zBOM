@@ -177,7 +177,7 @@ export const BOMCompare: React.FC = () => {
           <div>
             <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
               <GitCompare className="w-6 h-6 text-blue-600" />
-              Compare Revisions
+              BOM Compare
             </h1>
           </div>
           <div className="flex items-center gap-3">
