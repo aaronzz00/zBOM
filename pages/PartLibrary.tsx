@@ -5,11 +5,40 @@ import { useAppStore } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { coreRepository } from '../repositories/core/coreRepository';
 
-const CATEGORIES = ['All', 'Semiconductors', 'Passives', 'Mechanical', 'Electromechanical', 'Software'];
-const INVENTORY_LOCATIONS = ['WH-A', 'WH-B', 'WH-C'];
-
 export const PartLibrary: React.FC = () => {
-  const { libraryParts, suppliers, updateLibraryPart, addLibraryPart, bomData } = useAppStore();
+  const {
+    libraryParts,
+    suppliers,
+    updateLibraryPart,
+    addLibraryPart,
+    bomData,
+    enabledComponentTypes = [ComponentType.Assembly, ComponentType.Part, ComponentType.Material, ComponentType.Software],
+    enabledLifecycleStates = [LifecycleState.Draft, LifecycleState.InReview, LifecycleState.Released, LifecycleState.Obsolete, LifecycleState.Prototype],
+    warehouseLocations = ['WH-A', 'WH-B', 'WH-C'],
+    complianceStandards = ['RoHS', 'REACH', 'UN38.3']
+  } = useAppStore();
+
+  const activeCategories = useMemo(() => {
+    const categories = ['All'];
+    if (enabledComponentTypes.includes(ComponentType.Part)) {
+      categories.push('Semiconductors', 'Passives', 'Mechanical', 'Electromechanical');
+    }
+    if (enabledComponentTypes.includes(ComponentType.Software)) {
+      categories.push('Software');
+    }
+    if (enabledComponentTypes.includes(ComponentType.Assembly)) {
+      categories.push('Assembly');
+    }
+    if (enabledComponentTypes.includes(ComponentType.Material)) {
+      categories.push('Material');
+    }
+    return categories;
+  }, [enabledComponentTypes]);
+
+  const activeCategoriesWithoutAll = useMemo(() => {
+    return activeCategories.filter(c => c !== 'All');
+  }, [activeCategories]);
+
   const { currentUser, hasPermission } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,7 +47,26 @@ export const PartLibrary: React.FC = () => {
   const [stockFilter, setStockFilter] = useState<'All' | 'Below minimum' | 'In stock'>('All');
   const [sortBy, setSortBy] = useState<'partNumber' | 'description' | 'supplier' | 'stock' | 'state'>('partNumber');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [selectedLocations, setSelectedLocations] = useState<string[]>(INVENTORY_LOCATIONS);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedLocations(prev => {
+      if (prev.length === 0) return warehouseLocations;
+      return prev.filter(loc => warehouseLocations.includes(loc));
+    });
+  }, [warehouseLocations]);
+
+  useEffect(() => {
+    if (!activeCategories.includes(selectedCategory)) {
+      setSelectedCategory('All');
+    }
+  }, [activeCategories, selectedCategory]);
+
+  useEffect(() => {
+    if (selectedLifecycle !== 'All' && !enabledLifecycleStates.includes(selectedLifecycle)) {
+      setSelectedLifecycle('All');
+    }
+  }, [enabledLifecycleStates, selectedLifecycle]);
 
   // Edit State
   const [selectedPart, setSelectedPart] = useState<LibraryPart | null>(null);
@@ -30,7 +78,7 @@ export const PartLibrary: React.FC = () => {
 	    mpn: '',
 	    manufacturer: '',
 	    description: '',
-	    category: 'Mechanical',
+	    category: activeCategoriesWithoutAll[0] || '',
 	    cost: '0',
 	    leadTimeWeeks: '',
 	    supplierId: '',
@@ -39,6 +87,15 @@ export const PartLibrary: React.FC = () => {
 	    stock: '0',
 	    minStock: '0',
 	  });
+
+	  useEffect(() => {
+	    if (!activeCategoriesWithoutAll.includes(createForm.category)) {
+	      setCreateForm((prev) => ({
+	        ...prev,
+	        category: activeCategoriesWithoutAll[0] || '',
+	      }));
+	    }
+	  }, [activeCategoriesWithoutAll, createForm.category]);
 	  const [panelTab, setPanelTab] = useState<'details' | 'usage' | 'tooling' | 'audit'>('details');
 	  const [createError, setCreateError] = useState('');
 	  const [editError, setEditError] = useState('');
@@ -168,6 +225,12 @@ export const PartLibrary: React.FC = () => {
   // Filter Logic
   const filteredParts = useMemo(() => {
     return libraryParts.filter(part => {
+      // Dynamic settings filters
+      const partType = part.type || (part.category === 'Software' ? ComponentType.Software : ComponentType.Part);
+      if (!enabledComponentTypes.includes(partType)) return false;
+      if (!enabledLifecycleStates.includes(part.state)) return false;
+      if (!activeCategoriesWithoutAll.includes(part.category)) return false;
+
       const supplierName = getSupplierLabel(part.supplierId).toLowerCase();
       const matchesSearch =
         part.partNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -199,7 +262,7 @@ export const PartLibrary: React.FC = () => {
           return compareText(left.partNumber, right.partNumber);
       }
     });
-  }, [searchQuery, selectedCategory, selectedLifecycle, stockFilter, sortBy, libraryParts, selectedLocations, suppliers]);
+  }, [searchQuery, selectedCategory, selectedLifecycle, stockFilter, sortBy, libraryParts, selectedLocations, suppliers, enabledComponentTypes, enabledLifecycleStates, activeCategoriesWithoutAll]);
 
   // UI Helpers
   const getCategoryIcon = (cat: string) => {
@@ -382,8 +445,8 @@ export const PartLibrary: React.FC = () => {
 	      cost: Number.isFinite(cost) && cost >= 0 ? cost : 0,
 	      stock: Number.isFinite(stock) && stock >= 0 ? stock : 0,
 	      minStock: Number.isFinite(minStock) && minStock >= 0 ? minStock : 0,
-	      state: LifecycleState.Draft,
-	      location: createForm.category === 'Software' ? 'Git/Repo' : 'WH-A-NEW',
+	      state: enabledLifecycleStates[0] || LifecycleState.Draft,
+	      location: createForm.category === 'Software' ? 'Git/Repo' : (warehouseLocations[0] || 'WH-A'),
 	      type: createForm.category === 'Software' ? ComponentType.Software : ComponentType.Part,
 	      supplierId: createForm.supplierId || undefined,
 	      leadTimeWeeks: Number.isFinite(leadTimeWeeks) && leadTimeWeeks >= 0 ? leadTimeWeeks : undefined,
@@ -424,7 +487,7 @@ export const PartLibrary: React.FC = () => {
         <div className="p-4 flex-1 overflow-y-auto">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Categories</h3>
             <div className="space-y-1">
-                {CATEGORIES.map(cat => (
+                {activeCategories.map(cat => (
                     <button
                         key={cat}
                         onClick={() => setSelectedCategory(cat)}
@@ -446,7 +509,7 @@ export const PartLibrary: React.FC = () => {
             <div className="mt-8">
                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Lifecycle</h3>
                  <div className="space-y-1">
-                    {(['All', ...Object.values(LifecycleState)] as Array<'All' | LifecycleState>).map((state) => (
+                    {(['All', ...enabledLifecycleStates] as Array<'All' | LifecycleState>).map((state) => (
                          <button
                             key={state}
                             type="button"
@@ -486,7 +549,7 @@ export const PartLibrary: React.FC = () => {
             <div className="mt-8">
                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Inventory Locations</h3>
                  <div className="space-y-2">
-                    {INVENTORY_LOCATIONS.map(loc => (
+                    {warehouseLocations.map(loc => (
                          <label key={loc} className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-900">
                             <input
                                 type="checkbox"
@@ -716,7 +779,7 @@ export const PartLibrary: React.FC = () => {
                                 onChange={(event) => setCreateForm((value) => ({ ...value, category: event.target.value }))}
                                 className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
                               >
-                                  {CATEGORIES.filter((category) => category !== 'All').map((category) => (
+                                  {activeCategoriesWithoutAll.map((category) => (
                                       <option key={category} value={category}>{category}</option>
                                   ))}
                               </select>
@@ -906,7 +969,7 @@ export const PartLibrary: React.FC = () => {
                                             onChange={(e) => setEditForm({...editForm, category: e.target.value})}
                                             className="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white"
                                         >
-                                            {CATEGORIES.filter(c => c!=='All').map(c => <option key={c} value={c}>{c}</option>)}
+                                            {Array.from(new Set([editForm.category, ...activeCategoriesWithoutAll])).filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                     </div>
                                     <div>
@@ -917,7 +980,7 @@ export const PartLibrary: React.FC = () => {
                                             onChange={(e) => setEditForm({...editForm, state: e.target.value as LifecycleState})}
                                             className="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white"
                                         >
-                                            {Object.values(LifecycleState).map(s => <option key={s} value={s}>{s}</option>)}
+                                            {Array.from(new Set([editForm.state, ...enabledLifecycleStates])).filter(Boolean).map(s => <option key={s} value={s}>{s}</option>)}
                                         </select>
                                     </div>
                                 </div>

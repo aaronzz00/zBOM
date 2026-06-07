@@ -82,6 +82,8 @@ export interface AttributeDefinition {
   key: string;  // Internal Key (e.g. "material")
   type: 'text' | 'number' | 'select' | 'date';
   options?: string[]; // For select type
+  projectIdScope?: string; // Optional scope to specific project
+  componentTypeScope?: ComponentType[]; // Optional scope to specific component types
 }
 
 export interface Attachment {

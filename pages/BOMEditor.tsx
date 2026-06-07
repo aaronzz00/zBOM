@@ -11,7 +11,7 @@ import { exportBOMToCSV, parseCSVToBOM } from '../utils/csvHelper';
 import { coreRepository } from '../repositories/core/coreRepository';
 
 export const BOMEditor: React.FC = () => {
-  const { bomData, setBOMData, libraryParts, updateBOMNode, addBOMNode, deleteBOMNode, createSnapshot, loadSnapshot, snapshots, attributeDefs, addAttributeDef, addAttachment, deleteAttachment } = useAppStore();
+  const { bomData, setBOMData, libraryParts, updateBOMNode, addBOMNode, deleteBOMNode, createSnapshot, loadSnapshot, snapshots, attributeDefs: rawAttributeDefs, addAttributeDef, addAttachment, deleteAttachment, project } = useAppStore();
   const { hasPermission } = useAuth();
   
   const [selectedNode, setSelectedNode] = useState<BOMNode | null>(null);
@@ -150,6 +150,15 @@ export const BOMEditor: React.FC = () => {
       }
       return findNode(bomData) || selectedNode;
   })() : null;
+
+  const attributeDefs = useMemo(() => {
+    return rawAttributeDefs.filter(def => !def.projectIdScope || def.projectIdScope === project.id);
+  }, [rawAttributeDefs, project.id]);
+
+  const visibleAttributeDefs = useMemo(() => {
+    if (!activeNode) return [];
+    return attributeDefs.filter(def => !def.componentTypeScope || def.componentTypeScope.includes(activeNode.type));
+  }, [attributeDefs, activeNode]);
 
 	  const activeNodeAuditEvents = useMemo(() => {
 	    if (!activeNode) return [];
@@ -590,10 +599,10 @@ export const BOMEditor: React.FC = () => {
                                     </div>
                                     
                                     <div className="space-y-3 bg-slate-50 p-3 rounded border border-slate-200">
-                                        {attributeDefs.length === 0 ? (
+                                        {visibleAttributeDefs.length === 0 ? (
                                             <p className="text-xs text-slate-400 italic text-center">No custom attributes defined.</p>
                                         ) : (
-                                            attributeDefs.map(def => (
+                                            visibleAttributeDefs.map(def => (
                                                 <div key={def.id}>
                                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">{def.name}</label>
                                                     {def.type === 'select' ? (

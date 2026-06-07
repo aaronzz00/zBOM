@@ -71,7 +71,10 @@ export const BOMTable: React.FC<BOMTableProps> = ({
     enableWhereUsed = true,
 }) => {
     const { hasPermission } = useAuth();
-    const { attributeDefs } = useAppStore();
+    const { attributeDefs: rawAttributeDefs, project } = useAppStore();
+    const attributeDefs = useMemo(() => {
+        return rawAttributeDefs.filter(def => !def.projectIdScope || def.projectIdScope === project.id);
+    }, [rawAttributeDefs, project.id]);
     const viewStore = useViewStore();
     const isColumnVisible = enableColumnControls ? viewStore.isColumnVisible : () => true;
     const toggleColumn = enableColumnControls ? viewStore.toggleColumn : () => {};
@@ -321,13 +324,14 @@ export const BOMTable: React.FC<BOMTableProps> = ({
                                 )}
 
                                 {/* Dynamic Attrs */}
-                                {attributeDefs.map(def => (
-                                    isColumnVisible(def.key) && (
+                                {attributeDefs.map(def => {
+                                    const isTypeMatch = !def.componentTypeScope || def.componentTypeScope.includes(row.type);
+                                    return isColumnVisible(def.key) && (
                                         <div key={def.id} className="px-3 border-r border-slate-100 h-full flex items-center truncate text-slate-600 text-xs">
-                                            {row.customAttributes?.[def.key] || '-'}
+                                            {isTypeMatch ? (row.customAttributes?.[def.key] || '-') : '-'}
                                         </div>
-                                    )
-                                ))}
+                                    );
+                                })}
 
                                 {/* Target Cost */}
                                 {isColumnVisible('targetCost') && (

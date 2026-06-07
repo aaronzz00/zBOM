@@ -42,6 +42,7 @@ export interface CoreRepository {
   getProjects: () => CoreProject[];
   setActiveProject: (projectId: string) => CoreProject;
   updateProjectPhase: (projectId: string, phase: 'EVT' | 'DVT' | 'PVT' | 'MP', actor: CoreActor) => CoreProject;
+  createProject: (input: Omit<CoreProject, 'updatedAt' | 'status'>, actor: CoreActor) => CoreProject;
   searchParts: (input?: PartSearchInput) => PartSearchResult;
   getPart: (partId: string) => CorePart;
   createPart: (input: CreatePartInput, actor: CoreActor) => CorePart;
@@ -428,6 +429,56 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
         { oldPhase, newPhase: phase }
       ));
       
+      persist();
+      return clone(project);
+    },
+
+    createProject(input, actor) {
+      requireCorePermission(actor, Permission.EDIT_BOM_STRUCTURE, 'create projects');
+      const duplicate = workspace.projects.find((proj) => proj.code.toLowerCase() === input.code.toLowerCase());
+      if (duplicate) {
+        throw new CoreRepositoryError('CONFLICT', `Project code ${input.code} already exists.`, { code: input.code });
+      }
+      
+      const project: CoreProject = {
+        ...input,
+        status: 'active',
+        updatedAt: now(),
+      };
+      
+      const bomId = `bom-${slug(input.code)}`;
+      const rootNodeId = `root-${slug(input.code)}`;
+      
+      const rootNode: CoreBOMNode = {
+        id: rootNodeId,
+        bomId,
+        isLocalItem: true,
+        partNumber: `800-${input.code.toUpperCase()}-001`,
+        name: `Top Level Assembly, ${input.name}`,
+        revision: 'A',
+        state: LifecycleState.Draft,
+        type: ComponentType.Assembly,
+        quantity: 1,
+        unit: 'PCS',
+        cost: 0,
+        currency: 'USD',
+      };
+
+      workspace = {
+        ...workspace,
+        projects: [...workspace.projects, project],
+        boms: [...workspace.boms, {
+          id: bomId,
+          projectId: project.id,
+          name: rootNode.name,
+          revision: rootNode.revision,
+          rootNodeId,
+          updatedAt: now(),
+        }],
+        bomNodes: [...workspace.bomNodes, rootNode],
+      };
+
+      recordAudit(createAuditEvent('project', project.id, 'create', actor, `Created project ${project.name}.`, 'Admin Console'));
       persist();
       return clone(project);
     },

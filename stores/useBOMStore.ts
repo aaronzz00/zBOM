@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { BOMNode, Project, LibraryPart, ComponentType, Supplier, BOMSnapshot, AttributeDefinition, Attachment, ProjectStageFlow } from '../types';
+import { BOMNode, Project, LibraryPart, ComponentType, Supplier, BOMSnapshot, AttributeDefinition, Attachment, ProjectStageFlow, LifecycleState } from '../types';
 import { mockProject, previousBOM } from '../data/mockBOM';
 import { FormulaEngine } from '../services/FormulaEngine';
 import { coreRepository, toLegacyLibraryParts } from '../repositories/core/coreRepository';
@@ -16,6 +16,10 @@ interface BOMState {
     attributeDefs: AttributeDefinition[];
     projectFlows: ProjectStageFlow[];
     projectFlowAssociations: Record<string, string>;
+    enabledComponentTypes: ComponentType[];
+    enabledLifecycleStates: LifecycleState[];
+    warehouseLocations: string[];
+    complianceStandards: string[];
 
     // Actions
     setActiveProject: (projectId: string) => void;
@@ -34,6 +38,13 @@ interface BOMState {
     updateProjectPhase: (projectId: string, newPhase: 'EVT' | 'DVT' | 'PVT' | 'MP') => void;
     updateProjectFlows: (flows: ProjectStageFlow[]) => void;
     setProjectFlowAssociation: (projectId: string, flowId: string) => void;
+    toggleComponentType: (type: ComponentType) => void;
+    toggleLifecycleState: (state: LifecycleState) => void;
+    addWarehouseLocation: (location: string) => void;
+    deleteWarehouseLocation: (location: string) => void;
+    addComplianceStandard: (standard: string) => void;
+    deleteComplianceStandard: (standard: string) => void;
+    createProject: (input: { code: string, name: string, sku: string, flowId: string }) => void;
 }
 
 const getActor = () => {
@@ -199,6 +210,11 @@ const DEFAULT_PROJECT_FLOWS: ProjectStageFlow[] = [
 
 const FLOWS_STORAGE_KEY = 'zbom.flows.configs';
 const FLOW_ASSOC_STORAGE_KEY = 'zbom.flows.associations';
+const COMP_TYPES_STORAGE_KEY = 'zbom.config.component_types';
+const STATES_STORAGE_KEY = 'zbom.config.lifecycle_states';
+const WAREHOUSE_STORAGE_KEY = 'zbom.config.warehouse_locations';
+const COMPLIANCE_STORAGE_KEY = 'zbom.config.compliance_standards';
+const ATTRIBUTES_STORAGE_KEY = 'zbom.config.attribute_defs';
 
 const loadSavedFlows = (): ProjectStageFlow[] => {
     try {
@@ -223,16 +239,60 @@ const loadSavedFlowAssociations = (): Record<string, string> => {
     };
 };
 
-export const useBOMStore = create<BOMState>((set, get) => ({
-    ...getRepositoryState(),
-    attributeDefs: [
+const loadSavedComponentTypes = (): ComponentType[] => {
+    try {
+        const saved = localStorage.getItem(COMP_TYPES_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch {}
+    return [ComponentType.Assembly, ComponentType.Part, ComponentType.Material, ComponentType.Software];
+};
+
+const loadSavedLifecycleStates = (): LifecycleState[] => {
+    try {
+        const saved = localStorage.getItem(STATES_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch {}
+    return [LifecycleState.Draft, LifecycleState.InReview, LifecycleState.Released, LifecycleState.Obsolete, LifecycleState.Prototype];
+};
+
+const loadSavedWarehouseLocations = (): string[] => {
+    try {
+        const saved = localStorage.getItem(WAREHOUSE_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch {}
+    return ['WH-A', 'WH-B', 'WH-C'];
+};
+
+const loadSavedComplianceStandards = (): string[] => {
+    try {
+        const saved = localStorage.getItem(COMPLIANCE_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch {}
+    return ['RoHS', 'REACH', 'UN38.3'];
+};
+
+const loadSavedAttributeDefs = (): AttributeDefinition[] => {
+    try {
+        const saved = localStorage.getItem(ATTRIBUTES_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
         { id: 'attr-1', name: 'Material', key: 'material', type: 'text' },
         { id: 'attr-2', name: 'Finish', key: 'finish', type: 'text' },
         { id: 'attr-3', name: 'Torque Spec', key: 'torque', type: 'text' },
         { id: 'attr-4', name: 'Compliance', key: 'compliance', type: 'select', options: ['RoHS', 'REACH', 'UN38.3'] }
-    ],
+    ];
+};
+
+export const useBOMStore = create<BOMState>((set, get) => ({
+    ...getRepositoryState(),
+    attributeDefs: loadSavedAttributeDefs(),
     projectFlows: loadSavedFlows(),
     projectFlowAssociations: loadSavedFlowAssociations(),
+    enabledComponentTypes: loadSavedComponentTypes(),
+    enabledLifecycleStates: loadSavedLifecycleStates(),
+    warehouseLocations: loadSavedWarehouseLocations(),
+    complianceStandards: loadSavedComplianceStandards(),
 
     setActiveProject: (projectId: string) => {
         coreRepository.setActiveProject(projectId);
@@ -349,15 +409,15 @@ export const useBOMStore = create<BOMState>((set, get) => ({
     },
 
     addAttributeDef: (def: AttributeDefinition) => {
-        set((state) => ({
-            attributeDefs: [...state.attributeDefs, def]
-        }));
+        const updated = [...get().attributeDefs, def];
+        localStorage.setItem(ATTRIBUTES_STORAGE_KEY, JSON.stringify(updated));
+        set({ attributeDefs: updated });
     },
 
     deleteAttributeDef: (id: string) => {
-        set((state) => ({
-            attributeDefs: state.attributeDefs.filter(a => a.id !== id)
-        }));
+        const updated = get().attributeDefs.filter(a => a.id !== id);
+        localStorage.setItem(ATTRIBUTES_STORAGE_KEY, JSON.stringify(updated));
+        set({ attributeDefs: updated });
     },
 
     addAttachment: (nodeId: string, file: File) => {
@@ -417,5 +477,77 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         };
         localStorage.setItem(FLOW_ASSOC_STORAGE_KEY, JSON.stringify(updatedAssoc));
         set({ projectFlowAssociations: updatedAssoc });
+    },
+
+    toggleComponentType: (type: ComponentType) => {
+        const current = get().enabledComponentTypes;
+        const updated = current.includes(type)
+            ? current.filter((t) => t !== type)
+            : [...current, type];
+        localStorage.setItem(COMP_TYPES_STORAGE_KEY, JSON.stringify(updated));
+        set({ enabledComponentTypes: updated });
+    },
+
+    toggleLifecycleState: (state: LifecycleState) => {
+        const current = get().enabledLifecycleStates;
+        const updated = current.includes(state)
+            ? current.filter((s) => s !== state)
+            : [...current, state];
+        localStorage.setItem(STATES_STORAGE_KEY, JSON.stringify(updated));
+        set({ enabledLifecycleStates: updated });
+    },
+
+    addWarehouseLocation: (location: string) => {
+        const current = get().warehouseLocations;
+        if (current.includes(location)) return;
+        const updated = [...current, location];
+        localStorage.setItem(WAREHOUSE_STORAGE_KEY, JSON.stringify(updated));
+        set({ warehouseLocations: updated });
+    },
+
+    deleteWarehouseLocation: (location: string) => {
+        const updated = get().warehouseLocations.filter((l) => l !== location);
+        localStorage.setItem(WAREHOUSE_STORAGE_KEY, JSON.stringify(updated));
+        set({ warehouseLocations: updated });
+    },
+
+    addComplianceStandard: (standard: string) => {
+        const current = get().complianceStandards;
+        if (current.includes(standard)) return;
+        const updated = [...current, standard];
+        localStorage.setItem(COMPLIANCE_STORAGE_KEY, JSON.stringify(updated));
+        set({ complianceStandards: updated });
+    },
+
+    deleteComplianceStandard: (standard: string) => {
+        const updated = get().complianceStandards.filter((s) => s !== standard);
+        localStorage.setItem(COMPLIANCE_STORAGE_KEY, JSON.stringify(updated));
+        set({ complianceStandards: updated });
+    },
+
+    createProject: (input: { code: string, name: string, sku: string, flowId: string }) => {
+        const actor = getActor();
+        const newCoreProject = coreRepository.createProject({
+          id: `project-${input.code.toLowerCase()}-${Date.now()}`,
+          code: input.code,
+          name: input.name,
+          sku: input.sku,
+          phase: 'EVT'
+        }, actor);
+
+        const newLegacyProject = coreProjectToProject(newCoreProject);
+        
+        set((state) => {
+            const updatedProjects = [...state.projects, newLegacyProject];
+            const updatedAssoc = {
+                ...state.projectFlowAssociations,
+                [newLegacyProject.id]: input.flowId
+            };
+            localStorage.setItem(FLOW_ASSOC_STORAGE_KEY, JSON.stringify(updatedAssoc));
+            return {
+                projects: updatedProjects,
+                projectFlowAssociations: updatedAssoc
+            };
+        });
     }
 }));
