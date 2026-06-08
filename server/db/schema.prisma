@@ -1,0 +1,281 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id                String                @id
+  name              String
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  memberships       Membership[]
+  projects          Project[]
+  parts             Part[]
+  bomNodes          BOMNode[]
+  designMasters     ToolingDesignMaster[]
+  toolingRecords    ToolingRecord[]
+  auditEvents       AuditEvent[]
+  aiProviderConfig  AiProviderConfig?
+  aiRequestLogs     AiRequestLog[]
+  settingsJson      String?
+  ecos              ECO[]
+  attachments       Attachment[]
+}
+
+model User {
+  id           String       @id
+  email        String       @unique
+  name         String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+  sessions     Session[]
+  auditEvents  AuditEvent[]
+  aiRequestLogs AiRequestLog[]
+}
+
+model Membership {
+  id          String    @id
+  workspaceId String
+  userId      String
+  role        String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([workspaceId, userId])
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Project {
+  id          String          @id
+  workspaceId String
+  code        String
+  name        String
+  sku         String
+  phase       String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  bomNodes    BOMNode[]
+  designMasters ToolingDesignMaster[]
+  toolingRecords ToolingRecord[]
+
+  @@unique([workspaceId, code])
+}
+
+model Part {
+  id             String          @id
+  workspaceId    String
+  partNumber     String
+  name           String
+  description    String?
+  type           String
+  lifecycleState String
+  manufacturer   String?
+  mpn            String?
+  cost           Float?
+  currency       String?
+  leadTimeWeeks  Int?
+  moq            Int?
+  spq            Int?
+  archivedAt     DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  bomNodes       BOMNode[]
+  toolingMappings ToolingConcretePartMapping[]
+  attachments     Attachment[]
+
+  @@unique([workspaceId, partNumber])
+}
+
+model BOMNode {
+  id                   String          @id
+  workspaceId          String
+  projectId            String
+  parentId             String?
+  partId               String?
+  partNumber           String
+  name                 String
+  revision             String
+  state                String
+  type                 String
+  quantity             Float
+  unit                 String
+  cost                 Float?
+  currency             String?
+  customAttributesJson String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  workspace            Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project              Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent               BOMNode?        @relation("BOMTree", fields: [parentId], references: [id])
+  children             BOMNode[]       @relation("BOMTree")
+  part                 Part?           @relation(fields: [partId], references: [id])
+  attachments          Attachment[]
+}
+
+model ToolingDesignMaster {
+  id          String                       @id
+  workspaceId String
+  projectId   String
+  code        String
+  name        String
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+  workspace   Workspace                    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mappings    ToolingConcretePartMapping[]
+  toolingRecords ToolingRecord[]
+
+  @@unique([workspaceId, code])
+}
+
+model ToolingConcretePartMapping {
+  id             String               @id
+  workspaceId    String
+  designMasterId String
+  partId         String
+  designMaster   ToolingDesignMaster  @relation(fields: [designMasterId], references: [id], onDelete: Cascade)
+  part           Part                 @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  @@unique([designMasterId, partId])
+}
+
+model ToolingRecord {
+  id             String                 @id
+  workspaceId    String
+  projectId      String
+  designMasterId String
+  name           String
+  supplier       String?
+  owner          String?
+  cavityCount    Int?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  workspace      Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  designMaster   ToolingDesignMaster    @relation(fields: [designMasterId], references: [id], onDelete: Cascade)
+  milestones     ToolingMilestone[]
+}
+
+model ToolingMilestone {
+  id            String                 @id
+  workspaceId   String
+  toolingId     String
+  key           String
+  status        String
+  plannedDate   DateTime?
+  actualDate    DateTime?
+  owner         String?
+  notes         String?
+  blockerReason String?
+  tooling       ToolingRecord          @relation(fields: [toolingId], references: [id], onDelete: Cascade)
+
+  @@unique([toolingId, key])
+}
+
+model AuditEvent {
+  id          String     @id
+  workspaceId String
+  actorUserId String?
+  entityType  String
+  entityId    String
+  action      String
+  beforeJson  String?
+  afterJson   String?
+  createdAt   DateTime   @default(now())
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actorUser   User?      @relation(fields: [actorUserId], references: [id])
+}
+
+model AiProviderConfig {
+  id             String    @id
+  workspaceId    String    @unique
+  providerType   String
+  baseUrl        String
+  model          String
+  temperature    Float
+  encryptedApiKey String?
+  keyLast4       String?
+  enabled        Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  requestLogs    AiRequestLog[]
+}
+
+model AiRequestLog {
+  id                    String            @id
+  workspaceId            String
+  actorUserId            String?
+  providerConfigId       String?
+  purpose                String
+  status                 String
+  redactedPromptPreview  String?
+  createdAt              DateTime          @default(now())
+  workspace              Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actorUser              User?             @relation(fields: [actorUserId], references: [id])
+  providerConfig         AiProviderConfig? @relation(fields: [providerConfigId], references: [id])
+}
+
+model ECO {
+  id           String      @id
+  workspaceId  String
+  ecoNumber    String
+  title        String
+  description  String
+  status       String      // "Draft" | "Pending Approval" | "Approved" | "Rejected" | "Implemented"
+  initiator    String
+  createdDate  DateTime    @default(now())
+  approvedBy   String?
+  approvalDate DateTime?
+  priority     String      // "Low" | "Medium" | "High" | "Emergency"
+  workspace    Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  impacts      ECOImpact[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([workspaceId, ecoNumber])
+}
+
+model ECOImpact {
+  id         String   @id
+  ecoId      String
+  partNumber String
+  name       String
+  changeType String   // "RevUp" | "New" | "Obsolete" | "QtyChange"
+  from       String?
+  to         String?
+  eco        ECO      @relation(fields: [ecoId], references: [id], onDelete: Cascade)
+}
+
+model Attachment {
+  id          String   @id
+  workspaceId String
+  name        String
+  type        String
+  url         String
+  size        String?
+  uploadDate  DateTime @default(now())
+
+  partId      String?
+  part        Part?    @relation(fields: [partId], references: [id], onDelete: Cascade)
+  bomNodeId   String?
+  bomNode     BOMNode? @relation(fields: [bomNodeId], references: [id], onDelete: Cascade)
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}

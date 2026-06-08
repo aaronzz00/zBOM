@@ -11,6 +11,10 @@ node_modules
 dist
 dist-ssr
 *.local
+server/db/*.db
+server/db/*.db-journal
+server/db/*.db-shm
+server/db/*.db-wal
 .worktrees/
 
 # Editor directories and files
@@ -24,3 +28,4 @@ dist-ssr
 *.sln
 *.sw?
 .agent/*
+.zbom.lark.json
