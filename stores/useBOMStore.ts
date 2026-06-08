@@ -5,6 +5,47 @@ import { FormulaEngine } from '../services/FormulaEngine';
 import { coreRepository, toLegacyLibraryParts } from '../repositories/core/coreRepository';
 import { useAuthStore } from './useAuthStore';
 import type { CoreBOMNode, CoreBOMSnapshot, CoreProject } from '../domain/coreTypes';
+import {
+    isBackendApiConfigured,
+    loadBackendWorkspace,
+    addBackendBOMNode,
+    updateBackendBOMNode,
+    deleteBackendBOMNode,
+    createBackendPart,
+    updateBackendPart,
+    type BackendWorkspaceSnapshot,
+    createBackendECO,
+    updateBackendECO,
+    saveBackendWorkspaceSettings,
+    ApiAuditEvent,
+    createBackendProject,
+    updateBackendProject,
+    transitionBackendProjectPhase,
+    loadBackendAuditEvents,
+    commitBackendBOMImport,
+    uploadBackendAttachment,
+    linkBackendAttachment,
+    unlinkBackendAttachment,
+    deleteBackendAttachment,
+} from '../services/backendApi';
+import { parseCSVToBOM } from '../utils/csvHelper';
+
+const saveSettingsIfBackendConfigured = async (get: any) => {
+    if (isBackendApiConfigured()) {
+        const state = get();
+        await saveBackendWorkspaceSettings({
+            flows: state.projectFlows,
+            flowAssociations: state.projectFlowAssociations,
+            componentTypes: state.enabledComponentTypes,
+            lifecycleStates: state.enabledLifecycleStates,
+            warehouseLocations: state.warehouseLocations,
+            complianceStandards: state.complianceStandards,
+            attributeDefs: state.attributeDefs,
+            componentTypeLabels: state.componentTypeLabels,
+            lifecycleStateLabels: state.lifecycleStateLabels,
+        });
+    }
+};
 
 interface BOMState {
     project: Project;
@@ -23,11 +64,18 @@ interface BOMState {
     componentTypeLabels: Record<ComponentType, string>;
     lifecycleStateLabels: Record<LifecycleState, string>;
     ecos: ECO[];
+    auditEvents: ApiAuditEvent[];
+    totalAuditEvents: number;
     isSandboxMode: boolean;
     sandboxBOMData: BOMNode | null;
     sandboxECOId: string | null;
+    apiStatus: 'idle' | 'loading' | 'loaded' | 'error';
+    apiError: string | null;
 
     // Actions
+    setApiHydrationLoading: () => void;
+    applyBackendWorkspace: (snapshot: BackendWorkspaceSnapshot) => void;
+    markBackendHydrationError: (error: unknown) => void;
     setActiveProject: (projectId: string) => void;
     updateBOMNode: (nodeId: string, updates: Partial<BOMNode>) => void;
     addBOMNode: (parentId: string, newNode: BOMNode) => void;
@@ -37,34 +85,37 @@ interface BOMState {
     addLibraryPart: (part: LibraryPart) => void;
     createSnapshot: (name: string) => void;
     loadSnapshot: (snapshotId: string) => void;
-    addAttributeDef: (def: AttributeDefinition) => void;
-    deleteAttributeDef: (id: string) => void;
-    updateAttributeDef: (id: string, updates: Partial<AttributeDefinition>) => void;
-    addAttachment: (nodeId: string, file: File) => void;
-    deleteAttachment: (nodeId: string, attachmentId: string) => void;
-    updateProjectPhase: (projectId: string, newPhase: 'EVT' | 'DVT' | 'PVT' | 'MP', signatures?: any) => void;
-    updateProjectFlows: (flows: ProjectStageFlow[]) => void;
-    setProjectFlowAssociation: (projectId: string, flowId: string) => void;
-    toggleComponentType: (type: ComponentType) => void;
-    toggleLifecycleState: (state: LifecycleState) => void;
-    updateComponentTypeLabel: (type: ComponentType, label: string) => void;
-    updateLifecycleStateLabel: (state: LifecycleState, label: string) => void;
-    addWarehouseLocation: (location: string) => void;
-    deleteWarehouseLocation: (location: string) => void;
-    updateWarehouseLocation: (oldLoc: string, newLoc: string) => void;
-    addComplianceStandard: (standard: string) => void;
-    deleteComplianceStandard: (standard: string) => void;
-    createProject: (input: { code: string, name: string, sku: string, flowId: string }) => void;
-    updateProject: (id: string, updates: Partial<Project>) => void;
+    addAttributeDef: (def: AttributeDefinition) => Promise<void>;
+    deleteAttributeDef: (id: string) => Promise<void>;
+    updateAttributeDef: (id: string, updates: Partial<AttributeDefinition>) => Promise<void>;
+    addAttachment: (nodeId: string, file: File) => Promise<void>;
+    deleteAttachment: (nodeId: string, attachmentId: string) => Promise<void>;
+    importBOM: (csvText: string) => Promise<void>;
+    updateProjectPhase: (projectId: string, newPhase: 'EVT' | 'DVT' | 'PVT' | 'MP', signatures?: any) => Promise<void>;
+    updateProjectFlows: (flows: ProjectStageFlow[]) => Promise<void>;
+    setProjectFlowAssociation: (projectId: string, flowId: string) => Promise<void>;
+    toggleComponentType: (type: ComponentType) => Promise<void>;
+    toggleLifecycleState: (state: LifecycleState) => Promise<void>;
+    updateComponentTypeLabel: (type: ComponentType, label: string) => Promise<void>;
+    updateLifecycleStateLabel: (state: LifecycleState, label: string) => Promise<void>;
+    addWarehouseLocation: (location: string) => Promise<void>;
+    deleteWarehouseLocation: (location: string) => Promise<void>;
+    updateWarehouseLocation: (oldLoc: string, newLoc: string) => Promise<void>;
+    addComplianceStandard: (standard: string) => Promise<void>;
+    deleteComplianceStandard: (standard: string) => Promise<void>;
+    updateComplianceStandard: (oldStd: string, newStd: string) => Promise<void>;
+    createProject: (input: { code: string, name: string, sku: string, flowId: string }) => Promise<void>;
+    updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
+    loadAuditTrail: (filters?: any) => Promise<void>;
     getBOMAndSnapshotsForProject: (projectId: string) => {
         bomData: BOMNode;
         snapshots: Array<{ id: string; name: string; timestamp: string; data: BOMNode }>;
     } | null;
 
     // ECO / Sandbox actions
-    createECO: (title: string, description: string, initiator: string, impacts: ECOImpact[], priority: ECO['priority']) => ECO;
-    approveECO: (ecoId: string, approvedBy: string) => void;
-    rejectECO: (ecoId: string) => void;
+    createECO: (title: string, description: string, initiator: string, impacts: ECOImpact[], priority: ECO['priority']) => Promise<ECO>;
+    approveECO: (ecoId: string, approvedBy: string) => Promise<void>;
+    rejectECO: (ecoId: string) => Promise<void>;
     toggleSandboxMode: (enabled: boolean, ecoId?: string | null) => void;
     publishSandboxChanges: (ecoId?: string) => void;
     discardSandboxChanges: () => void;
@@ -376,6 +427,114 @@ const loadSavedECOs = (): ECO[] => {
     ];
 };
 
+const refreshFromBackend = async (get: any) => {
+    const role = useAuthStore.getState().currentUser.role;
+    const projectId = get().project.id;
+    const snapshot = await loadBackendWorkspace(role, projectId);
+    get().applyBackendWorkspace(snapshot);
+};
+
+const flattenBOMTree = (node: BOMNode): Map<string, BOMNode> => {
+    const map = new Map<string, BOMNode>();
+    const traverse = (n: BOMNode) => {
+        map.set(n.id, n);
+        n.children?.forEach(traverse);
+    };
+    traverse(node);
+    return map;
+};
+
+const getParentIdMap = (node: BOMNode): Map<string, string | null> => {
+    const map = new Map<string, string | null>();
+    const traverse = (n: BOMNode, parentId: string | null) => {
+        map.set(n.id, parentId);
+        n.children?.forEach(c => traverse(c, n.id));
+    };
+    traverse(node, null);
+    return map;
+};
+
+const publishSandboxDiff = async (projectId: string, masterTree: BOMNode, sandboxTree: BOMNode) => {
+    const masterMap = flattenBOMTree(masterTree);
+    const sandboxMap = flattenBOMTree(sandboxTree);
+    const parentMap = getParentIdMap(sandboxTree);
+
+    // 1. Calculate Deleted Nodes
+    const deletedIds: string[] = [];
+    for (const id of masterMap.keys()) {
+        if (!sandboxMap.has(id)) {
+            deletedIds.push(id);
+        }
+    }
+    const getDepth = (id: string, map: Map<string, BOMNode>): number => {
+        let depth = 0;
+        let current: BOMNode | undefined = map.get(id);
+        while (current && current.id !== masterTree.id) {
+            const parent = Array.from(map.values()).find(n => n.children?.some(c => c.id === current!.id));
+            if (parent) {
+                depth++;
+                current = parent;
+            } else {
+                break;
+            }
+        }
+        return depth;
+    };
+    deletedIds.sort((a, b) => getDepth(b, masterMap) - getDepth(a, masterMap)); // Deepest first
+
+    // 2. Calculate Added Nodes
+    const addedNodes: BOMNode[] = [];
+    for (const node of sandboxMap.values()) {
+        if (!masterMap.has(node.id)) {
+            addedNodes.push(node);
+        }
+    }
+    addedNodes.sort((a, b) => getDepth(a.id, sandboxMap) - getDepth(b.id, sandboxMap)); // Shallowest first
+
+    // 3. Calculate Updated Nodes
+    const updatedNodes: Array<{ id: string; updates: Partial<BOMNode> }> = [];
+    for (const [id, sandNode] of sandboxMap.entries()) {
+        const mastNode = masterMap.get(id);
+        if (mastNode) {
+            const updates: Partial<BOMNode> = {};
+            if (sandNode.quantity !== mastNode.quantity) updates.quantity = sandNode.quantity;
+            if (sandNode.unit !== mastNode.unit) updates.unit = sandNode.unit;
+            if (sandNode.refDes !== mastNode.refDes) updates.refDes = sandNode.refDes;
+            if (sandNode.isAuxiliary !== mastNode.isAuxiliary) updates.isAuxiliary = sandNode.isAuxiliary;
+            if (JSON.stringify(sandNode.customAttributes) !== JSON.stringify(mastNode.customAttributes)) {
+                updates.customAttributes = sandNode.customAttributes;
+            }
+            if (Object.keys(updates).length > 0) {
+                updatedNodes.push({ id, updates });
+            }
+        }
+    }
+
+    // Execute API calls
+    for (const id of deletedIds) {
+        await deleteBackendBOMNode(projectId, id);
+    }
+    for (const node of addedNodes) {
+        const parentId = parentMap.get(node.id) || null;
+        await addBackendBOMNode(projectId, {
+            parentId: parentId === 'root' ? null : parentId,
+            partNumber: node.partNumber,
+            name: node.name,
+            revision: node.revision || 'A',
+            state: node.state || 'Draft',
+            type: node.type || 'Part',
+            quantity: node.quantity,
+            unit: node.unit || 'EA',
+            cost: node.cost,
+            currency: node.currency || 'USD',
+            customAttributes: node.customAttributes,
+        });
+    }
+    for (const item of updatedNodes) {
+        await updateBackendBOMNode(projectId, item.id, item.updates);
+    }
+};
+
 export const useBOMStore = create<BOMState>((set, get) => ({
     ...getRepositoryState(),
     attributeDefs: loadSavedAttributeDefs(),
@@ -388,9 +547,60 @@ export const useBOMStore = create<BOMState>((set, get) => ({
     componentTypeLabels: loadSavedComponentTypeLabels(),
     lifecycleStateLabels: loadSavedLifecycleStateLabels(),
     ecos: loadSavedECOs(),
+    auditEvents: [],
+    totalAuditEvents: 0,
     isSandboxMode: false,
     sandboxBOMData: null,
     sandboxECOId: null,
+    apiStatus: 'idle',
+    apiError: null,
+
+    setApiHydrationLoading: () => {
+        set({ apiStatus: 'loading', apiError: null });
+    },
+
+    applyBackendWorkspace: (snapshot: BackendWorkspaceSnapshot) => {
+        const recalculated = FormulaEngine.recalculate(snapshot.bomData);
+        const totals = FormulaEngine.calculateTotals(recalculated);
+        const projects = snapshot.projects.map((project) => (
+            project.id === snapshot.activeProjectId
+                ? { ...project, totalCost: totals.totalCost, totalWeight: totals.totalWeight }
+                : project
+        ));
+
+        const updatedState: Partial<BOMState> = {
+            project: { ...snapshot.project, totalCost: totals.totalCost, totalWeight: totals.totalWeight },
+            projects,
+            bomData: recalculated,
+            libraryParts: snapshot.libraryParts,
+            snapshots: [],
+            apiStatus: 'loaded',
+            apiError: null,
+        };
+
+        if (snapshot.settings) {
+            updatedState.attributeDefs = snapshot.settings.attributeDefs;
+            updatedState.projectFlows = snapshot.settings.flows;
+            updatedState.projectFlowAssociations = snapshot.settings.flowAssociations;
+            updatedState.enabledComponentTypes = snapshot.settings.componentTypes as any;
+            updatedState.enabledLifecycleStates = snapshot.settings.lifecycleStates as any;
+            updatedState.warehouseLocations = snapshot.settings.warehouseLocations;
+            updatedState.complianceStandards = snapshot.settings.complianceStandards;
+            updatedState.componentTypeLabels = snapshot.settings.componentTypeLabels as any;
+            updatedState.lifecycleStateLabels = snapshot.settings.lifecycleStateLabels as any;
+        }
+
+        if (snapshot.ecos) {
+            updatedState.ecos = snapshot.ecos;
+        }
+
+        set(updatedState);
+    },
+
+    markBackendHydrationError: (error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Backend API hydration failed.';
+        set({ apiStatus: 'error', apiError: message });
+    },
 
     setActiveProject: (projectId: string) => {
         coreRepository.setActiveProject(projectId);
@@ -407,7 +617,7 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         }));
     },
 
-    updateBOMNode: (nodeId: string, updates: Partial<BOMNode>) => {
+    updateBOMNode: async (nodeId: string, updates: Partial<BOMNode>) => {
         if (get().isSandboxMode && get().sandboxBOMData) {
             set((state) => {
                 const updatedTree = updateNodeRecursive(state.sandboxBOMData!, nodeId, updates);
@@ -416,6 +626,21 @@ export const useBOMStore = create<BOMState>((set, get) => ({
             });
             return;
         }
+
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                const projectId = get().project.id;
+                await updateBackendBOMNode(projectId, nodeId, updates);
+                await refreshFromBackend(get);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to update BOM node.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
+
         set((state) => {
             const updatedTree = updateNodeRecursive(state.bomData, nodeId, updates);
             const recalculated = FormulaEngine.recalculate(updatedTree);
@@ -428,7 +653,7 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         });
     },
 
-    addBOMNode: (parentId: string, newNode: BOMNode) => {
+    addBOMNode: async (parentId: string, newNode: BOMNode) => {
         if (get().isSandboxMode && get().sandboxBOMData) {
             set((state) => {
                 const updatedTree = addNodeRecursive(state.sandboxBOMData!, parentId, newNode);
@@ -437,6 +662,35 @@ export const useBOMStore = create<BOMState>((set, get) => ({
             });
             return;
         }
+
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                const projectId = get().project.id;
+                const libraryPart = get().libraryParts.find(p => p.partNumber === newNode.partNumber);
+                await addBackendBOMNode(projectId, {
+                    parentId: parentId === 'root' ? null : parentId,
+                    partId: libraryPart?.id || null,
+                    partNumber: newNode.partNumber,
+                    name: newNode.name,
+                    revision: newNode.revision || 'A',
+                    state: newNode.state || 'Draft',
+                    type: newNode.type || 'Part',
+                    quantity: newNode.quantity,
+                    unit: newNode.unit || 'EA',
+                    cost: newNode.cost,
+                    currency: newNode.currency || 'USD',
+                    customAttributes: newNode.customAttributes,
+                });
+                await refreshFromBackend(get);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to add BOM node.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
+
         set((state) => {
             const updatedTree = addNodeRecursive(state.bomData, parentId, newNode);
             const recalculated = FormulaEngine.recalculate(updatedTree);
@@ -449,7 +703,7 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         });
     },
 
-    deleteBOMNode: (nodeId: string) => {
+    deleteBOMNode: async (nodeId: string) => {
         const deleteNodeRecursive = (node: BOMNode): BOMNode => ({
             ...node,
             children: (node.children || [])
@@ -464,6 +718,21 @@ export const useBOMStore = create<BOMState>((set, get) => ({
             });
             return;
         }
+
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                const projectId = get().project.id;
+                await deleteBackendBOMNode(projectId, nodeId);
+                await refreshFromBackend(get);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to delete BOM node.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
+
         set((state) => {
             const updatedTree = deleteNodeRecursive(state.bomData);
             const recalculated = FormulaEngine.recalculate(updatedTree);
@@ -476,7 +745,34 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         });
     },
 
-    updateLibraryPart: (partId: string, updates: Partial<LibraryPart>) => {
+    updateLibraryPart: async (partId: string, updates: Partial<LibraryPart>) => {
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                const apiUpdates: any = {
+                    name: updates.description,
+                    description: updates.description,
+                    type: updates.type,
+                    lifecycleState: updates.state,
+                    manufacturer: updates.manufacturer,
+                    mpn: updates.mpn,
+                    cost: updates.cost,
+                    leadTimeWeeks: updates.leadTimeWeeks,
+                    moq: updates.moq,
+                    spq: updates.spq,
+                };
+                Object.keys(apiUpdates).forEach(key => apiUpdates[key] === undefined && delete apiUpdates[key]);
+
+                await updateBackendPart(partId, apiUpdates);
+                await refreshFromBackend(get);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to update library part.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
+
         set((state) => {
             const libraryParts = state.libraryParts.map(p => p.id === partId ? { ...p, ...updates } : p);
             coreRepository.replaceLegacyLibraryParts(libraryParts, getActor());
@@ -488,7 +784,33 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         });
     },
 
-    addLibraryPart: (part: LibraryPart) => {
+    addLibraryPart: async (part: LibraryPart) => {
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                await createBackendPart({
+                    partNumber: part.partNumber,
+                    name: part.description || part.partNumber,
+                    description: part.description,
+                    type: part.type,
+                    lifecycleState: part.state,
+                    manufacturer: part.manufacturer,
+                    mpn: part.mpn,
+                    cost: part.cost,
+                    currency: 'USD',
+                    leadTimeWeeks: part.leadTimeWeeks,
+                    moq: part.moq,
+                    spq: part.spq,
+                });
+                await refreshFromBackend(get);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to add library part.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
+
         set((state) => {
             const libraryParts = [...state.libraryParts, part];
             coreRepository.replaceLegacyLibraryParts(libraryParts, getActor());
@@ -530,19 +852,21 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         });
     },
 
-    addAttributeDef: (def: AttributeDefinition) => {
+    addAttributeDef: async (def: AttributeDefinition) => {
         const updated = [...get().attributeDefs, def];
         localStorage.setItem(ATTRIBUTES_STORAGE_KEY, JSON.stringify(updated));
         set({ attributeDefs: updated });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    deleteAttributeDef: (id: string) => {
+    deleteAttributeDef: async (id: string) => {
         const updated = get().attributeDefs.filter(a => a.id !== id);
         localStorage.setItem(ATTRIBUTES_STORAGE_KEY, JSON.stringify(updated));
         set({ attributeDefs: updated });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    updateAttributeDef: (id: string, updates: Partial<AttributeDefinition>) => {
+    updateAttributeDef: async (id: string, updates: Partial<AttributeDefinition>) => {
         const updated = get().attributeDefs.map((def) => {
             if (def.id === id) {
                 return { ...def, ...updates };
@@ -551,9 +875,24 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         });
         localStorage.setItem(ATTRIBUTES_STORAGE_KEY, JSON.stringify(updated));
         set({ attributeDefs: updated });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    addAttachment: (nodeId: string, file: File) => {
+    addAttachment: async (nodeId: string, file: File) => {
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                const uploaded = await uploadBackendAttachment(file);
+                await linkBackendAttachment('bom', nodeId, uploaded.id);
+                await refreshFromBackend(get);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to add attachment.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
+
         const fakeUrl = URL.createObjectURL(file);
         const newAtt: Attachment = {
             id: `att-${Date.now()}`,
@@ -574,7 +913,21 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         });
     },
 
-    deleteAttachment: (nodeId: string, attachmentId: string) => {
+    deleteAttachment: async (nodeId: string, attachmentId: string) => {
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                await unlinkBackendAttachment('bom', nodeId, attachmentId);
+                await deleteBackendAttachment(attachmentId);
+                await refreshFromBackend(get);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to delete attachment.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
+
         set((state) => {
             const newData = findNodeAndProcess(state.bomData, nodeId, (n) => ({
                 ...n,
@@ -585,7 +938,43 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         });
     },
 
-    updateProjectPhase: (projectId: string, newPhase: 'EVT' | 'DVT' | 'PVT' | 'MP', signatures?: any) => {
+    importBOM: async (csvText: string) => {
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                const projectId = get().project.id;
+                await commitBackendBOMImport(projectId, csvText);
+                await refreshFromBackend(get);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to import BOM.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
+
+        const newBOM = FormulaEngine.recalculate(parseCSVToBOM(csvText));
+        if (newBOM) {
+            get().setBOMData(newBOM);
+        } else {
+            throw new Error("Failed to parse CSV.");
+        }
+    },
+
+    updateProjectPhase: async (projectId: string, newPhase: 'EVT' | 'DVT' | 'PVT' | 'MP', signatures?: any) => {
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                await transitionBackendProjectPhase(projectId, newPhase, signatures || []);
+                await refreshFromBackend(get);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to transition project phase.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
+
         const actor = getActor();
         const updatedCoreProject = coreRepository.updateProjectPhase(projectId, newPhase, actor, signatures);
         set((state) => {
@@ -598,67 +987,75 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         });
     },
 
-    updateProjectFlows: (flows: ProjectStageFlow[]) => {
+    updateProjectFlows: async (flows: ProjectStageFlow[]) => {
         localStorage.setItem(FLOWS_STORAGE_KEY, JSON.stringify(flows));
         set({ projectFlows: flows });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    setProjectFlowAssociation: (projectId: string, flowId: string) => {
+    setProjectFlowAssociation: async (projectId: string, flowId: string) => {
         const updatedAssoc = {
             ...get().projectFlowAssociations,
             [projectId]: flowId
         };
         localStorage.setItem(FLOW_ASSOC_STORAGE_KEY, JSON.stringify(updatedAssoc));
         set({ projectFlowAssociations: updatedAssoc });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    toggleComponentType: (type: ComponentType) => {
+    toggleComponentType: async (type: ComponentType) => {
         const current = get().enabledComponentTypes;
         const updated = current.includes(type)
             ? current.filter((t) => t !== type)
             : [...current, type];
         localStorage.setItem(COMP_TYPES_STORAGE_KEY, JSON.stringify(updated));
         set({ enabledComponentTypes: updated });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    toggleLifecycleState: (state: LifecycleState) => {
+    toggleLifecycleState: async (state: LifecycleState) => {
         const current = get().enabledLifecycleStates;
         const updated = current.includes(state)
             ? current.filter((s) => s !== state)
             : [...current, state];
         localStorage.setItem(STATES_STORAGE_KEY, JSON.stringify(updated));
         set({ enabledLifecycleStates: updated });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    updateComponentTypeLabel: (type: ComponentType, label: string) => {
+    updateComponentTypeLabel: async (type: ComponentType, label: string) => {
         const current = get().componentTypeLabels;
         const updated = { ...current, [type]: label };
         localStorage.setItem(COMP_TYPE_LABELS_STORAGE_KEY, JSON.stringify(updated));
         set({ componentTypeLabels: updated });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    updateLifecycleStateLabel: (state: LifecycleState, label: string) => {
+    updateLifecycleStateLabel: async (state: LifecycleState, label: string) => {
         const current = get().lifecycleStateLabels;
         const updated = { ...current, [state]: label };
         localStorage.setItem(LIFECYCLE_STATE_LABELS_STORAGE_KEY, JSON.stringify(updated));
         set({ lifecycleStateLabels: updated });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    addWarehouseLocation: (location: string) => {
+    addWarehouseLocation: async (location: string) => {
         const current = get().warehouseLocations;
         if (current.includes(location)) return;
         const updated = [...current, location];
         localStorage.setItem(WAREHOUSE_STORAGE_KEY, JSON.stringify(updated));
         set({ warehouseLocations: updated });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    deleteWarehouseLocation: (location: string) => {
+    deleteWarehouseLocation: async (location: string) => {
         const updated = get().warehouseLocations.filter((l) => l !== location);
         localStorage.setItem(WAREHOUSE_STORAGE_KEY, JSON.stringify(updated));
         set({ warehouseLocations: updated });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    updateWarehouseLocation: (oldLoc: string, newLoc: string) => {
+    updateWarehouseLocation: async (oldLoc: string, newLoc: string) => {
         const current = get().warehouseLocations;
         const updated = current.map((l) => l === oldLoc ? newLoc : l);
         localStorage.setItem(WAREHOUSE_STORAGE_KEY, JSON.stringify(updated));
@@ -671,23 +1068,26 @@ export const useBOMStore = create<BOMState>((set, get) => ({
             warehouseLocations: updated,
             ...getRepositoryState()
         });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    addComplianceStandard: (standard: string) => {
+    addComplianceStandard: async (standard: string) => {
         const current = get().complianceStandards;
         if (current.includes(standard)) return;
         const updated = [...current, standard];
         localStorage.setItem(COMPLIANCE_STORAGE_KEY, JSON.stringify(updated));
         set({ complianceStandards: updated });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    deleteComplianceStandard: (standard: string) => {
+    deleteComplianceStandard: async (standard: string) => {
         const updated = get().complianceStandards.filter((s) => s !== standard);
         localStorage.setItem(COMPLIANCE_STORAGE_KEY, JSON.stringify(updated));
         set({ complianceStandards: updated });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    updateComplianceStandard: (oldStd: string, newStd: string) => {
+    updateComplianceStandard: async (oldStd: string, newStd: string) => {
         const current = get().complianceStandards;
         const updated = current.map((s) => s === oldStd ? newStd : s);
         localStorage.setItem(COMPLIANCE_STORAGE_KEY, JSON.stringify(updated));
@@ -708,9 +1108,36 @@ export const useBOMStore = create<BOMState>((set, get) => ({
             complianceStandards: updated,
             attributeDefs: updatedAttrs
         });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    createProject: (input: { code: string, name: string, sku: string, flowId: string }) => {
+    createProject: async (input: { code: string, name: string, sku: string, flowId: string }) => {
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                const createdProj = await createBackendProject({
+                    code: input.code,
+                    name: input.name,
+                    sku: input.sku
+                });
+                
+                const updatedAssoc = {
+                    ...get().projectFlowAssociations,
+                    [createdProj.id]: input.flowId
+                };
+                localStorage.setItem(FLOW_ASSOC_STORAGE_KEY, JSON.stringify(updatedAssoc));
+                set({ projectFlowAssociations: updatedAssoc });
+                await saveSettingsIfBackendConfigured(get);
+                
+                await refreshFromBackend(get);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to create project.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
+
         const actor = getActor();
         const newCoreProject = coreRepository.createProject({
           id: `project-${input.code.toLowerCase()}-${Date.now()}`,
@@ -734,9 +1161,27 @@ export const useBOMStore = create<BOMState>((set, get) => ({
                 projectFlowAssociations: updatedAssoc
             };
         });
+        await saveSettingsIfBackendConfigured(get);
     },
 
-    updateProject: (id: string, updates: Partial<Project>) => {
+    updateProject: async (id: string, updates: Partial<Project>) => {
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                await updateBackendProject(id, {
+                    code: updates.code,
+                    name: updates.name,
+                    sku: updates.sku
+                });
+                await refreshFromBackend(get);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to update project.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
+
         const actor = getActor();
         const updatedCoreProject = coreRepository.updateProject(id, {
             code: updates.code,
@@ -752,6 +1197,47 @@ export const useBOMStore = create<BOMState>((set, get) => ({
             const project = state.project.id === id ? legacyProject : state.project;
             return { projects, project };
         });
+    },
+
+    loadAuditTrail: async (filters?: any) => {
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                const result = await loadBackendAuditEvents(filters);
+                set({ auditEvents: result.events, totalAuditEvents: result.total, apiStatus: 'loaded' });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to load audit events.';
+                set({ apiStatus: 'error', apiError: message });
+            }
+        } else {
+            const events = coreRepository.getAuditEvents(filters?.entityType, filters?.entityId);
+            let filteredEvents = events;
+            if (filters?.action) {
+                filteredEvents = filteredEvents.filter(e => e.action === filters.action);
+            }
+            // Sort by timestamp desc
+            filteredEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            
+            const total = filteredEvents.length;
+            
+            const limit = filters?.limit ?? 50;
+            const offset = filters?.offset ?? 0;
+            const paginatedEvents = filteredEvents.slice(offset, offset + limit);
+
+            const apiEvents: ApiAuditEvent[] = paginatedEvents.map(e => ({
+                id: e.id,
+                actorUserId: e.actor.userId,
+                actorName: e.actor.name,
+                entityType: e.entityType,
+                entityId: e.entityId,
+                action: e.action,
+                beforeJson: null,
+                afterJson: e.changes ? JSON.stringify(e.changes) : null,
+                createdAt: e.timestamp
+            }));
+            
+            set({ auditEvents: apiEvents, totalAuditEvents: total, apiStatus: 'loaded' });
+        }
     },
 
     getBOMAndSnapshotsForProject: (projectId: string) => {
@@ -816,7 +1302,19 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         return { bomData, snapshots: projectSnapshots };
     },
 
-    createECO: (title: string, description: string, initiator: string, impacts: ECOImpact[], priority: ECO['priority'] = 'Medium') => {
+    createECO: async (title: string, description: string, initiator: string, impacts: ECOImpact[], priority: ECO['priority'] = 'Medium') => {
+        if (isBackendApiConfigured()) {
+            const apiEco = await createBackendECO({
+                title,
+                description,
+                initiator,
+                priority,
+                impacts
+            });
+            set(state => ({ ecos: [apiEco, ...state.ecos] }));
+            return apiEco;
+        }
+
         const nextIndex = get().ecos.length + 1;
         const newEco: ECO = {
             id: `eco-draft-${Date.now()}-${nextIndex}`,
@@ -835,7 +1333,17 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         return newEco;
     },
 
-    approveECO: (ecoId: string, approvedBy: string) => {
+    approveECO: async (ecoId: string, approvedBy: string) => {
+        if (isBackendApiConfigured()) {
+            await updateBackendECO(ecoId, {
+                status: 'Approved',
+                approvedBy,
+                approvalDate: new Date().toISOString()
+            });
+            await refreshFromBackend(get);
+            return;
+        }
+
         const updated = get().ecos.map(e => {
             if (e.id === ecoId) {
                 return {
@@ -851,7 +1359,15 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         set({ ecos: updated });
     },
 
-    rejectECO: (ecoId: string) => {
+    rejectECO: async (ecoId: string) => {
+        if (isBackendApiConfigured()) {
+            await updateBackendECO(ecoId, {
+                status: 'Rejected'
+            });
+            await refreshFromBackend(get);
+            return;
+        }
+
         const updated = get().ecos.map(e => {
             if (e.id === ecoId) {
                 return {
@@ -881,9 +1397,44 @@ export const useBOMStore = create<BOMState>((set, get) => ({
         }
     },
 
-    publishSandboxChanges: (ecoId?: string) => {
-        const { isSandboxMode, sandboxBOMData, sandboxECOId } = get();
+    publishSandboxChanges: async (ecoId?: string) => {
+        const { isSandboxMode, sandboxBOMData, sandboxECOId, bomData } = get();
         if (!isSandboxMode || !sandboxBOMData) return;
+
+        if (isBackendApiConfigured()) {
+            set({ apiStatus: 'loading', apiError: null });
+            try {
+                const projectId = get().project.id;
+                await publishSandboxDiff(projectId, bomData, sandboxBOMData);
+                const targetEcoId = ecoId || sandboxECOId;
+                let updatedEcos = get().ecos;
+                if (targetEcoId) {
+                    updatedEcos = get().ecos.map(e => {
+                        if (e.id === targetEcoId) {
+                            return {
+                                ...e,
+                                status: 'Pending Approval' as const
+                            };
+                        }
+                        return e;
+                    });
+                    localStorage.setItem(ECO_STORAGE_KEY, JSON.stringify(updatedEcos));
+                }
+
+                await refreshFromBackend(get);
+                set({
+                    isSandboxMode: false,
+                    sandboxBOMData: null,
+                    sandboxECOId: null,
+                    ecos: updatedEcos
+                });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to publish sandbox changes.';
+                set({ apiStatus: 'error', apiError: message });
+                throw error;
+            }
+            return;
+        }
 
         // Apply changes to master
         const recalculated = FormulaEngine.recalculate(sandboxBOMData);
