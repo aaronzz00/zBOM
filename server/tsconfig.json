@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "vitest"],
+    "moduleResolution": "bundler"
+  },
+  "include": ["./**/*.ts", "../shared/**/*.ts"]
+}
+
