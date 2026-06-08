@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BOMNode } from '../types';
-import { analyzeBOMNode, chatWithBOM } from '../services/gemini';
+import { analyzeBOMNode, chatWithBOM } from '../services/aiProvider';
 import { Sparkles, X, MessageSquare, AlertTriangle, TrendingDown, Send } from 'lucide-react';
 
 interface AIAssistantProps {
@@ -113,7 +113,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ selectedNode, onClose 
                 {loading && (
                     <div className="flex flex-col items-center justify-center py-8 gap-3">
                         <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-xs text-slate-500 animate-pulse">Processing with Gemini Pro...</span>
+                        <span className="text-xs text-slate-500 animate-pulse">Processing with configured AI provider...</span>
                     </div>
                 )}
 

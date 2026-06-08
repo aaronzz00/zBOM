@@ -1,5 +1,5 @@
 {
   "name": "zBOM",
-  "description": "An industrial-grade, intelligent BOM management system for high-complexity consumer electronics. Features multi-level BOM handling, SKU management, and Gemini AI-powered supply chain analysis.",
+  "description": "An industrial-grade, intelligent BOM management system for high-complexity consumer electronics. Features multi-level BOM handling, SKU management, and OpenAI-compatible AI-assisted supply chain analysis.",
   "requestFramePermissions": []
 }

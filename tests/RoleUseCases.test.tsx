@@ -155,12 +155,14 @@ describe('role use-case frontend standards', () => {
     expect(screen.getAllByText('QA Test Bracket').length).toBeGreaterThan(0);
   });
 
-  it('lets Admin create a deterministic ECO draft from the plus button', () => {
+  it('lets Admin create a deterministic ECO draft from the plus button', async () => {
     render(<ECOManager />);
 
     fireEvent.click(screen.getByRole('button', { name: /Create change order/i }));
 
-    expect(screen.getAllByText('ECO-2024-DRAFT-003').length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getAllByText('ECO-2024-DRAFT-003').length).toBeGreaterThan(0);
+    });
     expect(screen.getByText('Draft change order created from current BOM context.')).toBeInTheDocument();
   });
 

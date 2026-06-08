@@ -5,19 +5,21 @@ import { BOMFlatView } from '../components/BOMFlatView';
 import { AIAssistant } from '../components/AIAssistant';
 import { useAppStore } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { BOMNode, ComponentType, LifecycleState, LibraryPart, AVLEntry, Permission, PricingTier } from '../types';
+import { BOMNode, ComponentType, LifecycleState, LibraryPart, AVLEntry, Permission, PricingTier, ECO, ECOImpact } from '../types';
 import { Filter, Download, Upload, Plus, Minus, Bot, History, RotateCcw, Info, X, Search, Database, Box, Camera, FileSpreadsheet, CircuitBoard, Tags, LayoutGrid, ListTree, Trash2, Check, Star, Table2, Target, Lock, ToggleLeft, ToggleRight, Scale, PackageCheck, Coins, Hash, Paperclip, FileText, Settings, FileBox, Hammer } from 'lucide-react';
 import { exportBOMToCSV, parseCSVToBOM } from '../utils/csvHelper';
 import { coreRepository } from '../repositories/core/coreRepository';
+import { isBackendApiConfigured, previewBackendBOMImport, requestBackendChatCompletion } from '../services/backendApi';
 
 export const BOMEditor: React.FC = () => {
   const { 
     bomData, setBOMData, libraryParts, updateBOMNode, addBOMNode, deleteBOMNode, 
     createSnapshot, loadSnapshot, snapshots, attributeDefs: rawAttributeDefs, 
-    addAttributeDef, addAttachment, deleteAttachment, project, 
+    addAttributeDef, addAttachment, deleteAttachment, importBOM, project, 
     componentTypeLabels = {}, lifecycleStateLabels = {},
     isSandboxMode, sandboxBOMData, sandboxECOId, toggleSandboxMode,
-    publishSandboxChanges, discardSandboxChanges, createECO, ecos
+    publishSandboxChanges, discardSandboxChanges, createECO, ecos,
+    auditEvents, loadAuditTrail
   } = useAppStore();
   const { hasPermission } = useAuth();
   
@@ -43,6 +45,19 @@ export const BOMEditor: React.FC = () => {
       return null;
   };
 
+  // Sync selectedNode when bomData or sandboxBOMData changes
+  useEffect(() => {
+    if (selectedNode) {
+      const activeTree = isSandboxMode && sandboxBOMData ? sandboxBOMData : bomData;
+      const updatedNode = findNodeById(activeTree, selectedNode.id);
+      if (updatedNode) {
+        setSelectedNode(updatedNode);
+      } else {
+        setSelectedNode(null);
+      }
+    }
+  }, [bomData, sandboxBOMData, isSandboxMode]);
+
   const checkReleasedGate = (nodeId: string, action: () => void) => {
       if (isSandboxMode) {
           action();
@@ -59,7 +74,7 @@ export const BOMEditor: React.FC = () => {
       }
   };
 
-  const handleActivateSandboxWithECO = (ecoId: string | null) => {
+  const handleActivateSandboxWithECO = async (ecoId: string | null) => {
       let targetEcoId = ecoId;
       if (!targetEcoId) {
           const nextIndex = ecos.length + 1;
@@ -72,7 +87,7 @@ export const BOMEditor: React.FC = () => {
                   to: 'Draft'
               }
           ];
-          const newEco = createECO(
+          const newEco = await createECO(
               `Draft ECO for editing ${activeNode?.partNumber || bomData.partNumber}`,
               `Draft change order created from BOM Editor to stage modifications.`,
               'Alex Admin',
@@ -103,7 +118,11 @@ export const BOMEditor: React.FC = () => {
 	    tree: BOMNode;
 	    rowCount: number;
 	    errors: string[];
+	    csvText: string;
 	  } | null>(null);
+  const [aiResolutions, setAiResolutions] = useState<Array<{ partNumber: string; suggestedName: string; reason: string }>>([]);
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
+  const [aiError, setAiError] = useState('');
 	  const [newBomItem, setNewBomItem] = useState({
 	    parentId: 'root',
 	    partId: '',
@@ -167,23 +186,14 @@ export const BOMEditor: React.FC = () => {
   };
 
   // Attachments Logic
-  const handleAttachmentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0] && selectedNode) {
-          addAttachment(selectedNode.id, e.target.files[0]);
-          // Refetch selected node to update UI is tricky since update is async in context,
-          // but we are using optimistic update pattern in a real app.
-          // Here context update triggers re-render, but selectedNode needs sync.
-          // Since selectedNode is a copy in state, we rely on useEffect or manual sync?
-          // For simplicity, we won't manually sync local state deeply here, 
-          // the user might need to re-select or we depend on a context-driven selection approach.
-          // Actually, let's just assume context updates and we re-find the node.
-          // Ideally, selectedId should be state, and selectedNode derived.
-          // For now, let's just clear the input.
+          try {
+              await addAttachment(selectedNode.id, e.target.files[0]);
+          } catch (error) {
+              alert(error instanceof Error ? error.message : "Failed to upload attachment.");
+          }
           e.target.value = '';
-          
-          // Hack to update local selectedNode view immediately for demo feel
-          // Real app would derive selectedNode from bomData + selectedId
-          // We will wait for re-render or switch node.
       }
   };
 
@@ -235,7 +245,7 @@ export const BOMEditor: React.FC = () => {
     return attributeDefs.filter(def => !def.componentTypeScope || def.componentTypeScope.includes(activeNode.type));
   }, [attributeDefs, activeNode]);
 
-	  const activeNodeAuditEvents = useMemo(() => {
+	  const activeNodeAuditEventsRaw = useMemo(() => {
 	    if (!activeNode) return [];
 	    return coreRepository.getAuditEvents().filter((event) => (
 	        event.entityId === activeNode.id ||
@@ -244,6 +254,35 @@ export const BOMEditor: React.FC = () => {
 	        event.entityType === 'bom-snapshot'
 	    )).slice(0, 8);
 	  }, [activeNode, bomData, snapshots]);
+
+	  const activeNodeAuditEvents = useMemo(() => {
+	    if (isBackendApiConfigured()) {
+	      return auditEvents.map((event) => ({
+	        id: event.id,
+	        summary: event.action === 'create'
+	          ? 'Added item to BOM'
+	          : event.action === 'delete'
+	          ? 'Deleted item from BOM'
+	          : event.action === 'transition-phase'
+	          ? 'Transitioned project phase'
+	          : 'Updated BOM node details',
+	        actor: { name: event.actorName || 'System' },
+	        timestamp: event.createdAt,
+	        sourceModule: 'BOM Editor',
+	      }));
+	    } else {
+	      return activeNodeAuditEventsRaw;
+	    }
+	  }, [isBackendApiConfigured(), auditEvents, activeNodeAuditEventsRaw]);
+
+	  useEffect(() => {
+	    if (detailsTab === 'history' && activeNode && isBackendApiConfigured()) {
+	      loadAuditTrail({
+	        entityId: activeNode.id,
+	        limit: 8,
+	      });
+	    }
+	  }, [detailsTab, activeNode?.id, loadAuditTrail]);
 
 	  const assemblyOptions = useMemo(() => {
       const options: Array<{ id: string; partNumber: string; name: string }> = [];
@@ -410,34 +449,137 @@ export const BOMEditor: React.FC = () => {
     if (!file) return;
 
     const reader = new FileReader();
-	    reader.onload = (evt) => {
-	        const text = evt.target?.result as string;
-	        if (text) {
-	            const newBOM = parseCSVToBOM(text);
-	            if (newBOM) {
-	                const validation = validateImportedTree(newBOM);
-	                setImportPreview({
-	                    fileName: file.name,
-	                    tree: newBOM,
-	                    rowCount: validation.rowCount,
-	                    errors: validation.errors,
-	                });
-	            } else {
-	                alert("Failed to parse CSV.");
-	            }
-	        }
-	    };
+    reader.onload = async (evt) => {
+        const text = evt.target?.result as string;
+        if (text) {
+            if (isBackendApiConfigured()) {
+                try {
+                    const preview = await previewBackendBOMImport(project.id, text);
+                    setImportPreview({
+                        fileName: file.name,
+                        tree: preview.tree,
+                        rowCount: preview.rowCount,
+                        errors: preview.errors,
+                        csvText: text,
+                    });
+                } catch (error) {
+                    alert(error instanceof Error ? error.message : "Failed to preview CSV.");
+                }
+            } else {
+                const newBOM = parseCSVToBOM(text);
+                if (newBOM) {
+                    const validation = validateImportedTree(newBOM);
+                    setImportPreview({
+                        fileName: file.name,
+                        tree: newBOM,
+                        rowCount: validation.rowCount,
+                        errors: validation.errors,
+                        csvText: text,
+                    });
+                } else {
+                    alert("Failed to parse CSV.");
+                }
+            }
+        }
+    };
     reader.readAsText(file);
     e.target.value = '';
-	  };
+  };
 
-	  const handleCommitImport = () => {
-	    if (!importPreview || importPreview.errors.length > 0) return;
-	    setBOMData(importPreview.tree);
-	    setSelectedNode(null);
-	    setSaveStatus(`Imported ${importPreview.fileName} with ${importPreview.rowCount} rows.`);
-	    setImportPreview(null);
-	  };
+  const handleCommitImport = async () => {
+    if (!importPreview || importPreview.errors.length > 0) return;
+    try {
+        if (isBackendApiConfigured()) {
+            await importBOM(importPreview.csvText);
+        } else {
+            setBOMData(importPreview.tree);
+        }
+        setSelectedNode(null);
+        setSaveStatus(`Imported ${importPreview.fileName} with ${importPreview.rowCount} rows.`);
+        setImportPreview(null);
+        setAiResolutions([]);
+        setAiError('');
+    } catch (error) {
+        alert(error instanceof Error ? error.message : "Failed to commit import.");
+    }
+  };
+
+  const handleAiResolveConflicts = async () => {
+    if (!importPreview) return;
+    setIsAiAnalyzing(true);
+    setAiError('');
+    try {
+      const conflicts: any[] = [];
+      const visit = (n: any) => {
+        if (!n) return;
+        if (n.status === 'CONFLICT') {
+          conflicts.push({
+            partNumber: n.partNumber,
+            csvName: n.name,
+            libraryName: n.libraryName,
+          });
+        }
+        n.children?.forEach(visit);
+      };
+      visit(importPreview.tree);
+
+      if (conflicts.length === 0) {
+        setIsAiAnalyzing(false);
+        return;
+      }
+
+      const response = await requestBackendChatCompletion([
+        {
+          role: 'system',
+          content: 'You are a parts library metadata manager assistant. Analyze conflicts and output valid JSON only.',
+        },
+        {
+          role: 'user',
+          content: `We have part name conflicts between the imported BOM CSV and the existing Part Library.
+Here is the list of conflicts:
+${JSON.stringify(conflicts, null, 2)}
+
+Recommend which name is more standard/appropriate to use in the BOM tree. If one name contains descriptive features (e.g. manufacturer, MPN, package, capacitance, tolerance), prefer the more descriptive name.
+Return a JSON array of recommendations. Each element MUST be an object with fields: "partNumber", "suggestedName", and "reason".
+Do NOT write any text outside the JSON code block.`,
+        }
+      ], 'bom-assistant');
+
+      const text = response.choices?.[0]?.message?.content || '';
+      const match = text.match(/\[[\s\S]*\]/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        setAiResolutions(parsed);
+      } else {
+        throw new Error("Could not parse AI response.");
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'AI resolution failed.');
+    } finally {
+      setIsAiAnalyzing(false);
+    }
+  };
+
+  const handleApplyAiSuggestions = () => {
+    if (!importPreview || aiResolutions.length === 0) return;
+    const resolutionMap = new Map(aiResolutions.map(r => [r.partNumber.toLowerCase(), r.suggestedName]));
+    const updateTreeNames = (n: any): any => {
+      const newName = resolutionMap.get(n.partNumber.toLowerCase());
+      return {
+        ...n,
+        name: newName || n.name,
+        children: n.children ? n.children.map(updateTreeNames) : [],
+      };
+    };
+    const updatedTree = updateTreeNames(importPreview.tree);
+    const updatedCsvText = exportBOMToCSV(updatedTree);
+    setImportPreview({
+      ...importPreview,
+      tree: updatedTree,
+      csvText: updatedCsvText,
+    });
+    setAiResolutions([]);
+  };
 
   return (
     <div className="flex flex-1 h-full overflow-hidden bg-slate-50 relative">
@@ -972,7 +1114,13 @@ export const BOMEditor: React.FC = () => {
                                                             {canEditMetadata && (
                                                                 <button 
                                                                     type="button"
-                                                                    onClick={() => deleteAttachment(activeNode.id, att.id)}
+                                                                    onClick={async () => {
+                                                                        try {
+                                                                            await deleteAttachment(activeNode.id, att.id);
+                                                                        } catch (error) {
+                                                                            alert(error instanceof Error ? error.message : "Failed to delete attachment.");
+                                                                        }
+                                                                    }}
                                                                     className="p-1 hover:bg-rose-100 rounded text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
                                                                     aria-label={`Remove attachment ${att.name}`}
                                                                     title="Remove"
@@ -1217,7 +1365,7 @@ export const BOMEditor: React.FC = () => {
 	                <h3 id="csv-import-preview-title" className="font-bold text-slate-900">CSV Import Preview</h3>
 	                <p className="text-xs text-slate-500">{importPreview.fileName} · {importPreview.rowCount} rows parsed</p>
 	              </div>
-	              <button type="button" aria-label="Close import preview" onClick={() => setImportPreview(null)}>
+	              <button type="button" aria-label="Close import preview" onClick={() => { setImportPreview(null); setAiResolutions([]); setAiError(''); }}>
 	                <X className="h-5 w-5" />
 	              </button>
 	            </div>
@@ -1239,8 +1387,85 @@ export const BOMEditor: React.FC = () => {
 	                  Validation passed. Commit will replace the active BOM tree and persist it through the core repository.
 	                </div>
 	              )}
+
+                  {/* AI Conflict Resolution Section */}
+                  {(() => {
+                    const conflicts: any[] = [];
+                    const visit = (n: any) => {
+                      if (!n) return;
+                      if (n.status === 'CONFLICT') {
+                        conflicts.push(n);
+                      }
+                      n.children?.forEach(visit);
+                    };
+                    visit(importPreview.tree);
+
+                    if (conflicts.length === 0) return null;
+
+                    return (
+                      <div className="rounded border border-amber-200 bg-amber-50 p-3.5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-bold text-amber-800 flex items-center gap-1">
+                            <Bot className="w-3.5 h-3.5" /> {conflicts.length} Part Library Name Mismatches Detected
+                          </div>
+                          {aiResolutions.length === 0 && (
+                            <button
+                              type="button"
+                              onClick={handleAiResolveConflicts}
+                              disabled={isAiAnalyzing}
+                              className="text-[10px] bg-amber-600 hover:bg-amber-700 text-white font-bold px-2 py-1 rounded transition-colors disabled:bg-slate-300 animate-pulse animate-duration-1000"
+                            >
+                              {isAiAnalyzing ? 'Analyzing...' : '🤖 Ask AI to Resolve'}
+                            </button>
+                          )}
+                        </div>
+
+                        {aiError && (
+                          <div className="text-xs text-rose-600 font-semibold">{aiError}</div>
+                        )}
+
+                        {aiResolutions.length > 0 ? (
+                          <div className="space-y-2.5">
+                            <div className="max-h-40 overflow-y-auto space-y-2 border-t border-amber-200/50 pt-2 text-xs">
+                              {aiResolutions.map((res) => (
+                                <div key={res.partNumber} className="bg-white/60 p-2 rounded border border-amber-200/40">
+                                  <div className="font-bold text-slate-800">{res.partNumber}</div>
+                                  <div className="mt-0.5 text-slate-600 flex items-center gap-1.5 flex-wrap">
+                                    <span>Suggested Name:</span>
+                                    <strong className="text-emerald-700 bg-emerald-50 px-1 rounded">{res.suggestedName}</strong>
+                                  </div>
+                                  <div className="mt-1 text-[11px] text-slate-500 italic">"{res.reason}"</div>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setAiResolutions([])}
+                                className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2 py-1 rounded transition-colors"
+                              >
+                                Clear
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleApplyAiSuggestions}
+                                className="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-1 rounded transition-colors"
+                              >
+                                Apply AI Suggestions
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-amber-700">
+                            The CSV names differ from the existing Part Library definitions. In API mode, the system defaults to using the existing library parts for these nodes. Click "Ask AI to Resolve" to optimize names.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
 	              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
-	                <button type="button" onClick={() => setImportPreview(null)} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+	                <button type="button" onClick={() => { setImportPreview(null); setAiResolutions([]); setAiError(''); }} className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
 	                  Cancel
 	                </button>
 	                <button type="button" onClick={handleCommitImport} disabled={importPreview.errors.length > 0} className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300">

@@ -36,6 +36,8 @@ const runCoreFlows = async (page, viewport) => {
 
   await page.getByRole('button', { name: 'Tooling Hub' }).click();
   await page.locator('main').getByText('Tooling Records').first().waitFor();
+  await page.getByRole('button', { name: 'Details' }).first().click();
+  await page.getByRole('button', { name: /links/i }).click();
   await page.getByRole('button', { name: /Open in Part Library/i }).first().click();
   await page.locator('main').getByText('Library Filters').first().waitFor();
   await page.waitForFunction(() => (

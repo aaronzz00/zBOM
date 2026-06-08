@@ -1,8 +1,17 @@
-import React, { useState } from 'react';
-import { Shield, GitMerge, Plus, Trash2, Save, RotateCcw, AlertTriangle, CheckCircle2, List, Settings, Database, FolderPlus, Tag, Edit, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, GitMerge, Plus, Trash2, Save, RotateCcw, AlertTriangle, CheckCircle2, List, Settings, Database, FolderPlus, Tag, Edit, X, KeyRound, History } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useBOMStore } from '../stores/useBOMStore';
+import { DEFAULT_AI_SETTINGS, useAISettingsStore } from '../stores/useAISettingsStore';
 import { Permission, UserRole, ProjectStageFlow, ComponentType, LifecycleState, AttributeDefinition } from '../types';
+import {
+  isBackendApiConfigured,
+  saveBackendAIProvider,
+  loadBackendAIProviderConfig,
+  loadBackendWorkspaceSettings,
+  saveBackendWorkspaceSettings,
+  type ApiWorkspaceSettings,
+} from '../services/backendApi';
 
 export const SettingsPage: React.FC = () => {
   const { rolePermissions, updateRolePermissions, resetRolePermissions } = useAuth();
@@ -33,11 +42,21 @@ export const SettingsPage: React.FC = () => {
     updateWarehouseLocation,
     updateComplianceStandard,
     updateAttributeDef,
-    updateProject
+    updateProject,
+    auditEvents,
+    totalAuditEvents,
+    loadAuditTrail
   } = useBOMStore();
+  const {
+    settings: aiSettings,
+    updateSettings: updateAISettings,
+    resetSettings: resetAISettings,
+    isConfigured: isAIConfigured,
+  } = useAISettingsStore();
 
-  const [activeTab, setActiveTab] = useState<'roles' | 'flows' | 'metadata' | 'fields'>('roles');
+  const [activeTab, setActiveTab] = useState<'roles' | 'flows' | 'metadata' | 'fields' | 'ai' | 'audit'>('roles');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const backendAIConfigured = isBackendApiConfigured();
   
   // Tab 2: Flows & Projects state
   const [selectedFlowId, setSelectedFlowId] = useState<string>(projectFlows[0]?.id ?? 'flow-standard');
@@ -49,7 +68,10 @@ export const SettingsPage: React.FC = () => {
   const [newLocation, setNewLocation] = useState('');
   const [newCompliance, setNewCompliance] = useState('');
 
-  // Tab 4: Attributes state
+  // Tab 4: AI provider state
+  const [aiForm, setAiForm] = useState(aiSettings);
+
+  // Tab 5: Attributes state
   const [newAttr, setNewAttr] = useState({
     name: '',
     key: '',
@@ -88,6 +110,108 @@ export const SettingsPage: React.FC = () => {
   const [editingChecklistIndex, setEditingChecklistIndex] = useState<{ phase: string, index: number } | null>(null);
   const [editingChecklistValue, setEditingChecklistValue] = useState<string>('');
 
+  const [keyLast4, setKeyLast4] = useState<string | null>(null);
+
+  // Tab 6: Audit Trail state
+  const [auditEntityType, setAuditEntityType] = useState<string>('');
+  const [auditAction, setAuditAction] = useState<string>('');
+  const [auditPage, setAuditPage] = useState<number>(1);
+  const auditLimit = 20;
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      loadAuditTrail({
+        entityType: auditEntityType || undefined,
+        action: auditAction || undefined,
+        limit: auditLimit,
+        offset: (auditPage - 1) * auditLimit,
+      });
+    }
+  }, [activeTab, auditEntityType, auditAction, auditPage]);
+
+  useEffect(() => {
+    if (backendAIConfigured) {
+      loadBackendAIProviderConfig()
+        .then((provider) => {
+          if (provider) {
+            setAiForm((prev) => ({
+              ...prev,
+              enabled: provider.enabled,
+              baseUrl: provider.baseUrl,
+              model: provider.model,
+              temperature: provider.temperature,
+              apiKey: '',
+            }));
+            if (provider.keyLast4) {
+              setKeyLast4(provider.keyLast4);
+            }
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to load backend AI config:', err);
+        });
+    }
+  }, [backendAIConfigured]);
+
+  useEffect(() => {
+    const checkAndMigrateSettings = async () => {
+      if (!isBackendApiConfigured()) return;
+      try {
+        const dbSettings = await loadBackendWorkspaceSettings();
+        const localWarehouse = localStorage.getItem('zbom.config.warehouse_locations');
+        const localAttrs = localStorage.getItem('zbom.config.attribute_defs');
+        const localFlows = localStorage.getItem('zbom.flows.configs');
+
+        if (localWarehouse || localAttrs || localFlows) {
+          const mergedSettings: ApiWorkspaceSettings = {
+            flows: localFlows ? JSON.parse(localFlows) : (dbSettings?.flows ?? []),
+            flowAssociations: localStorage.getItem('zbom.flows.associations')
+              ? JSON.parse(localStorage.getItem('zbom.flows.associations')!)
+              : (dbSettings?.flowAssociations ?? {}),
+            componentTypes: localStorage.getItem('zbom.config.component_types')
+              ? JSON.parse(localStorage.getItem('zbom.config.component_types')!)
+              : (dbSettings?.componentTypes ?? []),
+            lifecycleStates: localStorage.getItem('zbom.config.lifecycle_states')
+              ? JSON.parse(localStorage.getItem('zbom.config.lifecycle_states')!)
+              : (dbSettings?.lifecycleStates ?? []),
+            warehouseLocations: localWarehouse
+              ? JSON.parse(localWarehouse)
+              : (dbSettings?.warehouseLocations ?? []),
+            complianceStandards: localStorage.getItem('zbom.config.compliance_standards')
+              ? JSON.parse(localStorage.getItem('zbom.config.compliance_standards')!)
+              : (dbSettings?.complianceStandards ?? []),
+            attributeDefs: localAttrs
+              ? JSON.parse(localAttrs)
+              : (dbSettings?.attributeDefs ?? []),
+            componentTypeLabels: localStorage.getItem('zbom.config.component_type_labels')
+              ? JSON.parse(localStorage.getItem('zbom.config.component_type_labels')!)
+              : (dbSettings?.componentTypeLabels ?? {}),
+            lifecycleStateLabels: localStorage.getItem('zbom.config.lifecycle_state_labels')
+              ? JSON.parse(localStorage.getItem('zbom.config.lifecycle_state_labels')!)
+              : (dbSettings?.lifecycleStateLabels ?? {}),
+          };
+
+          await saveBackendWorkspaceSettings(mergedSettings);
+
+          localStorage.removeItem('zbom.flows.configs');
+          localStorage.removeItem('zbom.flows.associations');
+          localStorage.removeItem('zbom.config.component_types');
+          localStorage.removeItem('zbom.config.lifecycle_states');
+          localStorage.removeItem('zbom.config.warehouse_locations');
+          localStorage.removeItem('zbom.config.compliance_standards');
+          localStorage.removeItem('zbom.config.attribute_defs');
+          localStorage.removeItem('zbom.config.component_type_labels');
+          localStorage.removeItem('zbom.config.lifecycle_state_labels');
+
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error('Failed to auto-migrate local settings:', err);
+      }
+    };
+    checkAndMigrateSettings();
+  }, []);
+
   const showNotification = (msg: string) => {
     setSuccessMessage(msg);
     setTimeout(() => setSuccessMessage(null), 3000);
@@ -97,8 +221,63 @@ export const SettingsPage: React.FC = () => {
     if (window.confirm('Are you sure you want to reset all configurations to system defaults?')) {
       resetRolePermissions();
       localStorage.clear();
+      resetAISettings();
       showNotification('Configuration reset to system defaults successfully.');
       window.location.reload();
+    }
+  };
+
+  const handleSaveAISettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!aiForm.baseUrl.trim() || !aiForm.model.trim()) {
+      showNotification('AI provider base URL and model are required.');
+      return;
+    }
+
+    try {
+      if (backendAIConfigured) {
+        await saveBackendAIProvider({
+          enabled: aiForm.enabled,
+          providerType: 'openai-compatible',
+          baseUrl: aiForm.baseUrl,
+          model: aiForm.model,
+          temperature: aiForm.temperature,
+          ...(aiForm.apiKey.trim() ? { apiKey: aiForm.apiKey } : {}),
+        });
+      }
+
+      updateAISettings({
+        enabled: aiForm.enabled,
+        providerType: 'openai-compatible',
+        baseUrl: aiForm.baseUrl,
+        apiKey: backendAIConfigured ? '' : aiForm.apiKey,
+        model: aiForm.model,
+        temperature: aiForm.temperature,
+      });
+      if (backendAIConfigured) {
+        setAiForm({ ...aiForm, apiKey: '' });
+      }
+      showNotification(backendAIConfigured ? 'AI provider settings saved to backend.' : 'AI provider settings saved.');
+    } catch (error) {
+      showNotification(error instanceof Error ? error.message : 'Failed to save AI provider settings.');
+    }
+  };
+
+  const handleResetAISettings = async () => {
+    try {
+      if (backendAIConfigured) {
+        await saveBackendAIProvider({
+          ...DEFAULT_AI_SETTINGS,
+          apiKey: undefined,
+          clearApiKey: true,
+        });
+      }
+      resetAISettings();
+      setAiForm({ ...DEFAULT_AI_SETTINGS });
+      showNotification('AI provider settings reset to defaults.');
+    } catch (error) {
+      showNotification(error instanceof Error ? error.message : 'Failed to reset AI provider settings.');
     }
   };
 
@@ -321,6 +500,17 @@ export const SettingsPage: React.FC = () => {
             Global Lists & Toggles
           </button>
           <button
+            onClick={() => setActiveTab('ai')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-t-2 transition-all ${
+              activeTab === 'ai'
+                ? 'border-blue-600 text-blue-600 bg-blue-50/50'
+                : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            }`}
+          >
+            <KeyRound className="h-4 w-4" />
+            AI Provider
+          </button>
+          <button
             onClick={() => setActiveTab('fields')}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-t-2 transition-all ${
               activeTab === 'fields'
@@ -330,6 +520,17 @@ export const SettingsPage: React.FC = () => {
           >
             <Database className="h-4 w-4" />
             Custom Fields (Attributes)
+          </button>
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-t-2 transition-all ${
+              activeTab === 'audit'
+                ? 'border-blue-600 text-blue-600 bg-blue-50/50'
+                : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            }`}
+          >
+            <History className="h-4 w-4" />
+            Audit Trail
           </button>
         </div>
 
@@ -1124,6 +1325,158 @@ export const SettingsPage: React.FC = () => {
           </div>
         )}
 
+        {/* AI Provider Tab Content */}
+        {activeTab === 'ai' && (
+          <div className="grid gap-6 lg:grid-cols-3">
+            <section className="lg:col-span-2 bg-white border border-slate-200 p-5 shadow-sm">
+              <div className="mb-5 flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">OpenAI-compatible Provider</h2>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    Configure the AI Assistant to call a provider that supports the OpenAI chat completions API.
+                  </p>
+                </div>
+                <div
+                  className={`shrink-0 border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
+                    backendAIConfigured && aiSettings.enabled
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : isAIConfigured()
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : aiSettings.enabled
+                        ? 'border-amber-200 bg-amber-50 text-amber-700'
+                        : 'border-slate-200 bg-slate-50 text-slate-500'
+                  }`}
+                >
+                  {backendAIConfigured && aiSettings.enabled
+                    ? 'Backend Proxy'
+                    : isAIConfigured()
+                      ? 'Configured'
+                      : aiSettings.enabled
+                        ? 'Missing Key'
+                        : 'Disabled'}
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveAISettings} className="space-y-5">
+                <label className="flex items-center justify-between gap-4 border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div>
+                    <div className="text-sm font-bold text-slate-800">Enable AI Assistant</div>
+                    <div className="mt-0.5 text-xs text-slate-500">Allow analysis and chat actions to call the configured provider.</div>
+                  </div>
+                  <input
+                    id="ai-enabled"
+                    type="checkbox"
+                    aria-label="Enable AI Assistant"
+                    checked={aiForm.enabled}
+                    onChange={(e) => setAiForm({ ...aiForm, enabled: e.target.checked })}
+                    className="h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </label>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label htmlFor="ai-provider-type" className="text-xs font-bold uppercase text-slate-500">Provider Type</label>
+                    <select
+                      id="ai-provider-type"
+                      value={aiForm.providerType}
+                      onChange={() => setAiForm({ ...aiForm, providerType: 'openai-compatible' })}
+                      className="mt-1 w-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="openai-compatible">OpenAI-compatible</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="ai-model" className="text-xs font-bold uppercase text-slate-500">Model</label>
+                    <input
+                      id="ai-model"
+                      type="text"
+                      value={aiForm.model}
+                      onChange={(e) => setAiForm({ ...aiForm, model: e.target.value })}
+                      placeholder="gpt-4o-mini"
+                      className="mt-1 w-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="ai-base-url" className="text-xs font-bold uppercase text-slate-500">OpenAI-compatible Base URL</label>
+                  <input
+                    id="ai-base-url"
+                    type="url"
+                    value={aiForm.baseUrl}
+                    onChange={(e) => setAiForm({ ...aiForm, baseUrl: e.target.value })}
+                    placeholder="https://api.openai.com/v1"
+                    className="mt-1 w-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-[1fr_160px]">
+                  <div>
+                    <label htmlFor="ai-api-key" className="text-xs font-bold uppercase text-slate-500">API Key</label>
+                    <input
+                      id="ai-api-key"
+                      type="password"
+                      autoComplete="off"
+                      value={aiForm.apiKey}
+                      onChange={(e) => setAiForm({ ...aiForm, apiKey: e.target.value })}
+                      placeholder={keyLast4 ? `••••••••••••${keyLast4}` : "sk-..."}
+                      className="mt-1 w-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="ai-temperature" className="text-xs font-bold uppercase text-slate-500">Temperature</label>
+                    <input
+                      id="ai-temperature"
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={aiForm.temperature}
+                      onChange={(e) => setAiForm({ ...aiForm, temperature: Number(e.target.value) })}
+                      className="mt-1 w-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                  <button
+                    type="button"
+                    onClick={handleResetAISettings}
+                    className="flex items-center gap-1.5 border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reset AI Defaults
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex items-center gap-1.5 bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    Save AI Settings
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <section className="bg-amber-50 border border-amber-200 p-5 shadow-sm">
+              <div className="mb-3 flex items-center gap-2 text-amber-800">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <h2 className="text-sm font-black uppercase tracking-wider">Production Note</h2>
+              </div>
+              <p className="text-xs leading-relaxed text-amber-900">
+                API keys are not persisted in browser localStorage. When VITE_API_BASE_URL is configured, this form saves
+                provider credentials to the backend encrypted store and AI calls use the server-side proxy.
+              </p>
+              <div className="mt-4 border-t border-amber-200 pt-4 text-xs text-amber-900">
+                <div className="font-bold">Saved endpoint</div>
+                <div className="mt-1 break-all font-mono">{aiSettings.baseUrl}/chat/completions</div>
+                <div className="mt-3 font-bold">Saved model</div>
+                <div className="mt-1 font-mono">{aiSettings.model}</div>
+              </div>
+            </section>
+          </div>
+        )}
+
         {/* Custom Fields Tab Content */}
         {activeTab === 'fields' && (
           <div className="grid gap-6 lg:grid-cols-3">
@@ -1431,6 +1784,188 @@ export const SettingsPage: React.FC = () => {
                   })}
                 </div>
               </section>
+            </div>
+          </div>
+        )}
+        {activeTab === 'audit' && (
+          <div className="space-y-6">
+            <div className="bg-white border border-slate-200 p-6 shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <History className="h-5 w-5 text-slate-500" />
+                    Workspace Audit Trail
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Query, filter and review audit event history and electronic signatures in this workspace.
+                  </p>
+                </div>
+                {/* Filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-slate-600">Entity Type</label>
+                    <select
+                      value={auditEntityType}
+                      onChange={(e) => {
+                        setAuditEntityType(e.target.value);
+                        setAuditPage(1);
+                      }}
+                      className="text-xs bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">All Entities</option>
+                      <option value="project">Project</option>
+                      <option value="part">Part</option>
+                      <option value="bom">BOM</option>
+                      <option value="bom-node">BOM Node</option>
+                      <option value="tooling-record">Tooling Record</option>
+                      <option value="supplier">Supplier</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-slate-600">Action</label>
+                    <select
+                      value={auditAction}
+                      onChange={(e) => {
+                        setAuditAction(e.target.value);
+                        setAuditPage(1);
+                      }}
+                      className="text-xs bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">All Actions</option>
+                      <option value="create">Create</option>
+                      <option value="update">Update</option>
+                      <option value="delete">Delete</option>
+                      <option value="transition-phase">Transition Phase</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1 justify-end pt-5">
+                    <button
+                      onClick={() => {
+                        setAuditEntityType('');
+                        setAuditAction('');
+                        setAuditPage(1);
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-bold px-2 py-1"
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Event List/Table */}
+              <div className="mt-4 overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-100 text-left text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 font-bold text-xs uppercase tracking-wider">
+                      <th className="px-4 py-3">Timestamp</th>
+                      <th className="px-4 py-3">Actor</th>
+                      <th className="px-4 py-3">Entity Type</th>
+                      <th className="px-4 py-3">Entity ID</th>
+                      <th className="px-4 py-3">Action</th>
+                      <th className="px-4 py-3">Details / Signatures</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {auditEvents.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-slate-400 font-medium">
+                          No audit events found matching filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      auditEvents.map((event) => {
+                        let parsedAfter: any = null;
+                        try {
+                          if (event.afterJson) {
+                            parsedAfter = JSON.parse(event.afterJson);
+                          }
+                        } catch (e) {}
+                        
+                        let badgeColor = 'bg-slate-50 text-slate-600 border-slate-200';
+                        if (event.action === 'create') badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                        else if (event.action === 'delete') badgeColor = 'bg-rose-50 text-rose-700 border-rose-200';
+                        else if (event.action === 'update') badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+                        else if (event.action === 'transition-phase') badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+
+                        return (
+                          <tr key={event.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 font-medium text-slate-500 whitespace-nowrap">
+                              {new Date(event.createdAt).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap">
+                              {event.actorName}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className="font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded text-xs">
+                                {event.entityType}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-xs text-slate-500 truncate max-w-[150px]" title={event.entityId}>
+                              {event.entityId}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className={`inline-block px-2.5 py-0.5 border text-xs font-bold rounded-full ${badgeColor}`}>
+                                {event.action}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {event.action === 'transition-phase' && parsedAfter?.signatures ? (
+                                <div className="space-y-1">
+                                  <div className="font-bold text-xs text-slate-700">
+                                    Transitioned Phase to <span className="text-amber-800 font-extrabold">{parsedAfter.phase}</span>
+                                  </div>
+                                  <div className="pl-2 border-l-2 border-amber-200 space-y-0.5 text-xs text-slate-500">
+                                    {parsedAfter.signatures.map((sig: any, idx: number) => (
+                                      <div key={idx} className="flex flex-wrap gap-x-2">
+                                        <span className="font-bold text-slate-600">• {sig.item}:</span>
+                                        <span>Signed by {sig.role || sig.userRole || 'Unknown'} ({sig.actor || sig.actorName || 'System'})</span>
+                                        <span className="text-slate-400">{new Date(sig.timestamp).toLocaleTimeString()}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-xs text-slate-600 break-words font-medium">
+                                  {event.action === 'create' && `Created new ${event.entityType}`}
+                                  {event.action === 'update' && `Updated ${event.entityType}`}
+                                  {event.action === 'delete' && `Deleted ${event.entityType}`}
+                                  {!['create', 'update', 'delete', 'transition-phase'].includes(event.action) && event.action}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Footer */}
+              {totalAuditEvents > auditLimit && (
+                <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-4 text-xs font-bold text-slate-500">
+                  <div>
+                    Showing {((auditPage - 1) * auditLimit) + 1} to {Math.min(auditPage * auditLimit, totalAuditEvents)} of {totalAuditEvents} events
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={auditPage === 1}
+                      onClick={() => setAuditPage(p => Math.max(1, p - 1))}
+                      className="px-3 py-1.5 border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      disabled={auditPage * auditLimit >= totalAuditEvents}
+                      onClick={() => setAuditPage(p => p + 1)}
+                      className="px-3 py-1.5 border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

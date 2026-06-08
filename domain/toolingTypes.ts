@@ -15,6 +15,7 @@ export type ToolingMilestoneKey =
     | 't1';
 
 export interface ToolingMilestone {
+    id?: string;
     key: ToolingMilestoneKey;
     plannedDate?: string;
     status: 'not-started' | 'in-progress' | 'done' | 'blocked';

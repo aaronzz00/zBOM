@@ -8,12 +8,20 @@ import {
 } from '../domain/toolingTypes';
 import { coreRepository, calculateLeadTimeDays, toLegacyToolingState } from '../repositories/core/coreRepository';
 import { useAuthStore } from './useAuthStore';
+import { useBOMStore } from './useBOMStore';
+import {
+    isBackendApiConfigured,
+    updateBackendToolingMilestone,
+    loadBackendWorkspace,
+    type BackendWorkspaceSnapshot,
+} from '../services/backendApi';
 
 export interface ToolingState {
     designMasterParts: DesignMasterPart[];
     tooling: Tooling[];
     reset: () => void;
     loadFromRepository: () => void;
+    applyBackendWorkspace: (snapshot: BackendWorkspaceSnapshot) => void;
     getToolingByDesignMasterPart: (designMasterPartId: string) => Tooling[];
     createDesignMasterPart: (part: DesignMasterPart) => void;
     createTooling: (tooling: Tooling) => void;
@@ -69,6 +77,13 @@ export const useToolingStore = create<ToolingState>((set, get) => ({
         set(createInitialState());
     },
 
+    applyBackendWorkspace: (snapshot: BackendWorkspaceSnapshot) => {
+        set({
+            designMasterParts: snapshot.designMasterParts,
+            tooling: snapshot.tooling,
+        });
+    },
+
     getToolingByDesignMasterPart: (designMasterPartId: string) => (
         get().tooling.filter((item) => item.designMasterPartId === designMasterPartId)
     ),
@@ -99,11 +114,32 @@ export const useToolingStore = create<ToolingState>((set, get) => ({
         });
     },
 
-    updateMilestone: (
+    updateMilestone: async (
         toolingId: string,
         milestoneKey: ToolingMilestoneKey,
         updates: Partial<ToolingMilestone>,
     ) => {
+        if (isBackendApiConfigured()) {
+            const tooling = get().tooling.find(t => t.id === toolingId);
+            const milestone = tooling?.milestones.find(m => m.key === milestoneKey);
+            if (milestone && milestone.id) {
+                try {
+                    await updateBackendToolingMilestone(milestone.id, updates);
+                    const role = useAuthStore.getState().currentUser.role;
+                    const projectId = useBOMStore.getState().project.id;
+                    const snapshot = await loadBackendWorkspace(role, projectId);
+                    useBOMStore.getState().applyBackendWorkspace(snapshot);
+                    get().applyBackendWorkspace(snapshot);
+                } catch (error) {
+                    console.error('Failed to update tooling milestone in API mode:', error);
+                    throw error;
+                }
+            } else {
+                console.error('Milestone ID not found for key:', milestoneKey);
+            }
+            return;
+        }
+
         set((state) => {
             const nextTooling = state.tooling.map((tooling) => {
                 if (tooling.id !== toolingId) {

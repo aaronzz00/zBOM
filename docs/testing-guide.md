@@ -119,6 +119,7 @@ npm run build
 | `tests/RoleUseCases.test.tsx` | 角色 use-case 标准、商业字段保护、Sourcing 维护、Admin 本地动作、Supply Chain 预览、Settings/ERP setup |
 | `tests/AppNavigation.test.tsx` | 页面导航、Production Core / Development Preview 状态、Viewer 可见模块、窄屏 shell 约束 |
 | `tests/BOMTable.test.tsx` | BOM 表格、Columns 菜单、键盘关闭与可访问状态 |
+| `tests/AIProvider.test.ts` / `tests/AISettingsStore.test.ts` | OpenAI-compatible AI provider 配置、持久化和请求构造 |
 | `tests/ProductMatrixCenter.test.tsx` | SKU 生命周期操作与产品矩阵工作流 |
 | `tests/PhaseOneWorkflowPages.test.tsx` | Product Matrix -> EBOM Architecture -> MBOM Delta -> Tooling 的跨模块流程 |
 | `tests/authStore.test.ts` | 角色切换和权限矩阵 |
@@ -207,8 +208,8 @@ VITE_ENABLE_DEMO_ROLE_SWITCHER=true npm run dev
 
 - 核心 repository 有角色策略层，但不能替代真实服务端授权。
 - 三大核心模块使用本地 durable repository；非核心 Development Preview 模块仍可能使用 mock/in-memory。
-- Settings、ERP Connect、Risk Report、Supplier Audit、Compare Export 等是确定性前端预览或 checklist，不代表真实外部服务已接通。
-- AI 分析依赖 `GEMINI_API_KEY`，缺少 key 时应视为不可用。
+- ERP Connect、Risk Report、Supplier Audit、Compare Export 等是确定性前端预览或 checklist，不代表真实外部服务已接通。
+- AI 分析通过 `Settings > AI Provider` 配置 OpenAI-compatible provider；当前 key 存于浏览器本地，生产环境仍需后端 secret store 和服务端代理。
 - in-app Browser 工具曾阻止 synthetic `data:` 390px viewport harness，因此窄屏证据采用响应式回归测试和直接浏览器 smoke，而不是保存的 synthetic 390px 截图。
 
 ## 回归前检查清单

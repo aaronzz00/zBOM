@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { User, UserRole, Permission } from '../types';
+import { getBackendUser, isBackendApiConfigured } from '../services/backendApi';
 
 // Mock Users (Copied from AuthContext)
 const MOCK_USERS: Record<UserRole, User> = {
@@ -66,11 +67,34 @@ interface AuthState {
     hasPermission: (permission: Permission) => boolean;
     updateRolePermissions: (role: UserRole, permissions: Permission[]) => void;
     resetRolePermissions: () => void;
+    initialize: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
     currentUser: MOCK_USERS.ADMIN,
     rolePermissions: loadSavedPermissions(),
+
+    initialize: async () => {
+        if (isBackendApiConfigured()) {
+            try {
+                const session = await getBackendUser();
+                const role = session.actor.role;
+                const name = session.user.name || 'User';
+                const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+                set({
+                    currentUser: {
+                        id: session.user.id,
+                        name: name,
+                        email: session.user.email,
+                        role: role,
+                        avatarInitials: initials || 'US',
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to initialize auth from backend:', error);
+            }
+        }
+    },
 
     switchRole: (role: UserRole) => {
         set({ currentUser: MOCK_USERS[role] });

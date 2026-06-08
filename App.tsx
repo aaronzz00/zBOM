@@ -5,6 +5,12 @@ import { SetupPage } from './pages/SetupPage';
 import { FeedbackOverlay } from './components/FeedbackOverlay';
 import { useBOMStore } from './stores/useBOMStore';
 import { useToolingStore } from './stores/useToolingStore';
+import { useAuthStore } from './stores/useAuthStore';
+import {
+  isBackendApiConfigured,
+  isLocalRepositoryFallbackEnabled,
+  loadBackendWorkspace,
+} from './services/backendApi';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then(({ Dashboard }) => ({ default: Dashboard })));
 const BOMEditor = lazy(() => import('./pages/BOMEditor').then(({ BOMEditor }) => ({ default: BOMEditor })));
@@ -70,13 +76,93 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const showFeedbackOverlay = import.meta.env.VITE_ENABLE_FEEDBACK_OVERLAY === 'true';
-  const { project, projects, setActiveProject } = useBOMStore();
+  const {
+    project,
+    projects,
+    setActiveProject,
+    setApiHydrationLoading,
+    applyBackendWorkspace,
+    markBackendHydrationError,
+  } = useBOMStore();
+  const currentRole = useAuthStore((state) => state.currentUser.role);
+  const initializeAuth = useAuthStore((state) => state.initialize);
+  const [authInitialized, setAuthInitialized] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const refreshToolingFromRepository = useToolingStore((state) => state.loadFromRepository);
+  const applyBackendToolingWorkspace = useToolingStore((state) => state.applyBackendWorkspace);
 
-  const handleProjectChange = (projectId: string) => {
+  const applyBackendSnapshot = (snapshot: Awaited<ReturnType<typeof loadBackendWorkspace>>) => {
+    applyBackendWorkspace(snapshot);
+    applyBackendToolingWorkspace(snapshot);
+  };
+
+  const handleProjectChange = async (projectId: string) => {
+    if (isBackendApiConfigured()) {
+      setApiHydrationLoading();
+      try {
+        const snapshot = await loadBackendWorkspace(currentRole, projectId);
+        applyBackendSnapshot(snapshot);
+      } catch (error) {
+        markBackendHydrationError(error);
+        if (isLocalRepositoryFallbackEnabled()) {
+          setActiveProject(projectId);
+          refreshToolingFromRepository();
+        }
+      }
+      return;
+    }
+
     setActiveProject(projectId);
     refreshToolingFromRepository();
   };
+
+  // Initialize Auth Store once on startup
+  useEffect(() => {
+    if (isBackendApiConfigured()) {
+      initializeAuth().finally(() => {
+        setAuthInitialized(true);
+      });
+    } else {
+      setAuthInitialized(true);
+    }
+  }, []);
+
+  // Listen for write auth errors globally
+  useEffect(() => {
+    const handleAuthRequired = () => {
+      setShowAuthModal(true);
+    };
+    window.addEventListener('zbom:auth-required', handleAuthRequired);
+    return () => window.removeEventListener('zbom:auth-required', handleAuthRequired);
+  }, []);
+
+  // Hydrate workspace once auth is ready
+  useEffect(() => {
+    if (!isBackendApiConfigured() || !authInitialized) {
+      return;
+    }
+
+    let cancelled = false;
+    setApiHydrationLoading();
+    loadBackendWorkspace(currentRole)
+      .then((snapshot) => {
+        if (!cancelled) {
+          applyBackendSnapshot(snapshot);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          markBackendHydrationError(error);
+          if (!isLocalRepositoryFallbackEnabled()) {
+            console.error('Backend API hydration failed without local fallback.', error);
+          }
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, authInitialized]);
 
   useEffect(() => {
     const handleNavigate = (event: Event) => {
@@ -162,6 +248,69 @@ function App() {
           </main>
         </div>
         {showFeedbackOverlay && <FeedbackOverlay activePage={activePage} />}
+        {showAuthModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-all duration-300">
+            <div className="w-full max-w-md scale-100 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl transition-all duration-300">
+              <div className="flex items-start space-x-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-semibold leading-6 text-slate-900">写入权限不足 / Write Permission Denied</h3>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    当前处于只读模式（Viewer），无法保存您的修改。要获取写入权限，请通过您电脑的飞书工具链进行授权。
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-slate-50 p-4 border border-slate-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">在终端运行登录命令 / Run command in terminal</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('lark-cli auth login');
+                    }}
+                    className="rounded px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 hover:bg-indigo-50 active:scale-95 transition-all"
+                  >
+                    复制 / Copy
+                  </button>
+                </div>
+                <div className="mt-2 flex items-center justify-between rounded-lg bg-slate-900 px-3 py-2.5 font-mono text-xs text-slate-200">
+                  <span>lark-cli auth login</span>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end space-x-2.5">
+                <button
+                  type="button"
+                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 active:scale-95 transition-all"
+                  onClick={() => setShowAuthModal(false)}
+                >
+                  取消 / Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 active:scale-95 transition-all"
+                  onClick={async () => {
+                    await initializeAuth();
+                    const role = useAuthStore.getState().currentUser.role;
+                    if (role !== 'VIEWER') {
+                      setShowAuthModal(false);
+                      const snapshot = await loadBackendWorkspace(role);
+                      applyBackendSnapshot(snapshot);
+                    } else {
+                      alert('未检测到有效的写入权限，请确保您在终端已成功登录飞书，且您的 OpenID 映射配置正确。');
+                    }
+                  }}
+                >
+                  我已在终端登录 / Refresh Auth
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ErrorBoundary>
   );

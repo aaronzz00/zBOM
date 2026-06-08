@@ -22,7 +22,7 @@ export const ECOManager: React.FC = () => {
   const canApprove = hasPermission(Permission.APPROVE_CHANGE);
   const canCreate = hasPermission(Permission.CREATE_ECO);
 
-  const handleCreateDraft = () => {
+  const handleCreateDraft = async () => {
     const nextIndex = ecos.length + 1;
     const impacts: ECOImpact[] = [
       {
@@ -34,7 +34,7 @@ export const ECOManager: React.FC = () => {
       },
     ];
     
-    const draft = createECO(
+    const draft = await createECO(
       'Draft BOM update request',
       'Draft change order created from current BOM context.',
       currentUser.name,
@@ -43,12 +43,12 @@ export const ECOManager: React.FC = () => {
     );
     setSelectedEco(draft);
   };
-
-  const handleStatusChange = (ecoId: string, newStatus: ECO['status']) => {
+ 
+  const handleStatusChange = async (ecoId: string, newStatus: ECO['status']) => {
     if (newStatus === 'Approved') {
-      approveECO(ecoId, currentUser.name);
+      await approveECO(ecoId, currentUser.name);
     } else if (newStatus === 'Rejected') {
-      rejectECO(ecoId);
+      await rejectECO(ecoId);
     }
   };
 

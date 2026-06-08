@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import App from '../App';
 import { SettingsPage } from '../pages/SettingsPage';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useAISettingsStore } from '../stores/useAISettingsStore';
 import { useBOMStore } from '../stores/useBOMStore';
 import { Permission, UserRole } from '../types';
 import { mockProject, complexBOM, previousBOM } from '../data/mockBOM';
@@ -42,6 +43,7 @@ const resetStores = () => {
   
   // Clear any localStorage mappings
   localStorage.clear();
+  useAISettingsStore.getState().resetSettings();
   useBOMStore.setState({
     projectFlowAssociations: {
       'project-zphone-2026': 'flow-standard',
@@ -194,6 +196,42 @@ describe('Dynamic Configuration System', () => {
       // Verify the item is stored in the BOM store state
       const standardFlow = useBOMStore.getState().projectFlows.find(f => f.id === 'flow-standard');
       expect(standardFlow?.transitions.EVT.checklist).toContain('Thermal Simulation Approved');
+    });
+  });
+
+  describe('AI Provider Settings', () => {
+    it('lets admins configure an OpenAI-compatible provider from Settings', () => {
+      render(<SettingsPage />);
+
+      fireEvent.click(screen.getByRole('button', { name: /AI Provider/i }));
+
+      expect(screen.getByText('OpenAI-compatible Provider')).toBeInTheDocument();
+      expect(screen.getByText('Production Note')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByLabelText('Enable AI Assistant'));
+      fireEvent.change(screen.getByLabelText('OpenAI-compatible Base URL'), {
+        target: { value: 'https://llm.example.com/v1' },
+      });
+      fireEvent.change(screen.getByLabelText('Model'), {
+        target: { value: 'gpt-test-model' },
+      });
+      fireEvent.change(screen.getByLabelText('API Key'), {
+        target: { value: 'sk-test-123' },
+      });
+      fireEvent.change(screen.getByLabelText('Temperature'), {
+        target: { value: '0.2' },
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /Save AI Settings/i }));
+
+      const saved = useAISettingsStore.getState().settings;
+      expect(saved.enabled).toBe(true);
+      expect(saved.providerType).toBe('openai-compatible');
+      expect(saved.baseUrl).toBe('https://llm.example.com/v1');
+      expect(saved.model).toBe('gpt-test-model');
+      expect(saved.apiKey).toBe('sk-test-123');
+      expect(saved.temperature).toBe(0.2);
+      expect(screen.getByText('Configured')).toBeInTheDocument();
     });
   });
 });

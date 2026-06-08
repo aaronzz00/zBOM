@@ -164,7 +164,7 @@ export const ToolingHub: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50">
+    <div className="relative flex-1 overflow-auto bg-slate-50">
       <div className="mx-auto max-w-7xl space-y-6 p-6">
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -310,7 +310,7 @@ export const ToolingHub: React.FC = () => {
       </div>
 
       {selectedTooling && selectedDesignMaster && (
-        <div className="absolute right-0 top-0 z-20 flex h-full w-[440px] flex-col border-l border-slate-200 bg-white shadow-2xl">
+        <div className="absolute right-0 top-0 z-20 flex h-full w-full max-w-[440px] flex-col border-l border-slate-200 bg-white shadow-2xl">
           <div className="flex items-start justify-between border-b border-slate-200 bg-slate-50 p-5">
             <div>
               <h2 className="text-lg font-bold text-slate-900">{selectedTooling.name}</h2>

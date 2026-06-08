@@ -288,8 +288,8 @@ describe('production core flows', () => {
     bomStore.updateBOMNode('root', { state: LifecycleState.Released });
     
     // Seed an existing draft ECO
-    const eco1 = bomStore.createECO('Draft ECO 1', 'Test eco 1', 'Admin', [], 'Low');
-    const eco2 = bomStore.createECO('Draft ECO 2', 'Test eco 2', 'Admin', [], 'Low');
+    const eco1 = await bomStore.createECO('Draft ECO 1', 'Test eco 1', 'Admin', [], 'Low');
+    const eco2 = await bomStore.createECO('Draft ECO 2', 'Test eco 2', 'Admin', [], 'Low');
     
     render(<BOMEditor />);
     
