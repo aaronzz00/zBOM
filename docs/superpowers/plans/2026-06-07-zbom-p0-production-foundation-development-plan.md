@@ -958,3 +958,59 @@ npm run build
    - **现状**：当前为 SQLite local 文件数据库开发。
    - **改进**：部署 PostgreSQL 环境，确认 Prisma Migration 机制在此环境中的引擎缺陷并修复。
 5. **ERP 同步逻辑**：实现真实的 ERP 写回和 Webhook 发布流程。
+
+---
+
+## 18. 2026-06-09 最终完成状态 (Final Completion Status)
+
+所有已承诺的开发任务均已验证完成并 commit。
+
+### 18.1 最终验证基线
+
+```bash
+npm run test:api
+# 12 files / 48 tests passed
+
+npx vitest run --reporter=verbose
+# 25 files / 193 tests passed
+
+npm run build
+# passed (built in ~2.7s)
+```
+
+### 18.2 已完成交付物总结
+
+**后端 API（server/）**
+- `server/routes/bom.ts` — import-preview / import-commit 事务端点
+- `server/routes/attachments.ts` — 文件上传/下载/link/unlink 完整路由
+- `server/routes/projects.ts` — 项目 CRUD + phase transition
+- `server/routes/audit.ts` — 分页审计日志查询
+- `server/routes/ai.ts` — AI provider 配置 + chat proxy
+- `server/routes/ecos.ts` — ECO 流程路由
+- `server/routes/workspace.ts` — Workspace 配置管理
+
+**数据库与 Schema**
+- `server/db/schema.prisma` — PostgreSQL provider + Attachment model
+- `docker-compose.yml` — 本地 PostgreSQL 容器
+
+**前端集成**
+- `services/backendApi.ts` — 全量 API client（BOM / Parts / Tooling / Audit / AI / Attachments / Import）
+- `stores/useBOMStore.ts` — CSV import preview/commit + attachment upload/delete 已接 API
+- `pages/BOMEditor.tsx` — 导入预览确认弹窗 + 附件 UI 已接 API
+
+**部署基础设施**
+- `Dockerfile.prod` — 三阶段多目标生产构建
+- `nginx.conf` — SPA fallback + /api/ 反代 + /uploads/ 静态
+- `docker-compose.prod.yml` — db + api + web 三服务编排（含 healthcheck）
+- `.env.prod.example` — 环境变量模板（含安全生成指引）
+- `deploy-qcloud.sh` — 腾讯云 CVM 一键部署脚本（7步 SSH 流程）
+- `start-local.sh` — 本地一键启动脚本（Docker/SQLite 自动检测）
+
+### 18.3 当前遗留项（下阶段任务）
+
+以下项目在本阶段明确标注为 "next phase"，不在当前 P0 范围内：
+
+1. **正式 SSO/OIDC 认证接入**：当前仍为 dev-login mock 机制
+2. **ERP 同步逻辑**：真实写回和 Webhook 发布流程
+3. **API mode 浏览器 QA 截图证据**：需 dev server 环境权限恢复后补充
+4. **Prisma migrate dev 引擎缺陷修复**：当前使用 SQL file 手动 migrate 绕过
