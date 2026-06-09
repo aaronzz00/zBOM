@@ -1,0 +1,34 @@
+# --- Stage 1: Build Vite Frontend ---
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+# Set VITE_API_BASE_URL to empty to let the client make relative requests to same origin
+ENV VITE_API_BASE_URL=""
+RUN npm run build
+
+# --- Stage 2: Prepare Backend API Server ---
+FROM node:20-alpine AS backend-runner
+WORKDIR /app
+
+# Install system dependencies needed for Node packages or database checks
+RUN apk add --no-cache curl netcat-openbsd
+
+COPY package*.json ./
+RUN npm ci --omit=dev && npm install -g tsx prisma
+
+COPY . .
+# Generate prisma client inside runner
+RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" npx prisma generate --schema server/db/schema.prisma
+
+# Expose Fastify port
+EXPOSE 3001
+
+CMD ["npx", "tsx", "server/index.ts"]
+
+# --- Stage 3: Nginx Web Server ---
+FROM nginx:alpine AS nginx-web
+COPY --from=frontend-builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80

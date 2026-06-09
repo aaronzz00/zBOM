@@ -1,0 +1,96 @@
+# docker-compose.prod.yml — Production Stack for Tencent Cloud
+# Usage: docker compose -f docker-compose.prod.yml up -d
+# Prerequisites: Create .env.prod from .env.prod.example before running
+
+version: '3.8'
+
+services:
+  # ─────────────────────────────────────────────
+  # PostgreSQL — Persistent Production Database
+  # ─────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: zbom-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-zbom}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-zbom}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - zbom-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zbom} -d ${POSTGRES_DB:-zbom}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─────────────────────────────────────────────
+  # API — Fastify Backend Server
+  # ─────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: backend-runner
+    container_name: zbom-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-zbom}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-zbom}
+      SESSION_SECRET: ${SESSION_SECRET}
+      AI_CREDENTIAL_ENCRYPTION_KEY: ${AI_CREDENTIAL_ENCRYPTION_KEY}
+      PORT: 3001
+    volumes:
+      # Shared uploads directory (attachments / object store)
+      - uploads:/app/uploads
+    networks:
+      - zbom-net
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/api/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ─────────────────────────────────────────────
+  # Web — Nginx + Vite Static Assets
+  # ─────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: nginx-web
+    container_name: zbom-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
+    volumes:
+      # Share uploads volume so Nginx can serve /uploads/ directly
+      - uploads:/app/uploads:ro
+    networks:
+      - zbom-net
+    depends_on:
+      api:
+        condition: service_healthy
+
+# ─────────────────────────────────────────────
+# Named Volumes
+# ─────────────────────────────────────────────
+volumes:
+  pgdata:
+    driver: local
+  uploads:
+    driver: local
+
+# ─────────────────────────────────────────────
+# Private Bridge Network
+# ─────────────────────────────────────────────
+networks:
+  zbom-net:
+    driver: bridge

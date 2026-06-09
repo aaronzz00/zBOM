@@ -29,3 +29,11 @@ server/db/*.db-wal
 *.sw?
 .agent/*
 .zbom.lark.json
+
+# Production environment secrets — NEVER commit
+.env.prod
+.env.*.local
+
+# User uploads (persisted via Docker volume)
+uploads/*
+!uploads/.gitkeep
