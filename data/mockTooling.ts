@@ -29,27 +29,26 @@ export const mockTooling: Tooling[] = [
         id: 'tooling-zp-a-cover-injection',
         projectId: 'project-zphone-2026',
         designMasterPartId: 'dmp-zp-a-enclosure-cover',
+        toolingNumber: 'TL-INJ-001',
         name: 'Enclosure Cover Injection Mold',
+        type: 'injection-mold',
+        status: 'approved',
         supplier: 'Shenzhen Precision Mold Co.',
-        cavityCount: 2,
+        cavityCount: '2',
+        owner: 'Mia Chen',
+        leadTimeDays: 21,
         milestones: [
             {
                 key: 'drawingRelease',
-                plannedDate: '2026-01-12',
                 status: 'done',
-                actualDate: '2026-01-13',
             },
             {
                 key: 'dfm',
-                plannedDate: '2026-01-20',
                 status: 'done',
-                actualDate: '2026-01-22',
             },
             {
                 key: 'quotation',
-                plannedDate: '2026-01-28',
                 status: 'done',
-                actualDate: '2026-01-30',
             },
             {
                 key: 'kickoff',
@@ -59,7 +58,6 @@ export const mockTooling: Tooling[] = [
             },
             {
                 key: 't1',
-                plannedDate: '2026-03-01',
                 status: 'done',
                 actualDate: '2026-03-03',
             },
@@ -69,23 +67,25 @@ export const mockTooling: Tooling[] = [
         id: 'tooling-zp-a-pro-camera-deco',
         projectId: 'project-zphone-2026',
         designMasterPartId: 'dmp-zp-a-pro-camera-deco',
+        toolingNumber: 'TL-STP-001',
         name: 'Pro Camera Decoration Ring Die',
+        type: 'stamping-die',
+        status: 'in-progress',
         supplier: 'Suzhou Micro Die Works',
-        cavityCount: 4,
+        cavityCount: '4',
+        owner: 'Leo Wang',
+        leadTimeDays: 30,
         milestones: [
             {
                 key: 'drawingRelease',
-                plannedDate: '2026-01-18',
                 status: 'done',
             },
             {
                 key: 'dfm',
-                plannedDate: '2026-01-26',
                 status: 'done',
             },
             {
                 key: 'quotation',
-                plannedDate: '2026-02-02',
                 status: 'done',
             },
             {
@@ -104,22 +104,25 @@ export const mockTooling: Tooling[] = [
         id: 'tooling-zp-a-cover-color-gauge',
         projectId: 'project-zphone-2026',
         designMasterPartId: 'dmp-zp-a-enclosure-cover',
+        toolingNumber: 'TL-GAU-001',
         name: 'Enclosure Cover Color Gauge',
+        type: 'gauge',
+        status: 'pending',
         supplier: 'Dongguan Appearance Fixtures',
+        owner: 'Priya Nair',
+        leadTimeDays: 14,
         milestones: [
             {
                 key: 'drawingRelease',
-                plannedDate: '2026-02-05',
                 status: 'done',
             },
             {
                 key: 'dfm',
-                plannedDate: '2026-02-12',
-                status: 'in-progress',
+                status: 'blocked',
+                blockerReason: 'Color limit samples not signed off.',
             },
             {
                 key: 'quotation',
-                plannedDate: '2026-02-19',
                 status: 'not-started',
             },
             {

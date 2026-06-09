@@ -3,6 +3,7 @@ import type {
   ApiPart,
   ApiProject,
   ApiToolingRecord,
+  ApiToolingRecordMutationResponse,
   ApiToolingResponse,
   ApiToolingMilestone,
   ApiECO,
@@ -10,7 +11,16 @@ import type {
 import type { ApiAuditEvent, ApiWorkspaceSettings } from '../shared/apiTypes';
 export type { ApiAuditEvent, ApiWorkspaceSettings };
 import { ComponentType, LifecycleState, type BOMNode, type LibraryPart, type Project, type UserRole, type ECO } from '../types';
-import type { DesignMasterPart, Tooling, ToolingMilestone, ToolingMilestoneKey } from '../domain/toolingTypes';
+import {
+  TOOLING_CATEGORIES,
+  TOOLING_STATUSES,
+  type DesignMasterPart,
+  type Tooling,
+  type ToolingCategory,
+  type ToolingMilestone,
+  type ToolingMilestoneKey,
+  type ToolingStatus,
+} from '../domain/toolingTypes';
 
 interface ProjectsResponse {
   projects: ApiProject[];
@@ -171,7 +181,7 @@ const toLibraryPart = (part: ApiPart): LibraryPart => ({
   mpn: part.mpn ?? 'N/A',
   manufacturer: part.manufacturer ?? 'Unassigned',
   description: part.description ?? part.name,
-  category: part.type,
+  category: part.type === 'Part' ? 'Mechanical' : part.type,
   state: toLifecycleState(part.lifecycleState),
   location: 'API',
   type: toComponentType(part.type),
@@ -197,6 +207,16 @@ const toMilestoneStatus = (value: string): ToolingMilestone['status'] => {
   return 'not-started';
 };
 
+const toToolingCategory = (value: string | undefined): ToolingCategory => {
+  return TOOLING_CATEGORIES.includes(value as ToolingCategory) ? value as ToolingCategory : 'other';
+};
+
+const toToolingStatus = (value: string | undefined): ToolingStatus => {
+  if (!value) return 'pending';
+  const normalized = value.toLowerCase().replace(/_/g, '-');
+  return TOOLING_STATUSES.includes(normalized as ToolingStatus) ? normalized as ToolingStatus : 'pending';
+};
+
 const toToolingMilestone = (record: ApiToolingRecord['milestones'][number]): ToolingMilestone => ({
   id: record.id,
   key: toMilestoneKey(record.key),
@@ -212,10 +232,14 @@ const toToolingRecord = (record: ApiToolingRecord): Tooling => ({
   id: record.id,
   projectId: record.projectId,
   designMasterPartId: record.designMasterId,
+  toolingNumber: record.toolingNumber ?? '',
   name: record.name,
+  type: toToolingCategory(record.type),
+  status: toToolingStatus(record.status),
   supplier: record.supplier ?? undefined,
   cavityCount: record.cavityCount ?? undefined,
   owner: record.owner ?? undefined,
+  leadTimeDays: record.leadTimeDays ?? undefined,
   milestones: record.milestones.map(toToolingMilestone),
 });
 
@@ -292,15 +316,19 @@ export const loadBackendWorkspace = async (
     projects,
     bomData: toBOMNode(root),
     libraryParts: partsResponse.parts.map(toLibraryPart),
-    designMasterParts: toolingResponse.designMasters.map((designMaster) => ({
-      id: designMaster.id,
-      projectId: designMaster.projectId,
-      structureId: designMaster.id,
-      code: designMaster.code,
-      name: designMaster.name,
-      concretePartNumbers: designMaster.concreteParts.map((part) => part.partNumber),
-    })),
-    tooling: toolingResponse.toolingRecords.map(toToolingRecord),
+    designMasterParts: toolingResponse.designMasters
+      .filter((designMaster) => designMaster.projectId === activeProject.id)
+      .map((designMaster) => ({
+        id: designMaster.id,
+        projectId: designMaster.projectId,
+        structureId: designMaster.id,
+        code: designMaster.code,
+        name: designMaster.name,
+        concretePartNumbers: designMaster.concreteParts.map((part) => part.partNumber),
+      })),
+    tooling: toolingResponse.toolingRecords
+      .filter((record) => record.projectId === activeProject.id)
+      .map(toToolingRecord),
     settings: mappedSettings,
     ecos: mappedEcos,
   };
@@ -368,6 +396,44 @@ export const updateBackendBOMNode = async (
     method: 'PATCH',
     body: JSON.stringify(updates),
   });
+};
+
+export const createBackendTooling = async (
+  tooling: {
+    projectId?: string;
+    designMasterPartId: string;
+    name: string;
+    type: ToolingCategory;
+    leadTimeDays?: number;
+    supplier?: string | null;
+    cavityCount?: string | null;
+    owner?: string | null;
+  }
+): Promise<Tooling> => {
+  const response = await apiFetch<ApiToolingRecordMutationResponse>('/api/tooling', {
+    method: 'POST',
+    body: JSON.stringify(tooling),
+  });
+  return toToolingRecord(response.toolingRecord);
+};
+
+export const updateBackendTooling = async (
+  toolingId: string,
+  updates: {
+    name?: string;
+    type?: ToolingCategory;
+    status?: ToolingStatus;
+    leadTimeDays?: number | null;
+    supplier?: string | null;
+    cavityCount?: string | null;
+    owner?: string | null;
+  }
+): Promise<Tooling> => {
+  const response = await apiFetch<ApiToolingRecordMutationResponse>(`/api/tooling/${toolingId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+  return toToolingRecord(response.toolingRecord);
 };
 
 export const deleteBackendBOMNode = async (projectId: string, nodeId: string): Promise<void> => {
@@ -650,5 +716,3 @@ export const deleteBackendAttachment = async (id: string): Promise<void> => {
     method: 'DELETE',
   });
 };
-
-

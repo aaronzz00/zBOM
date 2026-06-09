@@ -270,9 +270,14 @@ const seedTooling = async () => {
         workspaceId: WORKSPACE_ID,
         projectId: PROJECT_ID,
         designMasterId: tooling.designMasterPartId,
+        toolingNumber: tooling.toolingNumber,
         name: tooling.name,
+        type: tooling.type,
+        status: tooling.status,
         supplier: tooling.supplier,
+        owner: tooling.owner,
         cavityCount: tooling.cavityCount,
+        leadTimeDays: tooling.leadTimeDays,
         milestones: {
           create: tooling.milestones.map((milestone) => ({
             id: `${tooling.id}-${milestone.key}`,

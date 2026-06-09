@@ -79,11 +79,19 @@ export interface ApiToolingRecord {
   id: string;
   projectId: string;
   designMasterId: string;
+  toolingNumber: string;
   name: string;
+  type: string;
+  status: string;
   supplier?: string | null;
   owner?: string | null;
-  cavityCount?: number | null;
+  cavityCount?: string | null;
+  leadTimeDays?: number | null;
   milestones: ApiToolingMilestone[];
+}
+
+export interface ApiToolingRecordMutationResponse {
+  toolingRecord: ApiToolingRecord;
 }
 
 export interface ApiECOImpact {
@@ -137,4 +145,3 @@ export interface ApiAuditEvent {
   afterJson?: string | null;
   createdAt: string;
 }
-

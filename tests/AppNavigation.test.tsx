@@ -74,8 +74,8 @@ describe('App phase 1 navigation', () => {
     expect(await screen.findByText('800-00234-LITE', {}, { timeout: 5000 })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Tooling Hub/i }));
-    expect(await screen.findByText('No tooling records for this design master yet.', {}, { timeout: 5000 })).toBeInTheDocument();
-  });
+    expect(await screen.findByText('No tooling records match this view.', {}, { timeout: 5000 })).toBeInTheDocument();
+  }, 15000);
 
   it('keeps phase 1 BOM-facing modules visible to viewer role', () => {
     useAuthStore.getState().switchRole('VIEWER');

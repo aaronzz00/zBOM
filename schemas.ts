@@ -71,7 +71,7 @@ export const BOMNodeSchema: z.ZodType<any> = z.lazy(() => z.object({
     avl: z.array(AVLEntrySchema).optional(),
 
     // P1: Data Flexibility
-    customAttributes: z.record(z.any()).optional(),
+    customAttributes: z.record(z.string(), z.any()).optional(),
     attachments: z.array(AttachmentSchema).optional(),
 
     children: z.array(BOMNodeSchema).optional(),

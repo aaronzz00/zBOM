@@ -35,12 +35,24 @@ describe('OpenAI-compatible AI provider service', () => {
   });
 
   it('calls the configured OpenAI-compatible chat completions endpoint', async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => ({
       ok: true,
       status: 200,
       json: async () => ({
         choices: [{ message: { content: 'Risk analysis complete.' } }],
       }),
+      headers: new Headers(),
+      redirected: false,
+      statusText: 'OK',
+      type: 'basic' as ResponseType,
+      url: '',
+      clone: () => ({} as Response),
+      body: null,
+      bodyUsed: false,
+      arrayBuffer: async () => new ArrayBuffer(0),
+      blob: async () => new Blob(),
+      formData: async () => new FormData(),
+      text: async () => '',
     }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -67,7 +79,7 @@ describe('OpenAI-compatible AI provider service', () => {
       })
     );
 
-    const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const requestBody = JSON.parse(fetchMock.mock.calls[0][1]!.body as string);
     expect(requestBody).toMatchObject({
       model: 'gpt-test-model',
       temperature: 0.2,

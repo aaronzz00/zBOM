@@ -7,9 +7,10 @@ import type {
   Supplier,
   UserRole,
 } from '../types';
-import type { ToolingMilestoneKey } from './toolingTypes';
+import type { ToolingCategory, ToolingMilestoneKey, ToolingStatus } from './toolingTypes';
 
 export type CoreEntityType =
+  | 'project'
   | 'part'
   | 'part-revision'
   | 'bom'
@@ -171,10 +172,14 @@ export interface ToolingRecord {
   id: string;
   projectId: string;
   designMasterPartId: string;
+  toolingNumber: string;
   name: string;
+  type: ToolingCategory;
+  status: ToolingStatus;
   supplier?: string;
-  cavityCount?: number;
+  cavityCount?: string;
   owner?: string;
+  leadTimeDays?: number;
   milestones: CoreToolingMilestone[];
   updatedAt: string;
 }
@@ -284,11 +289,15 @@ export interface CreateDesignMasterPartInput {
 }
 
 export interface CreateToolingRecordInput {
+  id?: string;
   projectId: string;
   designMasterPartId: string;
   name: string;
+  type: ToolingCategory;
+  status?: ToolingStatus;
   supplier?: string;
-  cavityCount?: number;
+  cavityCount?: string;
   owner?: string;
+  leadTimeDays?: number;
   milestones?: CoreToolingMilestone[];
 }

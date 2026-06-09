@@ -78,15 +78,20 @@ export const BOMTable: React.FC<BOMTableProps> = ({
     const viewStore = useViewStore();
     const isColumnVisible = enableColumnControls ? viewStore.isColumnVisible : () => true;
     const toggleColumn = enableColumnControls ? viewStore.toggleColumn : () => {};
-    const collapseExpandedIds = initialExpandedIds ?? ['root'];
+    const defaultExpandedIds = useMemo(() => initialExpandedIds ?? [data.id, 'n1', 'n2', 'n2-3'], [data.id, initialExpandedIds]);
+    const collapseExpandedIds = defaultExpandedIds;
     const [expandedIds, setExpandedIds] = React.useState<Set<string>>(
-        () => new Set(initialExpandedIds ?? ['root', 'n1', 'n2', 'n2-3'])
+        () => new Set(defaultExpandedIds)
     );
     const parentRef = useRef<HTMLDivElement>(null);
     const [whereUsedPart, setWhereUsedPart] = useState<string | null>(null);
     const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
 
     const canViewCost = hasPermission(Permission.VIEW_COST);
+
+    useEffect(() => {
+        setExpandedIds(new Set(defaultExpandedIds));
+    }, [defaultExpandedIds]);
 
     useEffect(() => {
         if (!isColumnMenuOpen) {

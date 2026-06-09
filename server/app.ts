@@ -36,6 +36,7 @@ export const buildApp = async (
   await app.register(cors, {
     origin: config.CORS_ORIGIN,
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   await app.register(cookie, {

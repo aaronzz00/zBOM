@@ -44,8 +44,16 @@ export const PartLibrary: React.FC = () => {
     if (enabledComponentTypes.includes(ComponentType.Material)) {
       categories.push('Material');
     }
+    
+    // Dynamically add any other category present in libraryParts
+    for (const part of libraryParts) {
+      if (part.category && enabledComponentTypes.includes(part.type) && !categories.includes(part.category)) {
+        categories.push(part.category);
+      }
+    }
+    
     return categories;
-  }, [enabledComponentTypes]);
+  }, [enabledComponentTypes, libraryParts]);
 
   const activeCategoriesWithoutAll = useMemo(() => {
     return activeCategories.filter(c => c !== 'All');

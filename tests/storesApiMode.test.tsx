@@ -29,6 +29,8 @@ const mockPart: LibraryPart = {
   cost: 1.5,
   stock: 10,
   minStock: 5,
+  mpn: 'N/A',
+  manufacturer: 'N/A',
 };
 
 describe('Zustand stores in API Mode', () => {
@@ -62,7 +64,10 @@ describe('Zustand stores in API Mode', () => {
           id: 'tool-456',
           projectId: 'proj-123',
           designMasterPartId: 'dm-123',
+          toolingNumber: 'TL-INJ-001',
           name: 'Tool 1',
+          type: 'injection-mold',
+          status: 'pending',
           milestones: [
             {
               id: 'ms-789',
@@ -335,6 +340,8 @@ describe('Zustand stores in API Mode', () => {
       cost: 4.0,
       stock: 0,
       minStock: 0,
+      mpn: 'N/A',
+      manufacturer: 'N/A',
     };
 
     await useBOMStore.getState().addLibraryPart(partToAdd);

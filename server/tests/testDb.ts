@@ -15,12 +15,24 @@ export interface TestDatabase {
 }
 
 const applyMigration = async (db: PrismaClient) => {
-  const sql = readFileSync(migrationPath, 'utf8');
+  const sql = readFileSync(migrationPath, 'utf8').replace('"cavityCount" INTEGER', '"cavityCount" TEXT');
   const statements = sql
     .split(';')
     .map((statement) => statement.trim())
     .filter(Boolean);
 
+  statements.push(`
+    ALTER TABLE "ToolingRecord" ADD COLUMN "toolingNumber" TEXT NOT NULL DEFAULT ''
+  `);
+  statements.push(`
+    ALTER TABLE "ToolingRecord" ADD COLUMN "type" TEXT NOT NULL DEFAULT 'injection-mold'
+  `);
+  statements.push(`
+    ALTER TABLE "ToolingRecord" ADD COLUMN "status" TEXT NOT NULL DEFAULT 'pending'
+  `);
+  statements.push(`
+    ALTER TABLE "ToolingRecord" ADD COLUMN "leadTimeDays" INTEGER
+  `);
   statements.push(`
     CREATE TABLE IF NOT EXISTS "Attachment" (
         "id" TEXT NOT NULL PRIMARY KEY,
@@ -206,9 +218,14 @@ const seedCoreData = async (db: PrismaClient) => {
       workspaceId: 'workspace-test',
       projectId: 'project-test',
       designMasterId: 'dmp-cover',
+      toolingNumber: 'TL-INJ-001',
       name: 'Cover Injection Mold',
+      type: 'injection-mold',
+      status: 'in-progress',
       supplier: 'Precision Mold Co.',
-      cavityCount: 2,
+      owner: 'Tooling PM',
+      cavityCount: '2',
+      leadTimeDays: 28,
       milestones: {
         create: [
           {

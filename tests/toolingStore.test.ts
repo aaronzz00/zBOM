@@ -78,9 +78,12 @@ describe('useToolingStore', () => {
             id: 'tooling-owner-preserved',
             projectId: 'project-zphone-2026',
             designMasterPartId: multiPartDesignMasterPartId,
+            toolingNumber: 'TL-INJ-999',
             name: 'Owner Preserved Tool',
+            type: 'injection-mold',
+            status: 'pending',
             supplier: 'Demo Toolmaker',
-            cavityCount: 2,
+            cavityCount: '2',
             owner: 'Nina Tooling',
             milestones: [{ key: 'kickoff', status: 'not-started', owner: 'Nina Tooling' }],
         });
@@ -110,7 +113,7 @@ describe('useToolingStore', () => {
 
         expect(useToolingStore.getState().tooling).toHaveLength(initialToolingCount);
         expect(tooling?.milestones).toHaveLength(initialMilestoneCount);
-        expect(tooling?.milestones.some((milestone) => milestone.key === 'not-a-milestone')).toBe(false);
+        expect(tooling?.milestones.some((milestone) => (milestone.key as string) === 'not-a-milestone')).toBe(false);
     });
 
     it('returns Kickoff to T1 lead time days using actual dates when present', () => {

@@ -5,7 +5,7 @@ import { BOMNode, ComponentType, LifecycleState } from '../types';
 // Helper
 const node = (id: string, type: ComponentType, cost: number, quantity: number = 1, children: BOMNode[] = []): BOMNode => ({
     id, partNumber: id, name: id, revision: 'A', state: LifecycleState.Draft,
-    type, cost, quantity, unit: 'EA', children, weightG: 0
+    type, cost, quantity, unit: 'EA', currency: 'USD', children, weightG: 0
 });
 
 describe('FormulaEngine', () => {

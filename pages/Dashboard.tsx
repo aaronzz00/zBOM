@@ -1,9 +1,10 @@
 import React from 'react';
 import { useAppStore } from '../context/AppContext'; 
 import { useAuth } from '../context/AuthContext';
+import { useToolingStore } from '../stores/useToolingStore';
 import { Permission } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, Clock, AlertTriangle, CheckCircle, Lock } from 'lucide-react';
+import { DollarSign, Clock, AlertTriangle, CheckCircle, Lock, Hammer } from 'lucide-react';
 
 const costData = [
   { name: 'Display', value: 45 },
@@ -19,9 +20,22 @@ const CHART_INITIAL_DIMENSION = { width: 640, height: 256 };
 
 export const Dashboard: React.FC = () => {
   const { project } = useAppStore();
+  const { tooling, getT1PlannedDate } = useToolingStore();
   const { hasPermission } = useAuth();
   
   const canViewCost = hasPermission(Permission.VIEW_COST);
+  const completedTooling = tooling.filter((record) => record.status === 'approved' || record.status === 'approved-next-build').length;
+  const toolingPercent = tooling.length ? Math.round((completedTooling / tooling.length) * 100) : 0;
+  const blockedTooling = tooling.filter((record) => record.milestones.some((milestone) => milestone.status === 'blocked')).length;
+  const today = new Date().toISOString().slice(0, 10);
+  const delayedTooling = tooling.filter((record) => {
+    if (record.status === 'approved' || record.status === 'approved-next-build') return false;
+    const t1Planned = getT1PlannedDate(record.id);
+    return Boolean(t1Planned && t1Planned < today);
+  }).length;
+  const openToolingHub = () => {
+    window.dispatchEvent(new CustomEvent('zbom:navigate', { detail: { page: 'tooling' } }));
+  };
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 xl:p-8">
@@ -31,7 +45,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
         {/* Cost Card - Protected */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between relative overflow-hidden">
           <div>
@@ -87,6 +101,23 @@ export const Dashboard: React.FC = () => {
             <CheckCircle className="w-6 h-6" />
           </div>
         </div>
+
+        <button type="button" onClick={openToolingHub} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-left hover:border-blue-300 hover:bg-blue-50/40">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500 mb-1">Tooling Progress</p>
+              <h3 className="text-2xl font-bold text-slate-800">{toolingPercent}%</h3>
+              <span className="text-xs text-slate-500 mt-2 block">{blockedTooling} blocked | {delayedTooling} delayed</span>
+            </div>
+            <div className="p-3 bg-cyan-50 rounded-lg text-cyan-600">
+              <Hammer className="w-6 h-6" />
+            </div>
+          </div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full rounded-full bg-cyan-500" style={{ width: `${toolingPercent}%` }} />
+          </div>
+          <div className="mt-2 text-xs font-medium text-slate-500">{completedTooling} / {tooling.length} complete</div>
+        </button>
       </div>
 
       {/* Charts Section */}

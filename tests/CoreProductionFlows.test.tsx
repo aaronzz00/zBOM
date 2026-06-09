@@ -203,11 +203,8 @@ describe('production core flows', () => {
     fireEvent.change(screen.getAllByLabelText('DFM status')[0], {
       target: { value: 'blocked' },
     });
-    fireEvent.change(screen.getAllByLabelText('DFM planned date')[0], {
+    fireEvent.change(screen.getAllByLabelText('Kickoff planned date')[0], {
       target: { value: '2026-02-10' },
-    });
-    fireEvent.change(screen.getAllByLabelText('DFM owner')[0], {
-      target: { value: 'Nina Tooling' },
     });
     fireEvent.change(screen.getAllByLabelText('DFM blocker reason')[0], {
       target: { value: 'Waiting for DFM package' },

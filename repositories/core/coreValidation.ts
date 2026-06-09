@@ -5,8 +5,11 @@ import type {
   CoreWorkspace,
   CreateBOMNodeInput,
   CreatePartInput,
+  CreateToolingRecordInput,
+  ToolingRecord,
 } from '../../domain/coreTypes';
 import { CoreRepositoryError } from '../../domain/coreTypes';
+import { TOOLING_CATEGORIES, TOOLING_STATUSES } from '../../domain/toolingTypes';
 import type { PricingTier } from '../../types';
 
 const normalizePartNumber = (partNumber: string) => partNumber.trim().toUpperCase();
@@ -123,5 +126,44 @@ export function validateMilestone(updates: Partial<CoreToolingMilestone>) {
   }
   if (updates.status === 'blocked' && !updates.blockerReason && updates.blockerReason !== undefined) {
     throw new CoreRepositoryError('VALIDATION', 'Blocked milestones require a blocker reason.');
+  }
+}
+
+export function validateToolingRecordInput(input: CreateToolingRecordInput) {
+  if (!input.designMasterPartId.trim()) {
+    throw new CoreRepositoryError('VALIDATION', 'Design-master part is required.');
+  }
+  if (!input.name.trim()) {
+    throw new CoreRepositoryError('VALIDATION', 'Tooling name is required.');
+  }
+  if (!TOOLING_CATEGORIES.includes(input.type)) {
+    throw new CoreRepositoryError('VALIDATION', 'Invalid tooling type.', { type: input.type });
+  }
+  if (input.status !== undefined && !TOOLING_STATUSES.includes(input.status)) {
+    throw new CoreRepositoryError('VALIDATION', 'Invalid tooling status.', { status: input.status });
+  }
+  if (input.cavityCount !== undefined && !input.cavityCount.trim()) {
+    throw new CoreRepositoryError('VALIDATION', 'Cavity count cannot be empty.', { cavityCount: input.cavityCount });
+  }
+  if (input.leadTimeDays !== undefined && (!Number.isFinite(input.leadTimeDays) || input.leadTimeDays <= 0)) {
+    throw new CoreRepositoryError('VALIDATION', 'Lead time must be greater than zero days.', { leadTimeDays: input.leadTimeDays });
+  }
+}
+
+export function validateToolingRecordUpdates(updates: Partial<ToolingRecord>) {
+  if (updates.name !== undefined && !updates.name.trim()) {
+    throw new CoreRepositoryError('VALIDATION', 'Tooling name is required.');
+  }
+  if (updates.type !== undefined && !TOOLING_CATEGORIES.includes(updates.type)) {
+    throw new CoreRepositoryError('VALIDATION', 'Invalid tooling type.', { type: updates.type });
+  }
+  if (updates.status !== undefined && !TOOLING_STATUSES.includes(updates.status)) {
+    throw new CoreRepositoryError('VALIDATION', 'Invalid tooling status.', { status: updates.status });
+  }
+  if (updates.cavityCount !== undefined && !updates.cavityCount.trim()) {
+    throw new CoreRepositoryError('VALIDATION', 'Cavity count cannot be empty.', { cavityCount: updates.cavityCount });
+  }
+  if (updates.leadTimeDays !== undefined && (!Number.isFinite(updates.leadTimeDays) || updates.leadTimeDays <= 0)) {
+    throw new CoreRepositoryError('VALIDATION', 'Lead time must be greater than zero days.', { leadTimeDays: updates.leadTimeDays });
   }
 }

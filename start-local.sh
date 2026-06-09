@@ -11,6 +11,38 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}🚀 Starting zBOM Local Environment...${NC}"
 
+POSTGRES_DATABASE_URL="${POSTGRES_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/zbom?schema=public}"
+SQLITE_DATABASE_URL="file://$(pwd)/server/db/dev.db"
+export SESSION_SECRET="${SESSION_SECRET:-dev-session-secret-for-local-dev}"
+
+has_workspace_data() {
+  node --input-type=module -e 'import { PrismaClient } from "@prisma/client"; const prisma = new PrismaClient(); try { const count = await prisma.workspace.count(); process.exit(count > 0 ? 0 : 1); } catch { process.exit(1); } finally { await prisma.$disconnect(); }'
+}
+
+configure_prisma() {
+  local provider="$1"
+  node scripts/switch-db-provider.js "$provider"
+  npx prisma generate --schema server/db/schema.prisma
+}
+
+sync_schema() {
+  npx prisma db push --schema server/db/schema.prisma
+}
+
+seed_if_empty() {
+  if has_workspace_data; then
+    echo -e "${GREEN}✅ Existing workspace data found. Skipping seed to preserve imported data.${NC}"
+  else
+    echo -e "${YELLOW}🌱 No workspace data found. Seeding demo data once...${NC}"
+    npx tsx server/db/seed.ts
+  fi
+}
+
+backfill_tooling_numbers() {
+  echo -e "${YELLOW}🔢 Checking tooling numbers...${NC}"
+  node scripts/backfill-tooling-numbers.mjs
+}
+
 # 1. Verify node_modules
 if [ ! -d "node_modules" ]; then
   echo -e "${YELLOW}📦 node_modules not found. Running npm install...${NC}"
@@ -27,6 +59,7 @@ fi
 
 if [ "$DOCKER_RUNNING" = true ]; then
   echo -e "${GREEN}🐳 Docker daemon detected. Setting up PostgreSQL...${NC}"
+  export DATABASE_URL="$POSTGRES_DATABASE_URL"
   
   # Start postgres container
   docker-compose up -d
@@ -40,30 +73,28 @@ if [ "$DOCKER_RUNNING" = true ]; then
 
   # Configure DB provider to PostgreSQL
   echo -e "${YELLOW}🔄 Configuring Prisma to use PostgreSQL datasource...${NC}"
-  npm run db:use-postgres
+  configure_prisma postgresql
 
-  # Push schemas and seed data
-  echo -e "${YELLOW}⚙️ Syncing database schema to PostgreSQL and seeding...${NC}"
-  npx prisma db push --accept-data-loss
-  npm run prisma:seed
+  # Sync schema without reseeding existing data.
+  echo -e "${YELLOW}⚙️ Syncing database schema to PostgreSQL...${NC}"
+  sync_schema
+  seed_if_empty
+  backfill_tooling_numbers
   echo -e "${GREEN}✅ PostgreSQL setup complete.${NC}"
 else
   echo -e "${YELLOW}⚠️ Docker is not running or not installed. Falling back to local SQLite...${NC}"
+  export DATABASE_URL="$SQLITE_DATABASE_URL"
   
   # Configure DB provider to SQLite
   echo -e "${YELLOW}🔄 Configuring Prisma to use SQLite datasource...${NC}"
-  npm run db:use-sqlite
+  configure_prisma sqlite
 
-  # Seed SQLite database if not already present
-  if [ ! -f "server/db/dev.db" ]; then
-    echo -e "${YELLOW}⚙️ Initializing local SQLite database (dev.db) and seeding...${NC}"
-    # Touch file to ensure folder exists
-    mkdir -p server/db
-    npm run prisma:apply
-    npm run prisma:seed
-  else
-    echo -e "${GREEN}✅ Existing SQLite database found.${NC}"
-  fi
+  # Create/sync SQLite schema and seed only when the workspace is empty.
+  mkdir -p server/db
+  echo -e "${YELLOW}⚙️ Syncing local SQLite database schema...${NC}"
+  sync_schema
+  seed_if_empty
+  backfill_tooling_numbers
   echo -e "${GREEN}✅ SQLite fallback setup complete.${NC}"
 fi
 
@@ -80,14 +111,14 @@ trap cleanup INT TERM
 
 # Start Fastify backend server in background
 echo -e "${YELLOW}🖥️ Starting Fastify API Server (http://localhost:3001)...${NC}"
-VITE_API_BASE_URL=http://localhost:3001 npm run dev:api &
+DATABASE_URL="$DATABASE_URL" SESSION_SECRET="$SESSION_SECRET" npm run dev:api &
 BACKEND_PID=$!
 
 # Wait briefly for backend to start up
-sleep 1.5
+sleep 2
 
 # Start Vite frontend dev server in background
-echo -e "${YELLOW}💻 Starting Vite Web Application (http://localhost:5173)...${NC}"
+echo -e "${YELLOW}💻 Starting Vite Web Application (http://localhost:3000)...${NC}"
 VITE_API_BASE_URL=http://localhost:3001 npm run dev &
 FRONTEND_PID=$!
 

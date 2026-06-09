@@ -25,12 +25,19 @@ import { createSeedCoreWorkspace } from './coreSeed';
 import { assertCanUpdatePartFields, requireCorePermission, SYSTEM_ACTOR } from './corePolicy';
 import {
   assertUniquePartNumber,
+  validateToolingRecordInput,
+  validateToolingRecordUpdates,
   validateBOMNodeUpdates,
   validateCreateBOMNodeInput,
   validateMilestone,
   validatePartInput,
   validatePartUpdates,
 } from './coreValidation';
+import {
+  createToolingNumber,
+  DEFAULT_TOOLING_MILESTONES,
+  type ToolingCategory,
+} from '../../domain/toolingTypes';
 
 export interface CoreStorage {
   read: () => CoreWorkspace | null;
@@ -85,6 +92,36 @@ const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').
 const createId = (prefix: string) => {
   const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return `${prefix}-${random}`;
+};
+
+const allocateToolingNumber = (
+  records: Array<Partial<Pick<ToolingRecord, 'type' | 'toolingNumber'>>>,
+  type: ToolingCategory,
+) => {
+  const prefix = createToolingNumber(type, 0).replace(/-000$/, '');
+  const maxSequence = records.reduce((max, record) => {
+    if (record.type !== type || !record.toolingNumber?.startsWith(`${prefix}-`)) {
+      return max;
+    }
+    const sequence = Number(record.toolingNumber.slice(prefix.length + 1));
+    return Number.isFinite(sequence) ? Math.max(max, sequence) : max;
+  }, 0);
+
+  return createToolingNumber(type, maxSequence + 1);
+};
+
+const normalizeToolingRecord = (
+  tooling: ToolingRecord,
+  peers: ToolingRecord[],
+): ToolingRecord => {
+  const type = tooling.type ?? 'injection-mold';
+  return {
+    ...tooling,
+    toolingNumber: tooling.toolingNumber || allocateToolingNumber(peers.filter((peer) => peer.id !== tooling.id), type),
+    type,
+    status: tooling.status ?? 'pending',
+    milestones: tooling.milestones?.length ? tooling.milestones : clone(DEFAULT_TOOLING_MILESTONES),
+  };
 };
 
 const partIdFor = (partNumber: string) => `part-${slug(partNumber)}`;
@@ -335,7 +372,10 @@ const toLegacyTooling = (workspace: CoreWorkspace): Tooling[] => {
   const activeProjectId = getActiveProjectId(workspace);
   return workspace.toolingRecords
     .filter((tooling) => tooling.projectId === activeProjectId)
-    .map(({ updatedAt, ...tooling }) => tooling);
+    .map((record) => {
+      const { updatedAt, ...tooling } = normalizeToolingRecord(record, workspace.toolingRecords);
+      return tooling;
+    });
 };
 
 export const toLegacyToolingState = (workspace: CoreWorkspace) => ({
@@ -373,6 +413,9 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
       projectId: activeProjectId,
       activeProjectId,
       projects,
+      toolingRecords: (source.toolingRecords ?? []).map((tooling) => (
+        normalizeToolingRecord(tooling, source.toolingRecords ?? [])
+      )),
     };
   };
 
@@ -479,7 +522,7 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
         bomNodes: [...workspace.bomNodes, rootNode],
       };
 
-      recordAudit(createAuditEvent('project', project.id, 'create', actor, `Created project ${project.name}.`, 'Admin Console'));
+      recordAudit(createAuditEvent('project', project.id, 'create', actor, `Created project ${project.name}.`, 'Core Repository'));
       persist();
       return clone(project);
     },
@@ -509,7 +552,7 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
         projects: workspace.projects.map((p) => p.id === projectId ? updatedProject : p)
       };
       
-      recordAudit(createAuditEvent('project', projectId, 'update', actor, `Updated project ${updatedProject.name}.`, 'Admin Console', updates));
+      recordAudit(createAuditEvent('project', projectId, 'update', actor, `Updated project ${updatedProject.name}.`, 'Core Repository', updates));
       persist();
       return clone(updatedProject);
     },
@@ -807,24 +850,24 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
 
     createToolingRecord(input, actor) {
       requireCorePermission(actor, Permission.MANAGE_TOOLING, 'create tooling records');
+      validateToolingRecordInput(input);
       if (!workspace.designMasterParts.some((part) => part.id === input.designMasterPartId)) {
         throw new CoreRepositoryError('NOT_FOUND', 'Design-master part was not found.', { designMasterPartId: input.designMasterPartId });
       }
+      const toolingNumber = allocateToolingNumber(workspace.toolingRecords, input.type);
       const tooling: ToolingRecord = {
-        id: createId('tooling'),
+        id: input.id ?? createId('tooling'),
         projectId: input.projectId,
         designMasterPartId: input.designMasterPartId,
+        toolingNumber,
         name: input.name,
+        type: input.type,
+        status: input.status ?? 'pending',
         supplier: input.supplier,
         cavityCount: input.cavityCount,
         owner: input.owner,
-        milestones: input.milestones ?? [
-          { key: 'drawingRelease', status: 'not-started' },
-          { key: 'dfm', status: 'not-started' },
-          { key: 'quotation', status: 'not-started' },
-          { key: 'kickoff', status: 'not-started' },
-          { key: 't1', status: 'not-started' },
-        ],
+        leadTimeDays: input.leadTimeDays,
+        milestones: input.milestones ?? clone(DEFAULT_TOOLING_MILESTONES),
         updatedAt: now(),
       };
       workspace = { ...workspace, toolingRecords: [...workspace.toolingRecords, tooling] };
@@ -835,11 +878,21 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
 
     updateToolingRecord(toolingId, updates, actor) {
       requireCorePermission(actor, Permission.MANAGE_TOOLING, 'update tooling records');
+      validateToolingRecordUpdates(updates);
       const existing = workspace.toolingRecords.find((tooling) => tooling.id === toolingId);
       if (!existing) {
         throw new CoreRepositoryError('NOT_FOUND', 'Tooling record was not found.', { toolingId });
       }
-      const updated = { ...existing, ...updates, id: existing.id, updatedAt: now() };
+      const typeChanged = updates.type !== undefined && updates.type !== existing.type;
+      const updated = {
+        ...existing,
+        ...updates,
+        id: existing.id,
+        toolingNumber: typeChanged
+          ? allocateToolingNumber(workspace.toolingRecords.filter((tooling) => tooling.id !== toolingId), updates.type!)
+          : existing.toolingNumber,
+        updatedAt: now(),
+      };
       workspace = {
         ...workspace,
         toolingRecords: workspace.toolingRecords.map((tooling) => tooling.id === toolingId ? updated : tooling),
@@ -994,7 +1047,14 @@ export function createCoreRepository(storage: CoreStorage = createLocalStorageCo
         ],
         toolingRecords: [
           ...workspace.toolingRecords.filter((item) => item.projectId !== activeProjectId),
-          ...tooling.map((item) => ({ ...item, projectId: activeProjectId, updatedAt: now() })),
+          ...tooling.map((item, index, all) => normalizeToolingRecord({
+            ...item,
+            projectId: activeProjectId,
+            toolingNumber: item.toolingNumber || allocateToolingNumber(all.slice(0, index), item.type ?? 'injection-mold'),
+            type: item.type ?? 'injection-mold',
+            status: item.status ?? 'pending',
+            updatedAt: now(),
+          }, workspace.toolingRecords)),
         ],
       };
       recordAudit(createAuditEvent('tooling-record', 'bulk-tooling', 'replace-tooling', actor, 'Replaced tooling records from legacy Tooling Hub flow.', 'Tooling Hub'));
