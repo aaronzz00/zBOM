@@ -183,7 +183,7 @@ const toLibraryPart = (part: ApiPart): LibraryPart => ({
   description: part.description ?? part.name,
   category: part.type === 'Part' ? 'Mechanical' : part.type,
   state: toLifecycleState(part.lifecycleState),
-  location: 'API',
+  location: 'Unassigned',
   type: toComponentType(part.type),
   cost: part.cost ?? 0,
   stock: 0,

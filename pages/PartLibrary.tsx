@@ -285,7 +285,8 @@ export const PartLibrary: React.FC = () => {
 
       const matchesCategory = selectedCategory === 'All' || part.category === selectedCategory;
       const matchesLifecycle = selectedLifecycle === 'All' || part.state === selectedLifecycle;
-      const matchesLocation = part.category === 'Software' || selectedLocations.some(loc => part.location.startsWith(loc));
+      const hasAssignedLocation = Boolean(part.location) && part.location !== 'API' && part.location !== 'Unassigned';
+      const matchesLocation = part.category === 'Software' || !hasAssignedLocation || selectedLocations.some(loc => part.location.startsWith(loc));
       const belowMinimum = part.category !== 'Software' && part.stock < part.minStock;
       const matchesStock = stockFilter === 'All' || (stockFilter === 'Below minimum' ? belowMinimum : !belowMinimum);
 
@@ -321,7 +322,7 @@ export const PartLibrary: React.FC = () => {
 
   const getStockStatus = (part: LibraryPart) => {
     if (part.category === 'Software') return <span className="text-slate-400">-</span>;
-    const ratio = part.stock / part.minStock;
+    const ratio = part.minStock > 0 ? part.stock / part.minStock : 1;
     let color = 'bg-emerald-500';
     if (ratio < 0.5) color = 'bg-rose-500';
     else if (ratio < 1) color = 'bg-amber-500';
